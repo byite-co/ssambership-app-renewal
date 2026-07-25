@@ -133,17 +133,19 @@ class MyPageRepository {
     try {
       final List<Map<String, dynamic>> rows = await _client
           .from('cash_ledger')
-          .select('delta_cents, created_at')
+          .select('delta_cents, created_at, reason')
           .eq('user_id', _uid)
           .order('created_at', ascending: false)
           .limit(5);
       for (final Map<String, dynamic> r in rows) {
         final Object? d = r['delta_cents'];
         final int delta = d is int ? d : (d is num ? d.toInt() : 0);
+        final Object? reasonRaw = r['reason'];
         recent.add(CashEntry(
           deltaCents: delta,
           createdAt: DateTime.tryParse('${r['created_at']}')?.toLocal() ??
               DateTime.fromMillisecondsSinceEpoch(0),
+          reason: reasonRaw is String ? reasonRaw : null,
         ));
       }
     } catch (_) {

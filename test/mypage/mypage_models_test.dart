@@ -27,9 +27,12 @@ void main() {
   });
 
   group('CashEntry', () {
-    test('kindLabel: 증가→충전, 감소→사용 (영문 reason 코드 비노출)', () {
-      expect(CashEntry(deltaCents: 100, createdAt: _t).kindLabel, '충전');
-      expect(CashEntry(deltaCents: -100, createdAt: _t).kindLabel, '사용');
+    test('kindLabel: reason exact 매핑 정본 — 부호 추론 폐기(세션1 §5)', () {
+      expect(
+          CashEntry(deltaCents: 100, createdAt: _t, reason: 'cash_topup')
+              .kindLabel,
+          '충전');
+      expect(CashEntry(deltaCents: -100, createdAt: _t).kindLabel, '기타 내역');
     });
   });
 

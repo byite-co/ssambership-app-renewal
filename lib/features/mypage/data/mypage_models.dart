@@ -108,17 +108,36 @@ class CashSummary {
   bool get hasBalance => balanceCents != null;
 }
 
-/// 캐시 내역 한 줄(조회). reason 등 영문 코드는 노출하지 않고 증감 부호로만 유형 표기.
+/// cash_ledger.reason 정본 4종 → 한글 라벨 (세션1 §5).
+/// ★ exact 매핑만 허용 — contains/접두사/부분 문자열/부호 추론 금지.
+///   (구 동작은 부호로 라벨을 추론해 '개별질문 환불'(+delta)이 '충전'으로 보였다.)
+const Map<String, String> kCashLedgerReasonLabels = <String, String>{
+  'cash_topup': '충전',
+  'subscription_payment': '구독 결제',
+  'individual_question_escrow_hold': '개별질문 안전 결제',
+  'individual_question_refund': '개별질문 환불',
+};
+
+/// 미지·null·빈 값 reason 은 크래시 없이 중립 표기(영문 코드 비노출).
+String cashLedgerReasonLabel(String? reason) =>
+    kCashLedgerReasonLabels[reason] ?? '기타 내역';
+
+/// 캐시 내역 한 줄(조회). 라벨은 reason exact 매핑, 금액 부호·색은 실제
+/// delta 가 정본 — 라벨과 부호를 서로 추론하지 않는다.
 class CashEntry {
-  const CashEntry({required this.deltaCents, required this.createdAt});
+  const CashEntry(
+      {required this.deltaCents, required this.createdAt, this.reason});
 
   final int deltaCents;
   final DateTime createdAt;
 
+  /// cash_ledger.reason 원문 코드(표시엔 kindLabel 만 사용).
+  final String? reason;
+
   bool get isCredit => deltaCents >= 0;
 
-  /// 유형 한글(코드 비노출): 충전/적립 vs 사용/차감.
-  String get kindLabel => isCredit ? '충전' : '사용';
+  /// 유형 한글: 정본 4종 exact → 그 외 '기타 내역'.
+  String get kindLabel => cashLedgerReasonLabel(reason);
 }
 
 /// 멘토 대시보드 요약(조회만). 정산 출금은 웹에서.
