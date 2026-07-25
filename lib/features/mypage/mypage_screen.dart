@@ -19,6 +19,7 @@ import 'ui/sections/settings_section.dart';
 import 'ui/sections/student_subscription_section.dart';
 import 'ui/sections/support_section.dart';
 import '../../shared/errors/friendly_error.dart';
+import '../../shared/widgets/withdrawal_pending_banner.dart';
 
 /// 마이페이지(보강) — 조회 중심 대시보드. role(student/mentor)별로 내용이 다르다.
 /// ★ Commerce-Zero: 결제·충전·정산 출금은 앱에서 실행하지 않고 '웹'으로만 연결한다.
@@ -216,6 +217,20 @@ class _MyPageScreenState extends State<MyPageScreen>
   }
 
   Widget _body(MyPageData data) {
+    // §5-1: 탈퇴 예약 상시 배너(홈 셸과 같은 공통 위젯·공통 상태 소스).
+    // ★ ListView 안에 두지 않는다 — SliverList 는 높이 0 인 선두 child 를
+    //   수거해버려서, 배너가 '미노출' 상태로 시작하면 element 가 사라지고
+    //   나중에 서버 상태가 도착해도 다시 뜨지 않는다(실측). 스크롤 바깥에 두면
+    //   상태가 바뀌는 즉시 나타난다. 미노출일 땐 높이 0 이라 레이아웃 영향 없음.
+    return Column(
+      children: <Widget>[
+        const WithdrawalPendingBanner(),
+        Expanded(child: _sections(data)),
+      ],
+    );
+  }
+
+  Widget _sections(MyPageData data) {
     final bool signedIn = AuthService.instance.isSignedIn;
     return ListView(
       padding:

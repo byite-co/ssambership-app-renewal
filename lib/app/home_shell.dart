@@ -10,6 +10,7 @@ import '../features/mypage/mypage_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
 
@@ -120,7 +121,14 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: _pages),
+      // §5-1: 탈퇴 예약 상시 배너 — 어느 탭에 있어도 보이도록 셸 레벨에 둔다.
+      // 노출·취소버튼 판정은 전부 서버 정본(DeletionNoticeController).
+      body: Column(
+        children: <Widget>[
+          const WithdrawalPendingBanner(),
+          Expanded(child: IndexedStack(index: _index, children: _pages)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _onSelect,
