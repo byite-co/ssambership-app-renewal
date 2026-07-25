@@ -24,7 +24,8 @@ SubscriptionStatusDisplay subscriptionStatusDisplay(
     case 'past_due':
       return const SubscriptionStatusDisplay('결제 확인 필요', StatusTone.danger);
     case 'expired':
-      return const SubscriptionStatusDisplay('만료됨 · 재구독 가능', StatusTone.neutral);
+      return const SubscriptionStatusDisplay(
+          '만료됨 · 재구독 가능', StatusTone.neutral);
     case 'canceled':
     case 'cancelled':
       return const SubscriptionStatusDisplay('해지됨', StatusTone.neutral);

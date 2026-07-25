@@ -1,9 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'subscription_status.dart';
+
 /// 멘토별 구독 요약(읽기 전용). ★ S2 구독 레이어 — 질문방 레포가 아니다.
 ///
 /// 질문방 화면의 '잔여/다음 갱신일'은 질문방 데이터가 아니라 구독에서 가져온다.
-/// - isActive: subscriptions.status == 'active'
+/// - isActive: [SubscriptionStatuses.entitled] (active·cancel_scheduled)
 /// - nextRenewal: current_period_end (없으면 next_billing_at)
 /// - remaining: 주간 문항 수가 미확정(plan_constants 값 비움 + DB에 잔여 컬럼 없음)이라
 ///   현재는 null(미정). 확정되면 채운다. 게이팅은 isActive 로 한다(미정이면 활성=가능).
@@ -18,6 +20,9 @@ class SubscriptionSummary {
   });
 
   final String mentorId;
+
+  /// 구독 자격 보유 여부. ★ 'active 상태'가 아니라 **자격 집합** 판정이다 —
+  /// 해지 예약(cancel_scheduled)도 잔여 기간이 살아 있어 true 다.
   final bool isActive;
 
   /// 원본 상태값(active/past_due/canceled/expired/pending/refunded/cancel_scheduled).
@@ -35,8 +40,9 @@ class SubscriptionSummary {
 class SubscriptionReader {
   SubscriptionReader._();
 
-  /// 학생의 모든 구독을 멘토별로 요약. 같은 멘토에 여러 건이면 active 우선,
-  /// 그다음 갱신일이 늦은 것을 택한다.
+  /// 학생의 모든 구독을 멘토별로 요약. 같은 멘토에 여러 건이면
+  /// active → cancel_scheduled → 그 외 순으로 우선하고, 같은 순위면
+  /// 갱신일이 늦은 것을 택한다.
   static Future<Map<String, SubscriptionSummary>> fetchForStudent(
     SupabaseClient client,
     String studentId,
@@ -53,7 +59,7 @@ class SubscriptionReader {
       final String? mentorId = r['mentor_id'] as String?;
       if (mentorId == null) continue;
       final String? statusRaw = (r['status'] as String?)?.trim();
-      final bool isActive = statusRaw == 'active';
+      final bool isActive = SubscriptionStatuses.isEntitled(statusRaw);
       final SubscriptionSummary s = SubscriptionSummary(
         mentorId: mentorId,
         isActive: isActive,
@@ -72,11 +78,13 @@ class SubscriptionReader {
   }
 
   static bool _isBetter(SubscriptionSummary a, SubscriptionSummary b) {
-    if (a.isActive != b.isActive) return a.isActive; // active 우선
-    final DateTime ar =
-        a.nextRenewal ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final DateTime br =
-        b.nextRenewal ?? DateTime.fromMillisecondsSinceEpoch(0);
+    // active 우선 · cancel_scheduled 차순(둘 다 자격이지만 active 가 낫다) ·
+    // 나머지는 종전대로 갱신일이 늦은 것.
+    final int aRank = SubscriptionStatuses.rank(a.status);
+    final int bRank = SubscriptionStatuses.rank(b.status);
+    if (aRank != bRank) return aRank > bRank;
+    final DateTime ar = a.nextRenewal ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final DateTime br = b.nextRenewal ?? DateTime.fromMillisecondsSinceEpoch(0);
     return ar.isAfter(br); // 갱신일 늦은 것
   }
 
