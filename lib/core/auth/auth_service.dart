@@ -9,6 +9,7 @@ import '../push/push_service.dart';
 import '../supabase/supabase_client.dart';
 import '../web_bridge/web_session_hygiene.dart';
 import 'account_status.dart';
+import 'deletion_notice_controller.dart';
 
 /// 사용자 역할. 화면에는 영문 코드 대신 의미에 맞는 한글 UI를 쓴다.
 enum AppRole { student, mentor, admin, guest }
@@ -290,6 +291,9 @@ class AuthService extends ChangeNotifier {
     final SupabaseClient? client = _client;
     _guest = false;
     DeepLinkService.instance.onSignedOut(); // 이전 사용자 대기 딥링크 폐기.
+    // 이전 사용자의 탈퇴 예약 배너 상태 폐기 — 다음 로그인 사용자에게 새지 않게.
+    // (배너 정본은 서버 self RPC 라, 비운 뒤 다음 진입에서 다시 조회한다.)
+    DeletionNoticeController.instance.clear();
     // 로그아웃 '전' WebView 쿠키/세션 정리 — 다음 사용자가 재사용하지 못하게.
     await WebSessionHygiene.clear();
     await performSignOut(
