@@ -128,9 +128,33 @@ class IqAttachmentRegistration {
 /// - 그 외/파싱 실패 → [kIqRegisterResultUnreadable] AppError(사용자 문구 불변).
 ///   이 오류는 PostgrestException 이 아니므로 코어의 **모호 결과** 경로를 타
 ///   SELECT 선행 확인으로 수렴한다(재호출 0).
+///
+/// ★ v22 fail-closed 강화(신규 계약 경로에만 적용): 168 은 성공 payload 에
+///   `question_id`·`storage_path` 를 **항상** 채워 보낸다. 따라서
+///   - `question_id` 누락·비문자·[expectedQuestionId] 불일치 → 거부.
+///     (누락 자체가 계약 위반 신호다 — 응답 뒤바뀜·오라우팅을 침묵으로 덮지
+///     않는다.)
+///   - `storage_path` 누락·비문자·공백 → 거부. **[requestedPath] 폴백을 두지
+///     않는다** — 서버 정규화 경로가 정본인데 앱 추정값을 정본으로 승격하면
+///     경로 불일치가 신호 없이 묻힌다.
+///   - `storage_path` 의 첫 세그먼트 ≠ [expectedQuestionId] → 거부
+///     (`question_id=q-1` 인데 `storage_path=q-2/...` 인 자기모순 응답 차단).
+///   [requestedPath] 와의 **완전 일치는 요구하지 않는다** — 서버가 경로를
+///   정규화할 여지를 남긴다(현행 168 은 btrim 만 한다).
+///   근거: 168 은 서버에서 이미 `split_part(v_path,'/',1) <> p_question_id`
+///   를 강제한다. 즉 이 검사는 정상 계약을 깨지 않는 **순수 이중 방어**이고
+///   정상 응답은 언제나 통과한다.
+///   거부는 전부 기존 [kIqRegisterResultUnreadable] — 새 에러 코드·새 사용자
+///   문구를 만들지 않는다. AppError 는 PostgrestException 이 아니므로 코어의
+///   모호 결과 경로를 타 SELECT 선행 확인으로 수렴한다(자동삭제 0·재호출 0).
+///
+/// 레거시(String) 분기는 이 강화의 대상이 아니다 — 168 미적용 배포에는
+/// `question_id` 가 애초에 없다. 이중 형태 리더의 전환기 안전성이 그 분기에
+/// 걸려 있으므로 종전 동작을 그대로 둔다.
 IqAttachmentRegistration parseIqAttachmentRegistration(
   Object? result, {
   required String requestedPath,
+  required String expectedQuestionId,
 }) {
   // 레거시 계약: 반환형이 등록 행 uuid 문자열.
   if (result is String) {
@@ -151,13 +175,27 @@ IqAttachmentRegistration parseIqAttachmentRegistration(
     if (id is! String || id.trim().isEmpty) {
       throw const AppError(kIqRegisterResultUnreadable);
     }
+    final String expectedId = expectedQuestionId.trim();
+    // question_id: 168 이 항상 채우므로 누락도 이상 신호 — 정확 일치만 통과.
+    final Object? questionId = result['question_id'];
+    if (questionId is! String || questionId.trim() != expectedId) {
+      throw const AppError(kIqRegisterResultUnreadable);
+    }
+    // storage_path: 서버 값이 유일한 정본 — requestedPath 폴백 없음.
     final Object? path = result['storage_path'];
+    if (path is! String || path.trim().isEmpty) {
+      throw const AppError(kIqRegisterResultUnreadable);
+    }
+    final String serverPath = path.trim();
+    // 자기모순 차단: question_id 는 맞는데 경로가 다른 질문을 가리키는 응답.
+    if (serverPath.split('/').first != expectedId) {
+      throw const AppError(kIqRegisterResultUnreadable);
+    }
     final Object? status = result['status'];
     return IqAttachmentRegistration(
       attachmentId: id.trim(),
-      // 서버 정규화 경로가 정본. 값이 없을 때만 앱 경로로 폴백한다.
-      storagePath:
-          (path is String && path.trim().isNotEmpty) ? path : requestedPath,
+      // 서버 정규화 경로가 정본(앱 경로 폴백 금지 — 위 주석 참조).
+      storagePath: serverPath,
       idempotentContract: true,
       idempotentHit: result['idempotent_hit'] == true,
       status: status is String ? status.trim() : null,
