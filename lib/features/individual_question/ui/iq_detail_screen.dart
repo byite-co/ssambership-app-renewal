@@ -584,6 +584,14 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         p.retryObjectPath = f.retryObjectPath;
         p.error = f.message;
       });
+    } on IqAttachmentAmbiguousResult catch (a) {
+      if (!mounted) return;
+      setState(() {
+        // AMBIGUOUS_SERVER_RESULT — 자동삭제 0·성공 표시 0·임시 삽입 0.
+        // 재시도는 같은 경로로 SELECT 선행 수렴을 다시 밟는다(RPC 선행 금지).
+        p.retryObjectPath = a.retryObjectPath;
+        p.error = a.message;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => p.error = friendlyError(e));

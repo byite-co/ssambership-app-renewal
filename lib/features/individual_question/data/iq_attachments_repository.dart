@@ -93,6 +93,35 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
       },
       removeObject: (String path) =>
           client.storage.from(bucket).remove(<String>[path]),
+      // 보정1: 등록 정본 확인 — 당사자 SELECT(iqa_select_party).
+      findRegistered: (String path) =>
+          _findRegistered(client, questionId, path),
+      // 서버가 '응답으로' 거부한 경우만 미등록 확정(PostgrestException).
+      // 그 외(타임아웃·연결 끊김·파싱 실패 등)는 전부 모호 결과로 취급.
+      isDefiniteRegisterFailure: (Object e) => e is PostgrestException,
+    );
+  }
+
+  /// 동일 question_id + storage_path 행 SELECT(당사자 RLS) — 0건이면 null,
+  /// SELECT 자체 실패는 그대로 throw(코어가 AMBIGUOUS 로 수렴).
+  Future<IqAttachment?> _findRegistered(
+      SupabaseClient client, String questionId, String path) async {
+    final List<dynamic> rows = await client
+        .from('individual_question_attachments')
+        .select('id, storage_path, message_id, file_name, mime_type')
+        .eq('question_id', questionId)
+        .eq('storage_path', path)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    final Map<String, dynamic> r = (rows.first as Map).cast<String, dynamic>();
+    final Object? id = r['id'];
+    if (id is! String) return null; // 식별 불가 행은 정본으로 쓰지 않는다.
+    return IqAttachment(
+      id: id,
+      storagePath: (r['storage_path'] as String?) ?? path,
+      messageId: r['message_id'] as String?,
+      fileName: r['file_name'] as String?,
+      mimeType: r['mime_type'] as String?,
     );
   }
 
