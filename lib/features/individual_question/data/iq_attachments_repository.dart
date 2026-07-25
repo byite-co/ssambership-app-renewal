@@ -75,8 +75,10 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
             fileOptions: FileOptions(contentType: file.mimeType, upsert: false),
           ),
       // 행 등록은 RPC 만(테이블 INSERT 정책 없음 — SELECT-only 규약).
+      // ★ 시그니처는 불변, 반환형만 uuid → jsonb 로 바뀐다(SQL 168). 앱은
+      //   적용 시점을 모른 채 **응답 형태로만** 분기한다(이중 형태 리더).
       register: (String path, PickedImage file, String? msgId) async {
-        final dynamic id = await client.rpc<dynamic>(
+        final dynamic result = await client.rpc<dynamic>(
           'add_individual_question_attachment',
           params: <String, dynamic>{
             'p_question_id': questionId,
@@ -86,21 +88,34 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
             if (msgId != null) 'p_message_id': msgId,
           },
         );
-        if (id is! String) {
-          throw const AppError('첨부 등록 결과를 확인하지 못했어요.');
-        }
-        return id;
+        return parseIqAttachmentRegistration(result, requestedPath: path);
       },
       removeObject: (String path) =>
           client.storage.from(bucket).remove(<String>[path]),
       // 보정1: 등록 정본 확인 — 당사자 SELECT(iqa_select_party).
       findRegistered: (String path) =>
           _findRegistered(client, questionId, path),
-      // 서버가 '응답으로' 거부한 경우만 미등록 확정(PostgrestException).
-      // 그 외(타임아웃·연결 끊김·파싱 실패 등)는 전부 모호 결과로 취급.
-      isDefiniteRegisterFailure: (Object e) => e is PostgrestException,
+      isDefiniteRegisterFailure: isDefiniteRegisterFailure,
+      isRetriableRegisterConflict: isRetriableRegisterConflict,
     );
   }
+
+  /// REGISTER_CONFLICT_UNRESOLVED(SQL 168) — 유일한 등록 RPC 재호출 사유.
+  static const String registerConflictCode = '40001';
+
+  /// 서버가 '응답으로' 거부한 경우만 미등록 확정(PostgrestException).
+  /// 그 외(타임아웃·연결 끊김·파싱 실패 등)는 전부 모호 결과로 취급한다.
+  ///
+  /// ★ 168 의 `42P10` 은 167(on conflict 대상 인덱스) 미적용 배포 사고 신호다.
+  ///   인덱스가 없어 INSERT 문 자체가 실패한 것이므로 행이 생성되지 않았음이
+  ///   확정 — 여기서 확정 실패로 분류되는 것이 **정상**이다. 재시도도,
+  ///   레거시 RPC 폴백도 하지 않는다(폴백하면 배포 순서 사고를 은폐한다).
+  static bool isDefiniteRegisterFailure(Object e) => e is PostgrestException;
+
+  /// 경합이 풀리지 않은 등록(`40001`)만 1회 재호출 — 모호 결과가 아니라
+  /// 응답이 도착한 명시 오류이며, 그 도착 자체가 168 적용을 증명한다.
+  static bool isRetriableRegisterConflict(Object e) =>
+      e is PostgrestException && e.code == registerConflictCode;
 
   /// 동일 question_id + storage_path 행 SELECT(당사자 RLS).
   /// v19 보정3: null 은 '실제 0건(미등록 확정)'일 때만. 행이 존재하는데
