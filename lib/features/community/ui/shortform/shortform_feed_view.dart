@@ -38,10 +38,11 @@ class ShortformFeedView extends StatefulWidget {
   static AppRole _defaultRoleOf() => AuthService.instance.currentRole;
 
   @override
-  State<ShortformFeedView> createState() => _ShortformFeedViewState();
+  State<ShortformFeedView> createState() => ShortformFeedViewState();
 }
 
-class _ShortformFeedViewState extends State<ShortformFeedView> {
+/// 상태를 공개해 바깥(커뮤니티 화면)에서 앱 복귀 시 [reload] 로 재조회한다.
+class ShortformFeedViewState extends State<ShortformFeedView> {
   static const int _pageSize = 20;
 
   final ScrollController _scroll = ScrollController();
@@ -71,6 +72,10 @@ class _ShortformFeedViewState extends State<ShortformFeedView> {
       _pager.loadMore();
     }
   }
+
+  /// 첫 페이지부터 다시 로드(앱 복귀·PTR·상세 변경 복귀 공용).
+  /// 세대 토큰이 있는 paginator.refresh 라 늦은 응답이 최신 목록을 덮지 않는다.
+  Future<void> reload() => _pager.refresh();
 
   @override
   Widget build(BuildContext context) {
@@ -112,20 +117,26 @@ class _ShortformFeedViewState extends State<ShortformFeedView> {
               message: '멘토들의 숏폼이 올라오면 여기에 표시돼요.',
             );
     }
-    final Widget list = ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, 8, AppSpacing.screenH, 88),
-      itemCount: posts.length + (_pager.hasMore ? 1 : 0),
-      itemBuilder: (BuildContext context, int i) {
-        if (i >= posts.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return ShortformCard(post: posts[i], onOpen: () => _open(posts[i]));
-      },
+    // §4: 외부(웹·관리자 숨김·복구) 변경 반영용 pull-to-refresh — 세대 토큰이 있는
+    // paginator.refresh 라 늦은 응답이 최신 목록을 덮지 않는다(board 탭과 동일).
+    final Widget list = RefreshIndicator(
+      onRefresh: () => _pager.refresh(),
+      child: ListView.builder(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenH, 8, AppSpacing.screenH, 88),
+        itemCount: posts.length + (_pager.hasMore ? 1 : 0),
+        itemBuilder: (BuildContext context, int i) {
+          if (i >= posts.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return ShortformCard(post: posts[i], onOpen: () => _open(posts[i]));
+        },
+      ),
     );
     if (!canCompose) return list;
     return Column(
@@ -165,8 +176,10 @@ class _ShortformFeedViewState extends State<ShortformFeedView> {
   }
 
   Future<void> _open(ShortformPost post) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    // §4-3: 상세에서 변경(작성자 차단 등, pop true)이 있었을 때만 재조회 —
+    // 차단한 작성자의 숏폼이 목록에 남아 있으면 안 된다(board 탭과 동일 계약).
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => ShortformDetailScreen(
           post: post,
           read: widget.read,
@@ -174,5 +187,6 @@ class _ShortformFeedViewState extends State<ShortformFeedView> {
         ),
       ),
     );
+    if (changed == true && mounted) await _pager.refresh();
   }
 }

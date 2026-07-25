@@ -37,6 +37,10 @@ class _CommunityScreenState extends State<CommunityScreen>
   late final TabController _tab;
   final GlobalKey<BoardListViewState> _boardKey =
       GlobalKey<BoardListViewState>();
+  final GlobalKey<ShortformFeedViewState> _shortformKey =
+      GlobalKey<ShortformFeedViewState>();
+  final GlobalKey<MyActivityViewState> _activityKey =
+      GlobalKey<MyActivityViewState>();
 
   @override
   void initState() {
@@ -54,7 +58,11 @@ class _CommunityScreenState extends State<CommunityScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // 세대 토큰이 있는 paginator.refresh 라 무한 새로고침·stale 덮어쓰기 없음.
+      // §4-3: 관리자 숨김·복구는 board 만의 일이 아니다 — 3개 탭을 모두 재조회한다
+      // (살아 있는 탭만 반응: currentState 가 null 이면 다음 진입 시 어차피 fresh).
       _boardKey.currentState?.reload();
+      _shortformKey.currentState?.reload();
+      _activityKey.currentState?.reload();
     }
   }
 
@@ -104,10 +112,12 @@ class _CommunityScreenState extends State<CommunityScreen>
             child: TabBarView(
               controller: _tab,
               children: <Widget>[
-                ShortformFeedView(read: widget.read, write: widget.write),
+                ShortformFeedView(
+                    key: _shortformKey, read: widget.read, write: widget.write),
                 BoardListView(
                     key: _boardKey, read: widget.read, write: widget.write),
-                MyActivityView(read: widget.read, write: widget.write),
+                MyActivityView(
+                    key: _activityKey, read: widget.read, write: widget.write),
               ],
             ),
           ),
