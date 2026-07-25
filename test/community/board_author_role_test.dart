@@ -280,6 +280,64 @@ void main() {
       expect(m.returnedPostId, isNull);
     });
 
+    group('v19 보정2 — DELETE representation 검증(0행≠성공)', () {
+      test('정확히 1행 + 요청 id 일치 → 통과(postDeleted=true 의 유일 조건)', () {
+        expect(
+            () => verifyCompensationDeleteReturn(<dynamic>[
+                  <String, dynamic>{'id': 'post-9'}
+                ], 'post-9'),
+            returnsNormally);
+      });
+
+      test('0행 반환 → throw (조건 불일치·RLS 비가시성·기삭제 = 미확정)', () {
+        expect(() => verifyCompensationDeleteReturn(<dynamic>[], 'post-9'),
+            throwsStateError);
+      });
+
+      test('반환 ID 불일치 → throw', () {
+        expect(
+            () => verifyCompensationDeleteReturn(<dynamic>[
+                  <String, dynamic>{'id': 'other'}
+                ], 'post-9'),
+            throwsStateError);
+      });
+
+      test('복수 행 → throw', () {
+        expect(
+            () => verifyCompensationDeleteReturn(<dynamic>[
+                  <String, dynamic>{'id': 'post-9'},
+                  <String, dynamic>{'id': 'post-9'},
+                ], 'post-9'),
+            throwsStateError);
+      });
+
+      test('비정상 shape(맵 아님) → throw', () {
+        expect(
+            () => verifyCompensationDeleteReturn(<dynamic>['post-9'], 'post-9'),
+            throwsStateError);
+      });
+
+      test('검증 throw 는 게이트에서 postDeleted=false 로 수렴(성공 승격 0)', () async {
+        // deleteError 경로와 동일 계약 — 기존 '삭제 실패' 테스트가 고정.
+        final _Harness h = _Harness(
+          rows: <Map<String, dynamic>>[_row()],
+          returned: <String, dynamic>{
+            'id': 'post-9',
+            'author_id': _uid,
+            'author_role': 'mentor',
+          },
+          deleteError: StateError('COMPENSATION_DELETE_NO_ROW'),
+        );
+        Object? caught;
+        try {
+          await h.run();
+        } catch (e) {
+          caught = e;
+        }
+        expect((caught! as BoardCanonicalizationMismatch).postDeleted, isFalse);
+      });
+    });
+
     test('불일치 예외는 AppError 하위(한글 메시지·성공 승격 불가)', () {
       const BoardCanonicalizationMismatch m = BoardCanonicalizationMismatch(
         '메시지',

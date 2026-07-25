@@ -199,11 +199,15 @@ class CommunityWriteRepository {
       deleteOwnPostForCompensation: (String postId) async {
         final String? uid = client.auth.currentUser?.id;
         if (uid == null) throw const AppError('로그인이 필요해요.');
-        await client
+        // v19 보정2: representation 을 요청해 실제 삭제 행을 확인한다 —
+        // 0행(조건 불일치·RLS 비가시성·기삭제)은 성공이 아니다.
+        final List<dynamic> deleted = await client
             .from('community_posts')
             .delete()
             .eq('id', postId)
-            .eq('author_id', uid);
+            .eq('author_id', uid)
+            .select('id');
+        verifyCompensationDeleteReturn(deleted, postId);
       },
     );
   }

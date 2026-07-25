@@ -112,6 +112,27 @@ String? boardPostReturnMismatch({
 /// repository API 로 노출하지 않고, 반환 정본 불일치 보상 흐름에서만 호출한다.
 typedef BoardPostCompensator = Future<void> Function(String postId);
 
+/// v19 보정2: DELETE representation 검증 — 영향 행을 확인하지 않은 void 완료를
+/// 삭제 성공으로 간주하지 않는다. '정확히 1행 + 반환 id == 요청 postId' 만
+/// 삭제 확인으로 인정하고, 0행·복수 행·비정상 shape·다른 ID 는 전부 throw
+/// (게이트가 postDeleted=false 로 구조화). 권한 우회·admin 추정 없음.
+void verifyCompensationDeleteReturn(List<dynamic> rows, String postId) {
+  if (rows.isEmpty) {
+    // 조건 불일치·RLS 비가시성·이미 삭제됨 — 삭제 미확정.
+    throw StateError('COMPENSATION_DELETE_NO_ROW');
+  }
+  if (rows.length != 1) {
+    throw StateError('COMPENSATION_DELETE_MULTI_ROW');
+  }
+  final Object? first = rows.first;
+  if (first is! Map) {
+    throw StateError('COMPENSATION_DELETE_BAD_SHAPE');
+  }
+  if (first['id'] != postId) {
+    throw StateError('COMPENSATION_DELETE_ID_MISMATCH');
+  }
+}
+
 /// SERVER_CANONICALIZATION_MISMATCH — INSERT 반환 정본 불일치.
 /// 성공 처리·로컬 성공 삽입 금지. 보상 결과를 케이스별로 구조화한다.
 /// (앱 게시판 작성은 텍스트 전용 — 이번 요청의 신규 첨부 집합은 항상 비어
