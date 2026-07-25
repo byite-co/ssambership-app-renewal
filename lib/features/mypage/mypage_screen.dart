@@ -48,30 +48,50 @@ class MyPageScreen extends StatefulWidget {
   State<MyPageScreen> createState() => _MyPageScreenState();
 }
 
-class _MyPageScreenState extends State<MyPageScreen> {
+class _MyPageScreenState extends State<MyPageScreen>
+    with WidgetsBindingObserver {
   final MyPageRepository _repo = const MyPageRepository();
-  late Future<MyPageData> _future;
+
+  /// v19 보정1: 마지막 '정상 완료' MyPageData 스냅샷 — 이후 재조회가 어떤
+  /// 원인(지갑 신호·resume·수동 재시도)으로 실패하든 이 화면을 지우지 않는다.
+  MyPageData? _lastGoodData;
+
+  /// 지갑 '확정값'(balanceCents != null)까지 확인된 마지막 캐시 스냅샷.
+  CashSummary? _lastGoodCash;
+
+  /// 지갑 변경 신호 후 아직 확정 재조회 성공을 확인하지 못한 상태(stale 표지).
+  bool _walletSyncPending = false;
+
+  bool _loading = true;
+
+  /// 직전 재조회가 Future.error 로 실패했는가(마지막 정상 화면 위 배너 표지).
+  bool _loadFailed = false;
+  Object? _lastError;
+
+  /// 늦게 도착한 이전 재조회 응답 폐기용 세대 토큰.
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _future = (widget.loaderOverride ?? _repo.load)();
+    _reload();
     // §4: 지갑 변경 신호(IQ 예치·환불·정산 등) 수신 → 잔액·최근 내역 재조회.
-    // Future 교체 + FutureBuilder 라 늦은 이전 응답이 최신 상태를 덮지 않는다.
     DataRefreshBus.walletGeneration.addListener(_onWalletChanged);
+    // v19: 앱 복귀(resumed)도 일반 재조회 경로 — 실패해도 화면 보존 계약 동일.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reload();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     DataRefreshBus.walletGeneration.removeListener(_onWalletChanged);
     super.dispose();
   }
-
-  /// 보정3: 지갑 변경 신호 이후의 마지막 정상 캐시 스냅샷(보존 표시용).
-  CashSummary? _lastGoodCash;
-
-  /// 지갑 변경 신호를 받았고 아직 최신 재조회 성공을 확인하지 못한 상태.
-  bool _walletSyncPending = false;
 
   void _onWalletChanged() {
     if (!mounted) return; // dispose 후 상태 변경 금지.
@@ -79,35 +99,53 @@ class _MyPageScreenState extends State<MyPageScreen> {
     _reload();
   }
 
-  /// 캐시 섹션 결정(세션1.5 보정3):
-  /// - 최신 잔액 확인 → 그대로 표시(마지막 정상값 갱신).
-  /// - 지갑 변경 후 재조회 실패(잔액 미확인) → 마지막 정상값을 **삭제하지 않고**
-  ///   '최신 정보 아님' + 재시도로 표시(이전 금액을 최신 확정값처럼 표시 금지).
-  /// - 그 외(변경 신호 없는 실패)는 기존 '-' 동작 유지.
+  /// v19 보정1: 상태 갱신은 전부 loader 완료 지점(then/catchError)에서만 —
+  /// build/렌더링 경로는 주어진 상태를 그리기만 한다(숨은 상태 변경 0).
+  void _reload() {
+    if (!mounted) return;
+    final int gen = ++_loadGeneration;
+    final Future<MyPageData> next = (widget.loaderOverride ?? _repo.load)();
+    setState(() {
+      _loading = true;
+    });
+    next.then((MyPageData data) {
+      if (!mounted || gen != _loadGeneration) return; // 늦은 이전 응답 폐기
+      setState(() {
+        _loading = false;
+        _loadFailed = false;
+        _lastError = null;
+        _lastGoodData = data; // loader 정상 완료 = 정상 스냅샷 갱신
+        final CashSummary? cash = data.cash;
+        if (cash != null && cash.balanceCents != null) {
+          // 지갑 확정값 확인 시에만 stale 해제·정상 지갑 스냅샷 갱신.
+          _lastGoodCash = cash;
+          _walletSyncPending = false;
+        }
+        // cash == null / balanceCents == null 이면 확정 불가 — pending 유지.
+      });
+    }).catchError((Object e) {
+      if (!mounted || gen != _loadGeneration) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true; // 마지막 정상 스냅샷은 삭제하지 않는다.
+        _lastError = e;
+      });
+    });
+  }
+
+  /// 캐시 섹션 렌더(순수 — 상태 변경 없음):
+  /// - 지갑 변경 후 확정 실패(로드 실패·cash null·balance null) → 마지막 정상
+  ///   지갑을 stale 로 보존 표시(이전 금액을 최신 확정값처럼 표시 금지).
+  /// - 그 외엔 최신 데이터 그대로(변경 신호 없는 '-' 동작 유지).
   List<Widget> _cashSectionFor(MyPageData data) {
-    final CashSummary? fetched = data.cash;
-    if (fetched == null) return const <Widget>[];
-    if (fetched.balanceCents != null) {
-      _lastGoodCash = fetched;
-      _walletSyncPending = false;
-      return <Widget>[CashSection(cash: fetched)];
-    }
     if (_walletSyncPending && _lastGoodCash != null) {
       return <Widget>[
         CashSection(cash: _lastGoodCash!, stale: true, onRetryStale: _reload),
       ];
     }
+    final CashSummary? fetched = data.cash;
+    if (fetched == null) return const <Widget>[];
     return <Widget>[CashSection(cash: fetched)];
-  }
-
-  void _reload() {
-    if (!mounted) return;
-    // ★ 블록 바디: setState(() => _future = future) 는 클로저가 Future 를 반환해
-    //   'setState callback returned a Future' 로 리빌드가 취소된다.
-    final Future<MyPageData> next = (widget.loaderOverride ?? _repo.load)();
-    setState(() {
-      _future = next;
-    });
   }
 
   Future<void> _openProfileEdit(MyProfile profile) async {
@@ -130,27 +168,30 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: FutureBuilder<MyPageData>(
-        future: _future,
-        builder: (BuildContext context, AsyncSnapshot<MyPageData> snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('내 정보를 불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
-            );
-          }
-          return _body(snap.data!);
-        },
-      ),
-    );
+    // v19 보정1: 렌더링은 상태를 그리기만 한다. 마지막 정상 스냅샷이 있으면
+    // 이후 재조회가 Future.error 로 실패해도 전체 오류 화면으로 교체하지 않는다.
+    final MyPageData? good = _lastGoodData;
+    final Widget child;
+    if (good == null) {
+      if (_loading) {
+        child = const Center(child: CircularProgressIndicator());
+      } else {
+        // 초기 진입부터 실패 — 정상 스냅샷이 전혀 없을 때만 전체 오류 화면.
+        final String detail =
+            _lastError == null ? '' : '\n${friendlyError(_lastError!)}';
+        child = Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('내 정보를 불러오지 못했어요.$detail',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: ColorTokens.danger)),
+          ),
+        );
+      }
+    } else {
+      child = _body(good);
+    }
+    return SafeArea(child: child);
   }
 
   Widget _body(MyPageData data) {
@@ -159,6 +200,19 @@ class _MyPageScreenState extends State<MyPageScreen> {
       padding:
           const EdgeInsets.fromLTRB(20, AppSpacing.s16, 20, AppSpacing.s24),
       children: <Widget>[
+        // v19 보정1: 일반 재조회 실패 — 마지막 정상 화면 위 비단정 안내만.
+        if (_loadFailed) ...<Widget>[
+          Text('최신 정보를 불러오지 못했습니다.',
+              style: AppType.caption.copyWith(color: ColorTokens.danger)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _reload,
+              child: const Text('다시 시도'),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         ProfileSection(
           profile: data.profile,
           // 게스트(비로그인)는 수정 불가 — 세션 있을 때만 수정 진입 노출.

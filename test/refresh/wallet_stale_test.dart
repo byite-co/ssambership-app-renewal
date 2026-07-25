@@ -60,7 +60,7 @@ void main() {
     expect(find.text('50,000원'), findsOneWidget);
     expect(find.text('보유 캐시 (최신 정보 아님)'), findsOneWidget);
     expect(find.text('보유 캐시'), findsNothing); // 최신값 표기는 사라져야 한다
-    expect(find.text('환불은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsOneWidget);
+    expect(find.text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsOneWidget);
     final Finder retryInCash = find.descendant(
         of: find.byType(CashSection), matching: find.text('다시 시도'));
     expect(retryInCash, findsOneWidget);
@@ -71,7 +71,141 @@ void main() {
     expect(calls, 3);
     expect(find.text('보유 캐시'), findsOneWidget);
     expect(find.text('보유 캐시 (최신 정보 아님)'), findsNothing);
-    expect(find.text('환불은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsNothing);
+    expect(find.text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsNothing);
+  });
+
+  group('v19 보정1 — 실제 Future.error·cash null·일반 재조회', () {
+    testWidgets('bump 후 loader Future.error → 전체 화면 보존·stale·공통 안내·재시도',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final _SeqLoader loader = _SeqLoader(<Object>[
+        _data(balanceCents: 5000000),
+        StateError('timeout'), // 실제 Future 예외
+        _data(balanceCents: 6000000),
+      ]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
+      await tester.pumpAndSettle();
+      expect(find.text('50,000원'), findsOneWidget);
+
+      DataRefreshBus.bumpWallet();
+      await tester.pumpAndSettle();
+
+      // 전체 오류 화면으로 교체되지 않는다 — 마지막 정상 마이페이지 보존.
+      expect(find.textContaining('내 정보를 불러오지 못했어요'), findsNothing);
+      expect(find.text('50,000원'), findsOneWidget);
+      expect(find.text('보유 캐시 (최신 정보 아님)'), findsOneWidget);
+      // 비단정 공통 안내(원인 추정·환불 단정 없음) + 재시도.
+      expect(find.text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsOneWidget);
+      // 원장 라벨('개별질문 환불')은 정당 — '환불 완료' 단정 문구만 금지.
+      expect(find.textContaining('환불은 완료됐지만'), findsNothing);
+      expect(find.text('최신 정보를 불러오지 못했습니다.'), findsOneWidget);
+
+      // 재시도 성공 → stale 해제·최신 잔액.
+      final Finder retry = find.descendant(
+          of: find.byType(CashSection), matching: find.text('다시 시도'));
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(find.text('60,000원'), findsOneWidget);
+      expect(find.text('보유 캐시 (최신 정보 아님)'), findsNothing);
+    });
+
+    testWidgets('bump 후 data.cash == null → 기존 정상 지갑 보존 + stale',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      const MyPageData noCash = MyPageData(
+        role: AppRole.student,
+        profile: MyProfile(name: '학생', roleLabel: '학생'),
+      );
+      final _SeqLoader loader =
+          _SeqLoader(<Object>[_data(balanceCents: 5000000), noCash]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
+      await tester.pumpAndSettle();
+
+      DataRefreshBus.bumpWallet();
+      await tester.pumpAndSettle();
+      expect(find.text('50,000원'), findsOneWidget); // 보존
+      expect(find.text('보유 캐시 (최신 정보 아님)'), findsOneWidget);
+    });
+
+    testWidgets('stale 재시도 실패 → stale 유지·정상 데이터 삭제 0',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final _SeqLoader loader = _SeqLoader(<Object>[
+        _data(balanceCents: 5000000),
+        StateError('e1'),
+        StateError('e2'), // 재시도도 실패
+      ]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
+      await tester.pumpAndSettle();
+      DataRefreshBus.bumpWallet();
+      await tester.pumpAndSettle();
+
+      final Finder retry = find.descendant(
+          of: find.byType(CashSection), matching: find.text('다시 시도'));
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(find.text('50,000원'), findsOneWidget); // 여전히 보존
+      expect(find.text('보유 캐시 (최신 정보 아님)'), findsOneWidget); // stale 유지
+    });
+
+    testWidgets('일반 재조회(resumed·비지갑) Future.error → 마지막 정상 화면 + 비단정 안내',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final _SeqLoader loader = _SeqLoader(
+          <Object>[_data(balanceCents: 5000000), StateError('offline')]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
+      await tester.pumpAndSettle();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      // 초기 로드 실패(전체 오류)와 구분 — 마지막 정상 화면 보존.
+      expect(find.textContaining('내 정보를 불러오지 못했어요'), findsNothing);
+      expect(find.text('50,000원'), findsOneWidget);
+      expect(find.text('최신 정보를 불러오지 못했습니다.'), findsOneWidget);
+      // 지갑 신호가 아니므로 지갑 stale 문구·환불 문구는 없다.
+      expect(find.text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsNothing);
+      expect(find.textContaining('환불은 완료됐지만'), findsNothing);
+      expect(find.text('보유 캐시'), findsOneWidget);
+      // 재시도 제공(페이지 배너).
+      expect(find.text('다시 시도'), findsWidgets);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    });
+
+    testWidgets('초기 로드부터 Future.error·정상 스냅샷 없음 → 기존 전체 오류 UI',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: MyPageScreen(
+                loaderOverride: () =>
+                    Future<MyPageData>.error(StateError('down')))),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('내 정보를 불러오지 못했어요'), findsOneWidget);
+    });
+
+    testWidgets('build 반복 호출 → 렌더링 경로 상태 변경 0(로더 재호출·상태 전이 없음)',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final _SeqLoader loader =
+          _SeqLoader(<Object>[_data(balanceCents: 5000000)]);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
+      await tester.pumpAndSettle();
+      final int callsAfterFirst = loader.calls;
+      // 강제 리빌드 수차례 — _cashSectionFor 등 렌더 경로는 순수여야 한다.
+      for (int i = 0; i < 3; i++) {
+        await tester.pump();
+      }
+      expect(loader.calls, callsAfterFirst);
+      expect(find.text('50,000원'), findsOneWidget);
+      expect(find.text('보유 캐시 (최신 정보 아님)'), findsNothing);
+    });
   });
 
   testWidgets('변경 신호 없는 초기 실패 → 기존 - 표기 유지(배너 없음·회귀 0)',
@@ -85,7 +219,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('-'), findsOneWidget);
     expect(find.text('보유 캐시'), findsOneWidget);
-    expect(find.text('환불은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsNothing);
+    expect(find.text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.'), findsNothing);
   });
 
   testWidgets('환불 RPC 실패 → 지갑 신호 0(낙관적 변경 없음) + 오류 안내',
@@ -133,5 +267,21 @@ class _FailingRefundRepo extends IndividualQuestionRepository {
   @override
   Future<IqEscrowResult> refund(String questionId) async {
     throw const AppError('환불 처리에 실패했어요.');
+  }
+}
+
+/// v19 보정1 — 실제 Future.error·cash null·일반 재조회 실패·초기 실패 매트릭스.
+class _SeqLoader {
+  _SeqLoader(this.steps);
+
+  /// 각 호출이 소비하는 스텝: MyPageData 또는 Object(에러로 throw).
+  final List<Object> steps;
+  int calls = 0;
+
+  Future<MyPageData> call() {
+    final Object step = steps[calls < steps.length ? calls : steps.length - 1];
+    calls++;
+    if (step is MyPageData) return Future<MyPageData>.value(step);
+    return Future<MyPageData>.error(step);
   }
 }

@@ -35,7 +35,9 @@ class CashSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (stale) ...<Widget>[
-            Text('환불은 완료됐지만 최신 잔액을 불러오지 못했습니다.',
+            // v19: walletGeneration 은 환불 전용 신호가 아니다(예치·정산도 bump)
+            // — 원인을 단정하지 않는 공통 문구만 사용한다.
+            Text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.',
                 style: AppType.caption.copyWith(color: ColorTokens.danger)),
             Align(
               alignment: Alignment.centerLeft,
