@@ -67,9 +67,37 @@ class _MyPageScreenState extends State<MyPageScreen> {
     super.dispose();
   }
 
+  /// 보정3: 지갑 변경 신호 이후의 마지막 정상 캐시 스냅샷(보존 표시용).
+  CashSummary? _lastGoodCash;
+
+  /// 지갑 변경 신호를 받았고 아직 최신 재조회 성공을 확인하지 못한 상태.
+  bool _walletSyncPending = false;
+
   void _onWalletChanged() {
     if (!mounted) return; // dispose 후 상태 변경 금지.
+    _walletSyncPending = true; // 이 시점 이전 잔액은 stale generation.
     _reload();
+  }
+
+  /// 캐시 섹션 결정(세션1.5 보정3):
+  /// - 최신 잔액 확인 → 그대로 표시(마지막 정상값 갱신).
+  /// - 지갑 변경 후 재조회 실패(잔액 미확인) → 마지막 정상값을 **삭제하지 않고**
+  ///   '최신 정보 아님' + 재시도로 표시(이전 금액을 최신 확정값처럼 표시 금지).
+  /// - 그 외(변경 신호 없는 실패)는 기존 '-' 동작 유지.
+  List<Widget> _cashSectionFor(MyPageData data) {
+    final CashSummary? fetched = data.cash;
+    if (fetched == null) return const <Widget>[];
+    if (fetched.balanceCents != null) {
+      _lastGoodCash = fetched;
+      _walletSyncPending = false;
+      return <Widget>[CashSection(cash: fetched)];
+    }
+    if (_walletSyncPending && _lastGoodCash != null) {
+      return <Widget>[
+        CashSection(cash: _lastGoodCash!, stale: true, onRetryStale: _reload),
+      ];
+    }
+    return <Widget>[CashSection(cash: fetched)];
   }
 
   void _reload() {
@@ -166,7 +194,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
         subscriptions: data.subscriptions,
         onGoToQuestions: _goToQuestions,
       ),
-      if (data.cash != null) CashSection(cash: data.cash!),
+      ..._cashSectionFor(data),
       // 학생: 리뷰 행 미노출(범용 '리뷰 작성' 메뉴는 폐기 — 역할 게이트).
       SupportSection(onOpenNotifications: widget.onOpenNotifications),
     ];
