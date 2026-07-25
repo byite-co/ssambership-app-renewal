@@ -99,8 +99,24 @@ class _MyPageScreenState extends State<MyPageScreen>
     _reload();
   }
 
+  /// v20 정정1: 수동 재시도(오류 배너·CashSection 두 버튼 공용) single-flight.
+  /// 진행 중 요청이 있으면 새 loader 를 시작하지 않는다(연타 병렬 요청 0) —
+  /// 버튼 비활성(onPressed=null)과 이중 방어. 진행 중 요청이 성공/실패로
+  /// 끝나면 _loading 해제와 함께 재시도가 다시 가능해진다.
+  ///
+  /// 반면 최신성 신호(지갑 변경·resume·프로필 저장·initState)는 이 가드를
+  /// 타지 않고 [_reload] 를 직접 호출한다 — 이미 시작된 요청보다 뒤에 생긴
+  /// 변경을 반영해야 하므로 기존 요청을 supersede(새 세대 시작)하고, 이전
+  /// 응답은 _loadGeneration 계약으로 폐기된다(최신 조회 유실 0).
+  void _retryManual() {
+    if (_loading) return;
+    _reload();
+  }
+
   /// v19 보정1: 상태 갱신은 전부 loader 완료 지점(then/catchError)에서만 —
   /// build/렌더링 경로는 주어진 상태를 그리기만 한다(숨은 상태 변경 0).
+  /// v20 정정1: 직접 호출 = 최신성 확보 경로(supersede). 수동 재시도 버튼은
+  /// 반드시 [_retryManual] 을 거친다.
   void _reload() {
     if (!mounted) return;
     final int gen = ++_loadGeneration;
@@ -140,7 +156,12 @@ class _MyPageScreenState extends State<MyPageScreen>
   List<Widget> _cashSectionFor(MyPageData data) {
     if (_walletSyncPending && _lastGoodCash != null) {
       return <Widget>[
-        CashSection(cash: _lastGoodCash!, stale: true, onRetryStale: _reload),
+        CashSection(
+          cash: _lastGoodCash!,
+          stale: true,
+          // v20 정정1: 수동 재시도 — 로딩 중 비활성 + single-flight 공유 가드.
+          onRetryStale: _loading ? null : _retryManual,
+        ),
       ];
     }
     final CashSummary? fetched = data.cash;
@@ -207,7 +228,9 @@ class _MyPageScreenState extends State<MyPageScreen>
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: _reload,
+              key: const ValueKey<String>('mypage-reload-retry'),
+              // v20 정정1: 수동 재시도 — 로딩 중 비활성 + single-flight 가드.
+              onPressed: _loading ? null : _retryManual,
               child: const Text('다시 시도'),
             ),
           ),
