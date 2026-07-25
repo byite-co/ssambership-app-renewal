@@ -152,8 +152,7 @@ class _WithdrawalPendingBannerState extends State<WithdrawalPendingBanner>
   }
 
   /// '2026년 7월 25일 15:30' — 기기 로컬 시각으로 표시(서버 값은 UTC).
-  static String _formatUntil(DateTime until) {
-    final DateTime local = until.toLocal();
-    return '${Formatters.koreanDate(local)} ${Formatters.hourMinute(local)}';
-  }
+  /// 탈퇴 화면과 같은 포맷터를 쓴다(표시가 두 벌로 갈리지 않도록).
+  static String _formatUntil(DateTime until) =>
+      Formatters.dateTimeMinute(until);
 }

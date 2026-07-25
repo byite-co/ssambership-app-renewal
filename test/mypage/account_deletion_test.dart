@@ -369,4 +369,116 @@ void main() {
       expect(port.cancelCalls, 0);
     });
   });
+
+  /// 탈퇴 안내 문구 정정 — '30분' 하드코딩 폐기.
+  ///
+  /// 취소 마감은 **서버 `cancelable_until` 정본**만 표시한다. 값이 없으면
+  /// 시간을 명시하지 않는 중립 문구로 돌아간다 — 클라이언트 시계로 마감을
+  /// 재계산하지 않는다.
+  group('탈퇴 안내 문구 — 서버 cancelable_until 정본 표시', () {
+    Future<void> pumpPending(
+      WidgetTester tester, {
+      required _FakePort port,
+    }) async {
+      await tester.pumpWidget(MaterialApp(
+        home: AccountDeleteScreen(
+          port: port,
+          pendingOverride: true,
+          signOutOverride: () async {},
+          openWebFallbackOverride: (_) async {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('pending: 서버가 준 마감 시각을 그대로 표시(로컬 재계산 0)',
+        (WidgetTester tester) async {
+      final DateTime until = DateTime(2026, 7, 25, 15, 30);
+      final _FakePort port = _FakePort(
+        statusResult: DeletionStatusResult(
+          exists: true,
+          state: 'pending',
+          cancelableUntil: until,
+          writeBlocked: false,
+          canCancel: true,
+        ),
+      );
+      await pumpPending(tester, port: port);
+
+      expect(find.textContaining('2026년 7월 25일 15:30까지'), findsOneWidget);
+      expect(find.textContaining('30분'), findsNothing);
+    });
+
+    testWidgets('pending: 서버 값이 없으면 시간 미명시 중립 문구(추정 표시 금지)',
+        (WidgetTester tester) async {
+      final _FakePort port = _FakePort(
+        statusResult: const DeletionStatusResult(
+          exists: true,
+          state: 'pending',
+          writeBlocked: false,
+          canCancel: true,
+        ),
+      );
+      await pumpPending(tester, port: port);
+
+      expect(find.textContaining('취소 가능 시간 내에는'), findsOneWidget);
+      expect(find.textContaining('30분'), findsNothing);
+      expect(find.textContaining('분 이내'), findsNothing);
+    });
+
+    testWidgets('요청 전 안내(고지 목록·확인 다이얼로그)에는 구체 시간이 없다',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: AccountDeleteScreen(
+          port: _FakePort(),
+          pendingOverride: false,
+          signOutOverride: () async {},
+          openWebFallbackOverride: (_) async {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // 고지 목록: 접수 전이라 서버 마감 시각이 없다 → 시간 미명시.
+      expect(find.textContaining('취소 가능 시간 내에만'), findsOneWidget);
+      expect(find.textContaining('30분'), findsNothing);
+
+      await tester.tap(find.text('위 내용을 모두 확인했어요'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('탈퇴 요청'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('취소 가능 시간 내에는'), findsOneWidget);
+      expect(find.textContaining('30분'), findsNothing);
+    });
+
+    testWidgets('접수 완료 안내는 요청 응답의 cancelable_until 을 표시',
+        (WidgetTester tester) async {
+      final _FakePort port = _FakePort(
+        requestResult: DeletionRequestResult(
+          existing: false,
+          jobId: 'job-1',
+          state: 'pending',
+          cancelableUntil: DateTime(2026, 7, 25, 9, 5),
+        ),
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: AccountDeleteScreen(
+          port: port,
+          pendingOverride: false,
+          signOutOverride: () async {},
+          openWebFallbackOverride: (_) async {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('위 내용을 모두 확인했어요'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('탈퇴 요청'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('탈퇴 요청').last);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('2026년 7월 25일 09:05까지'), findsOneWidget);
+      expect(find.textContaining('30분'), findsNothing);
+    });
+  });
 }

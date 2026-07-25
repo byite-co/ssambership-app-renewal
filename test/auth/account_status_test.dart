@@ -170,7 +170,9 @@ void main() {
       expect(s.kind, AccountStatusKind.deletionPending);
       expect(s.allowsAppUse, isTrue); // 서버가 쓰기를 막지 않는 구간
       expect(s.isBlocked, isFalse);
-      expect(s.noticeMessage, contains('탈퇴 요청'));
+      // 안내 문구는 이 모델이 아니라 상시 배너(서버 cancelable_until)가 낸다 —
+      // noticeMessage 는 폐기됐다. 차단 문구는 여기서 비어 있어야 한다.
+      expect(s.blockedMessage, isEmpty);
     });
 
     test('locked/purging 등 write-block 상태 → deletionLocked(비복구 차단)', () async {

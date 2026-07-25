@@ -9,6 +9,7 @@ import '../../../design/typography_tokens.dart';
 import '../../../design/widgets/primary_button.dart';
 import '../../../design/widgets/secondary_button.dart';
 import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/format/formatters.dart';
 import '../data/account_deletion_repository.dart';
 
 /// 회원 탈퇴(P1-10) — 위험 확인 → 서버 RPC 요청 → 로그아웃.
@@ -59,6 +60,10 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   /// 42501 — 앱 경로 미개방 → 웹 폴백 카드 노출(self RPC 미배포 환경 방어).
   bool _unavailable = false;
 
+  /// 서버 `cancelable_until` 정본. null 이면 시각을 표시하지 않는다 —
+  /// ★ 클라이언트 시계로 취소 마감을 계산하지 않는다(로컬 추정 금지).
+  DateTime? _cancelableUntil;
+
   bool get _pending =>
       widget.pendingOverride ??
       AuthService.instance.accountState.kind ==
@@ -76,7 +81,10 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     try {
       final DeletionStatusResult s = await widget.port.fetchStatus();
       if (!mounted) return;
-      if (!s.canCancel) setState(() => _cancelClosed = true);
+      setState(() {
+        _cancelableUntil = s.cancelableUntil; // 서버 정본 시각(있을 때만 표시)
+        if (!s.canCancel) _cancelClosed = true;
+      });
     } on AccountDeletionUnavailable {
       if (mounted) setState(() => _unavailable = true);
     } catch (_) {
@@ -95,8 +103,9 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     if (_busy) return;
     final bool ok = await _confirm(
       '정말 탈퇴할까요?',
+      // 아직 접수 전이라 서버 마감 시각이 없다 — 시간을 명시하지 않는다.
       '탈퇴하면 계정과 데이터가 삭제되며 되돌릴 수 없어요.\n'
-          '접수 후 30분 이내에는 취소할 수 있어요.',
+          '접수 후 취소 가능 시간 내에는 취소할 수 있어요.',
       '탈퇴 요청',
     );
     if (!ok || !mounted) return;
@@ -107,7 +116,8 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
       // 실패 시 성공 화면·로컬 성공 상태를 만들지 않는다 — 여기 도달 = 서버 접수 확정.
       await _showDone(
         result.isPending
-            ? '탈퇴 요청이 접수됐어요.\n30분 이내에는 다시 로그인해 취소할 수 있어요.\n보안을 위해 로그아웃돼요.'
+            ? '탈퇴 요청이 접수됐어요.\n${_cancelWindowLine(result.cancelableUntil)}\n'
+                '보안을 위해 로그아웃돼요.'
             : '이미 탈퇴 처리가 진행 중인 계정이에요.\n보안을 위해 로그아웃돼요.',
       );
       await _signOut(); // 토큰 revoke → 세션 폐기(내부 순서 보장) → 로그인 화면.
@@ -150,6 +160,12 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  /// 취소 가능 구간 안내 — **서버 `cancelable_until` 이 있을 때만** 시각을
+  /// 적는다. 값이 없으면 시간 미명시 중립 문구로 돌아간다(로컬 재계산 금지).
+  static String _cancelWindowLine(DateTime? until) => until != null
+      ? '${Formatters.dateTimeMinute(until)}까지 다시 로그인해 취소할 수 있어요.'
+      : '취소 가능 시간 내에는 다시 로그인해 취소할 수 있어요.';
 
   Future<bool> _confirm(String title, String body, String action) async {
     final bool? ok = await showDialog<bool>(
@@ -222,9 +238,10 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
       Text('탈퇴 전에 꼭 확인해 주세요', style: AppType.title),
       const SizedBox(height: AppSpacing.s16),
       const Text(
+        // 접수 전에는 서버 마감 시각이 없다 — 구체 시각은 접수 후 안내·배너가 낸다.
         '· 계정과 프로필, 질문/답변 기록이 삭제돼요.\n'
         '· 삭제 후에는 되돌릴 수 없어요.\n'
-        '· 접수 후 30분 이내에만 취소할 수 있어요.\n'
+        '· 접수 후 취소 가능 시간 내에만 취소할 수 있어요.\n'
         '· 남은 캐시·구독은 웹 고객센터 안내를 따라 주세요.',
         style: AppType.body,
       ),
@@ -250,8 +267,9 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     return <Widget>[
       Text('탈퇴 요청이 접수된 계정이에요', style: AppType.title),
       const SizedBox(height: AppSpacing.s16),
-      const Text(
-        '접수 후 30분 이내에는 취소할 수 있어요.\n'
+      Text(
+        // 서버 status_self 의 cancelable_until 정본을 그대로 표시한다.
+        '${_cancelWindowLine(_cancelableUntil)}\n'
         '취소하면 보안을 위해 다시 로그인해야 해요.',
         style: AppType.body,
       ),

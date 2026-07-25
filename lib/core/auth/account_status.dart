@@ -89,14 +89,10 @@ class AccountState {
     }
   }
 
-  /// 이용은 가능하지만 알려줄 게 있을 때의 안내(현재는 탈퇴 접수 상태).
-  /// 소비하는 UI 가 아직 없으면 무해 — 게이팅은 allowsAppUse 로만 한다.
-  String get noticeMessage {
-    if (kind == AccountStatusKind.deletionPending) {
-      return '탈퇴 요청이 접수된 계정이에요. 취소는 웹에서 할 수 있어요.';
-    }
-    return '';
-  }
+  // ★ noticeMessage 는 폐기했다(프로덕션 소비처 0). 문구가 '취소는 웹에서'
+  //   였는데 인앱 취소 경로가 생긴 지금 사실과 다르고, 실제 통지 표면은
+  //   서버 cancelable_until 을 그리는 상시 배너(WithdrawalPendingBanner)다.
+  //   탈퇴 접수 안내가 필요하면 그 배너를 쓴다 — 문구를 두 벌로 두지 않는다.
 
   static const AccountState active =
       AccountState(kind: AccountStatusKind.active);
@@ -163,8 +159,7 @@ class SupabaseAccountStatusGateway implements AccountStatusGateway {
 
   @override
   Future<Map<String, dynamic>> fetchDeletionSelfStatus() async {
-    final Object? result =
-        await _client.rpc('account_deletion_status_self');
+    final Object? result = await _client.rpc('account_deletion_status_self');
     if (result is Map && result['ok'] == true) {
       return Map<String, dynamic>.from(result);
     }
