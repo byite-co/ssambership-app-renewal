@@ -107,6 +107,46 @@ String? boardPostReturnMismatch({
   return null;
 }
 
+/// 보상 전용 내부 삭제(세션1.5 보정2) — cp_delete_own(RLS: author 본인 또는
+/// admin)이 실제 권한 정본. **일반 삭제 기능이 아니다** — UI·메뉴·라우트·공개
+/// repository API 로 노출하지 않고, 반환 정본 불일치 보상 흐름에서만 호출한다.
+typedef BoardPostCompensator = Future<void> Function(String postId);
+
+/// SERVER_CANONICALIZATION_MISMATCH — INSERT 반환 정본 불일치.
+/// 성공 처리·로컬 성공 삽입 금지. 보상 결과를 케이스별로 구조화한다.
+/// (앱 게시판 작성은 텍스트 전용 — 이번 요청의 신규 첨부 집합은 항상 비어
+///  있어 첨부 보상은 해당 없음. 첨부가 생기면 별도 결과 필드로 분리할 것.)
+class BoardCanonicalizationMismatch extends AppError {
+  const BoardCanonicalizationMismatch(
+    super.userMessage, {
+    required this.mismatchField,
+    required this.ownRow,
+    required this.returnedPostId,
+    required this.expectedRole,
+    required this.returnedRole,
+    required this.postDeleted,
+  });
+
+  /// 'author_id' | 'author_role'.
+  final String mismatchField;
+
+  /// 케이스 A(반환 author_id == 현재 사용자) 여부. false = 케이스 B —
+  /// 권한 밖 행이므로 어떤 삭제도 시도하지 않는다.
+  final bool ownRow;
+
+  /// 반환 행 id(비민감 식별자). null = 행 ID 미확정(삭제 시도 불가).
+  final String? returnedPostId;
+
+  final String expectedRole;
+
+  /// 반환 author_role 원문(비문자면 null) — 비민감 코드 값.
+  final String? returnedRole;
+
+  /// null = 삭제 미시도(케이스 B·ID 미확정·보상 미배선),
+  /// true = 본인 행 best-effort 삭제 성공, false = 삭제 실패(행 잔존 가능).
+  final bool? postDeleted;
+}
+
 /// 게시판 글 작성 전체 흐름(정본 확정 → INSERT → 반환 행 재검증).
 /// 순수 오케스트레이터 — 의존은 전부 주입이라 단위 테스트로 INSERT 호출 횟수까지
 /// 고정할 수 있다.
@@ -117,6 +157,9 @@ Future<BoardPost> createBoardPostGated({
   required String title,
   required String body,
   required String category,
+
+  /// 보정2: 반환 정본 불일치 시에만 쓰는 보상 전용 내부 삭제(미주입 시 미시도).
+  BoardPostCompensator? deleteOwnPostForCompensation,
 }) async {
   final BoardAuthorIdentity author = await resolveBoardAuthorIdentity(
     authUserId: authUserId,
@@ -131,8 +174,37 @@ Future<BoardPost> createBoardPostGated({
   final String? mismatch =
       boardPostReturnMismatch(returned: returned, author: author);
   if (mismatch != null) {
-    // 저장은 됐을 수 있으나 정합이 깨졌다 — 성공 토스트/이동 금지.
-    throw const AppError('글 저장 결과가 요청과 달라 등록을 완료하지 못했어요. 목록을 새로고침해 확인해 주세요.');
+    // 저장은 됐을 수 있으나 정합이 깨졌다 — 성공 토스트/이동/로컬 삽입 금지.
+    final Object? idValue = returned['id'];
+    final String? postId = idValue is String ? idValue : null;
+    final bool ownRow = returned['author_id'] == author.userId;
+    final Object? roleValue = returned['author_role'];
+
+    bool? postDeleted; // null = 미시도
+    if (ownRow && postId != null && deleteOwnPostForCompensation != null) {
+      // 케이스 A: 본인 행·ID 확정 — best-effort 보상삭제(권한 정본은 RLS
+      // cp_delete_own). 앱 게시판 작성은 텍스트 전용이라 이번 요청의 신규
+      // 첨부 집합은 비어 있다(첨부 보상 해당 없음).
+      try {
+        await deleteOwnPostForCompensation(postId);
+        postDeleted = true;
+      } catch (_) {
+        postDeleted = false; // 부분 실패도 성공으로 뭉개지 않는다.
+      }
+    }
+    // 케이스 B(반환 author_id ≠ 현재 사용자)·ID 미확정: 권한 밖일 수 있는
+    // 행·객체는 어떤 삭제도 시도하지 않는다.
+    throw BoardCanonicalizationMismatch(
+      postDeleted == true
+          ? '글 저장 결과가 요청과 달라 등록을 취소했어요. 다시 시도해 주세요.'
+          : '글 저장 결과가 요청과 달라 등록을 완료하지 못했어요. 목록을 새로고침해 확인해 주세요.',
+      mismatchField: mismatch,
+      ownRow: ownRow,
+      returnedPostId: postId,
+      expectedRole: author.role,
+      returnedRole: roleValue is String ? roleValue : null,
+      postDeleted: postDeleted,
+    );
   }
   return BoardPost.fromMap(returned);
 }

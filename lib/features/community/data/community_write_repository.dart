@@ -193,6 +193,18 @@ class CommunityWriteRepository {
       title: title,
       body: body,
       category: category,
+      // 보정2: 반환 정본 불일치 '보상 전용' 내부 삭제 — 공개 API·UI·라우트로
+      // 노출하지 않는다. id+본인 author_id 로 클라이언트 범위를 좁히고,
+      // 실제 권한 판정은 RLS cp_delete_own(author 본인 또는 admin)에 맡긴다.
+      deleteOwnPostForCompensation: (String postId) async {
+        final String? uid = client.auth.currentUser?.id;
+        if (uid == null) throw const AppError('로그인이 필요해요.');
+        await client
+            .from('community_posts')
+            .delete()
+            .eq('id', postId)
+            .eq('author_id', uid);
+      },
     );
   }
 

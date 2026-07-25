@@ -22,17 +22,22 @@ class _Harness {
     List<Map<String, dynamic>>? rows,
     Object? fetchError,
     Map<String, dynamic>? returned,
+    Object? deleteError,
   })  : _rows = rows,
         _fetchError = fetchError,
-        _returned = returned;
+        _returned = returned,
+        _deleteError = deleteError;
 
   final String? authUserId;
   final List<Map<String, dynamic>>? _rows;
   final Object? _fetchError;
   final Map<String, dynamic>? _returned;
+  final Object? _deleteError;
 
   int fetchCalls = 0;
   int insertCalls = 0;
+  int deleteCalls = 0;
+  String? deletedPostId;
   Map<String, dynamic>? lastPayload;
 
   Future<BoardPost> run() {
@@ -57,6 +62,11 @@ class _Harness {
       title: '제목',
       body: '본문',
       category: 'study',
+      deleteOwnPostForCompensation: (String postId) async {
+        deleteCalls++;
+        deletedPostId = postId;
+        if (_deleteError != null) throw _deleteError;
+      },
     );
   }
 }
@@ -174,6 +184,113 @@ void main() {
             'author_role': 'student',
           }, author: a),
           isNull);
+    });
+  });
+
+  group('보정2 — SERVER_CANONICALIZATION_MISMATCH 보상 전용 삭제', () {
+    test('케이스 A: 본인 행·ID 확정 → 보상 삭제 1회·postDeleted=true·구조화 보고', () async {
+      final _Harness h = _Harness(
+        rows: <Map<String, dynamic>>[_row()],
+        returned: <String, dynamic>{
+          'id': 'post-9',
+          'author_id': _uid,
+          'author_role': 'mentor', // DEFAULT 개입 감지
+        },
+      );
+      Object? caught;
+      try {
+        await h.run();
+      } catch (e) {
+        caught = e;
+      }
+      final BoardCanonicalizationMismatch m =
+          caught! as BoardCanonicalizationMismatch;
+      expect(h.deleteCalls, 1);
+      expect(h.deletedPostId, 'post-9');
+      expect(m.ownRow, isTrue);
+      expect(m.postDeleted, isTrue);
+      expect(m.mismatchField, 'author_role');
+      expect(m.expectedRole, 'student');
+      expect(m.returnedRole, 'mentor');
+    });
+
+    test('케이스 A: 삭제 실패 → postDeleted=false·성공 처리 0(부분 실패 분리)', () async {
+      final _Harness h = _Harness(
+        rows: <Map<String, dynamic>>[_row()],
+        returned: <String, dynamic>{
+          'id': 'post-9',
+          'author_id': _uid,
+          'author_role': 'mentor',
+        },
+        deleteError: StateError('rls'),
+      );
+      Object? caught;
+      try {
+        await h.run();
+      } catch (e) {
+        caught = e;
+      }
+      final BoardCanonicalizationMismatch m =
+          caught! as BoardCanonicalizationMismatch;
+      expect(m.postDeleted, isFalse);
+      expect(h.deleteCalls, 1);
+    });
+
+    test('케이스 B: 반환 author_id 불일치 → 삭제 시도 0·postDeleted=null', () async {
+      final _Harness h = _Harness(
+        rows: <Map<String, dynamic>>[_row()],
+        returned: <String, dynamic>{
+          'id': 'post-9',
+          'author_id': 'someone-else',
+          'author_role': 'student',
+        },
+      );
+      Object? caught;
+      try {
+        await h.run();
+      } catch (e) {
+        caught = e;
+      }
+      final BoardCanonicalizationMismatch m =
+          caught! as BoardCanonicalizationMismatch;
+      expect(h.deleteCalls, 0, reason: '권한 밖 행 삭제 시도 금지');
+      expect(m.ownRow, isFalse);
+      expect(m.postDeleted, isNull);
+      expect(m.mismatchField, 'author_id');
+    });
+
+    test('행 ID 미확정 → 삭제 시도 0·postDeleted=null', () async {
+      final _Harness h = _Harness(
+        rows: <Map<String, dynamic>>[_row()],
+        returned: <String, dynamic>{
+          'author_id': _uid,
+          'author_role': 'mentor', // id 없음
+        },
+      );
+      Object? caught;
+      try {
+        await h.run();
+      } catch (e) {
+        caught = e;
+      }
+      final BoardCanonicalizationMismatch m =
+          caught! as BoardCanonicalizationMismatch;
+      expect(h.deleteCalls, 0);
+      expect(m.postDeleted, isNull);
+      expect(m.returnedPostId, isNull);
+    });
+
+    test('불일치 예외는 AppError 하위(한글 메시지·성공 승격 불가)', () {
+      const BoardCanonicalizationMismatch m = BoardCanonicalizationMismatch(
+        '메시지',
+        mismatchField: 'author_role',
+        ownRow: true,
+        returnedPostId: 'p',
+        expectedRole: 'student',
+        returnedRole: 'mentor',
+        postDeleted: true,
+      );
+      expect(m, isA<AppError>());
     });
   });
 
