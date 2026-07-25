@@ -44,6 +44,7 @@ class _FakeIqAttachments implements IqAttachmentsPort {
     required String questionId,
     required PickedImage image,
     String? messageId,
+    String? existingObjectPath,
   }) async {
     questionIds.add(questionId);
     if (failNames.contains(image.fileName)) {
@@ -146,8 +147,8 @@ void main() {
   group('작성 화면 첨부 흐름', () {
     testWidgets('추가(1/5 썸네일) → 삭제(0/5)', (WidgetTester tester) async {
       final _FakeScanPort scan = _FakeScanPort();
-      await tester.pumpWidget(
-          _screen(scan: scan, attachments: _FakeIqAttachments()));
+      await tester
+          .pumpWidget(_screen(scan: scan, attachments: _FakeIqAttachments()));
       await tester.pumpAndSettle();
 
       expect(find.text('문제 스캔 첨부 (0/5)'), findsOneWidget);
@@ -160,11 +161,10 @@ void main() {
       expect(find.text('문제 스캔 첨부 (0/5)'), findsOneWidget);
     });
 
-    testWidgets('최대 5장 — 5장이면 추가 버튼 비활성(§6-1)',
-        (WidgetTester tester) async {
+    testWidgets('최대 5장 — 5장이면 추가 버튼 비활성(§6-1)', (WidgetTester tester) async {
       final _FakeScanPort scan = _FakeScanPort();
-      await tester.pumpWidget(
-          _screen(scan: scan, attachments: _FakeIqAttachments()));
+      await tester
+          .pumpWidget(_screen(scan: scan, attachments: _FakeIqAttachments()));
       await tester.pumpAndSettle();
 
       for (int i = 0; i < 5; i++) {
@@ -180,8 +180,7 @@ void main() {
         (WidgetTester tester) async {
       final _FakeScanPort scan = _FakeScanPort();
       final _FakeIqAttachments attachments = _FakeIqAttachments();
-      await tester
-          .pumpWidget(_screen(scan: scan, attachments: attachments));
+      await tester.pumpWidget(_screen(scan: scan, attachments: attachments));
       await tester.pumpAndSettle();
 
       await _addOne(tester);
@@ -198,8 +197,7 @@ void main() {
       final _FakeScanPort scan = _FakeScanPort();
       final _FakeIqAttachments attachments =
           _FakeIqAttachments(failNames: <String>{'scan2.png'});
-      await tester
-          .pumpWidget(_screen(scan: scan, attachments: attachments));
+      await tester.pumpWidget(_screen(scan: scan, attachments: attachments));
       await tester.pumpAndSettle();
 
       await _addOne(tester);

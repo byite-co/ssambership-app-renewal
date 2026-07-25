@@ -5,26 +5,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/scan/picked_image.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
-import '../../question_room/data/attachments/attachment_upload.dart'
-    show validatePickedImage;
 import 'individual_question_repository.dart';
+import 'iq_attachment_upload_core.dart';
 import 'models/individual_question_models.dart';
 
-/// 개별질문 첨부 업로드 포트(S17). 조회는 기존
+/// 개별질문 첨부 업로드 포트(S17·세션1 §6). 조회는 기존
 /// [IndividualQuestionRepository.listAttachments](당사자 SELECT RLS)가 담당.
 ///
 /// ★ 쓰기 규약: 이 DB 의 IQ 테이블은 SELECT-only — 행 등록은 반드시
 ///   SECURITY DEFINER RPC `add_individual_question_attachment` 로 한다
-///   (supabase/migrations/20260707T0100 v1 운영 적용 확인, 20260707T1500 v2 보강).
+///   (staging 실측: 당사자 검증·경로 위조 차단·메시지 소속 검증 내장).
+/// ★ 검증·보상삭제·재시도 멱등은 순수 코어(uploadIqAttachmentCore)가 정본.
 abstract class IqAttachmentsPort {
   /// 준비 여부(RPC 적용·버킷). false 면 upload 는 안내 에러.
   bool get isReady;
 
   /// 파일 업로드 + 행 등록(한 메서드 — 경로 규약을 호출부가 다룰 필요 없음).
+  /// [existingObjectPath]: 직전 시도에서 업로드까지 성공(등록만 실패·고아)한
+  /// 경로 — 재업로드를 생략해 재시도 중복 객체 0 을 보장한다.
   Future<IqAttachment> upload({
     required String questionId,
     required PickedImage image,
     String? messageId,
+    String? existingObjectPath,
   });
 }
 
@@ -49,43 +52,54 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
     required String questionId,
     required PickedImage image,
     String? messageId,
-  }) async {
-    final String? invalid = validatePickedImage(image);
-    if (invalid != null) throw AppError(invalid);
-
-    // 규약: 첫 세그먼트 = 질문 uuid (스토리지 RLS·RPC 위조 검증과 동일).
-    final String objectPath = buildStoragePath(
+    String? existingObjectPath,
+  }) {
+    final SupabaseClient client = _client;
+    return uploadIqAttachmentCore(
       questionId: questionId,
-      fileName: image.fileName,
-      timestamp: DateTime.now().microsecondsSinceEpoch,
-      salt: Random().nextInt(0xFFFFFF),
-    );
-
-    await _client.storage.from(bucket).uploadBinary(
-          objectPath,
-          image.bytes,
-          fileOptions: FileOptions(contentType: image.mimeType, upsert: false),
-        );
-
-    // 행 등록은 RPC 만(테이블 INSERT 정책 없음 — SELECT-only 규약).
-    final dynamic id = await _client.rpc<dynamic>(
-      'add_individual_question_attachment',
-      params: <String, dynamic>{
-        'p_question_id': questionId,
-        'p_storage_path': objectPath,
-        'p_file_name': image.fileName,
-        'p_mime_type': image.mimeType,
-        if (messageId != null) 'p_message_id': messageId,
-      },
-    );
-
-    return IqAttachment(
-      id: id as String,
-      storagePath: objectPath,
+      file: image,
       messageId: messageId,
-      fileName: image.fileName,
-      mimeType: image.mimeType,
+      existingObjectPath: existingObjectPath,
+      // 규약: 첫 세그먼트 = 질문 uuid (스토리지 RLS·RPC 위조 검증과 동일).
+      buildPath: () => buildStoragePath(
+        questionId: questionId,
+        fileName: image.fileName,
+        timestamp: DateTime.now().microsecondsSinceEpoch,
+        salt: Random().nextInt(0xFFFFFF),
+      ),
+      uploadBinary: (String path, PickedImage file) => client.storage
+          .from(bucket)
+          .uploadBinary(
+            path,
+            file.bytes,
+            fileOptions: FileOptions(contentType: file.mimeType, upsert: false),
+          ),
+      // 행 등록은 RPC 만(테이블 INSERT 정책 없음 — SELECT-only 규약).
+      register: (String path, PickedImage file, String? msgId) async {
+        final dynamic id = await client.rpc<dynamic>(
+          'add_individual_question_attachment',
+          params: <String, dynamic>{
+            'p_question_id': questionId,
+            'p_storage_path': path,
+            'p_file_name': file.fileName,
+            'p_mime_type': file.mimeType,
+            if (msgId != null) 'p_message_id': msgId,
+          },
+        );
+        if (id is! String) {
+          throw const AppError('첨부 등록 결과를 확인하지 못했어요.');
+        }
+        return id;
+      },
+      removeObject: (String path) =>
+          client.storage.from(bucket).remove(<String>[path]),
     );
+  }
+
+  /// 당사자 다운로드(저장용) — RLS(iqa_storage_read_party) 경유 바이트 수신.
+  /// signed URL 을 만들지도, 저장하지도 않는다(위생 규약).
+  Future<List<int>> downloadBytes(String storagePath) async {
+    return _client.storage.from(bucket).download(storagePath);
   }
 
   /// 경로 조립(순수 함수 — 테스트 가능):

@@ -43,6 +43,7 @@ class _FakeIqAttachments implements IqAttachmentsPort {
     required String questionId,
     required PickedImage image,
     String? messageId,
+    String? existingObjectPath,
   }) async {
     uploaded.add(image);
     return IqAttachment(
@@ -130,8 +131,9 @@ void main() {
             _question(),
         scanPicker: _FakeScanPort(),
         attachments: attachments,
-        annotateOverride: (PickedImage background, InkDocument? initial) async =>
-            AnnotationResult(document: _doc(), flattenedPng: flat),
+        annotateOverride:
+            (PickedImage background, InkDocument? initial) async =>
+                AnnotationResult(document: _doc(), flattenedPng: flat),
       )));
       await tester.pumpAndSettle();
 
@@ -202,8 +204,7 @@ void main() {
           ],
         );
 
-    testWidgets('멘토에게만 첨삭하기가 보인다(학생은 비노출)',
-        (WidgetTester tester) async {
+    testWidgets('멘토에게만 첨삭하기가 보인다(학생은 비노출)', (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(IqDetailScreen(
         questionId: 'q-1',
         roleOverride: AppRole.mentor,
@@ -234,8 +235,8 @@ void main() {
           loads++;
           return data();
         },
-        annotationsOverride:
-            IqAnnotationRepository(store: store, uploader: _FakeIqAttachments()),
+        annotationsOverride: IqAnnotationRepository(
+            store: store, uploader: _FakeIqAttachments()),
         annotateLauncherOverride: (IqAnnotateRequest r) async {
           request = r;
           return true; // 전송됨.
@@ -252,8 +253,7 @@ void main() {
       expect(request!.sourceAttachmentId, 'src-1');
       expect(request!.background, isNotEmpty);
       expect(loads, 2); // 완료(true) → 목록 새로고침.
-      expect(find.text('첨삭본을 새 첨부로 등록했어요. 원본은 그대로 있어요.'),
-          findsOneWidget);
+      expect(find.text('첨삭본을 새 첨부로 등록했어요. 원본은 그대로 있어요.'), findsOneWidget);
     });
 
     testWidgets('기존 ink.json 있음 → 불러오기/새로 시작 선택 다이얼로그 분기',
@@ -266,8 +266,8 @@ void main() {
         questionId: 'q-1',
         roleOverride: AppRole.mentor,
         loaderOverride: () async => data(),
-        annotationsOverride:
-            IqAnnotationRepository(store: store, uploader: _FakeIqAttachments()),
+        annotationsOverride: IqAnnotationRepository(
+            store: store, uploader: _FakeIqAttachments()),
         annotateLauncherOverride: (IqAnnotateRequest r) async {
           initials.add(r.initial);
           return null; // 취소로 닫힘(새 첨부 없음).

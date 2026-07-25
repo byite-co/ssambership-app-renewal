@@ -51,6 +51,7 @@ class _FakeUploader implements IqAttachmentsPort {
     required String questionId,
     required PickedImage image,
     String? messageId,
+    String? existingObjectPath,
   }) async {
     questionIds.add(questionId);
     uploaded.add(image);
@@ -82,8 +83,7 @@ InkDocument _doc() => const InkDocument(
 
 void main() {
   group('InkStoragePaths.iqAnnotationDocument (경로 규약)', () {
-    test('첫 세그먼트=질문 uuid + annotations/ 프리픽스 — 기존 버킷 정책 그대로 통과',
-        () {
+    test('첫 세그먼트=질문 uuid + annotations/ 프리픽스 — 기존 버킷 정책 그대로 통과', () {
       expect(
         InkStoragePaths.iqAnnotationDocument('q-uuid-1', 'att-1'),
         'q-uuid-1/annotations/att-1.json',
@@ -99,8 +99,7 @@ void main() {
   });
 
   group('IqAnnotationRepository', () {
-    test('완료: 평탄화본이 새 첨부로 등록되고(원본 비접촉) ink.json 이 원본첨부 id 경로에 저장',
-        () async {
+    test('완료: 평탄화본이 새 첨부로 등록되고(원본 비접촉) ink.json 이 원본첨부 id 경로에 저장', () async {
       final _FakeStore store = _FakeStore();
       final _FakeUploader uploader = _FakeUploader();
       final IqAnnotationRepository repo =
@@ -127,8 +126,7 @@ void main() {
       expect(saved.isEmpty, isFalse);
     });
 
-    test('재첨삭: 같은 원본에 다시 완료하면 첨부가 하나 더 생긴다(덮어쓰기 금지)',
-        () async {
+    test('재첨삭: 같은 원본에 다시 완료하면 첨부가 하나 더 생긴다(덮어쓰기 금지)', () async {
       final _FakeStore store = _FakeStore();
       final _FakeUploader uploader = _FakeUploader();
       final IqAnnotationRepository repo =
@@ -147,8 +145,7 @@ void main() {
       expect(store.objects.length, 1); // ink.json 은 같은 경로 upsert.
     });
 
-    test('loadAnnotation: 없으면 null(새로 시작), 있으면 문서 복원(이어 그리기)',
-        () async {
+    test('loadAnnotation: 없으면 null(새로 시작), 있으면 문서 복원(이어 그리기)', () async {
       final _FakeStore store = _FakeStore();
       final IqAnnotationRepository repo =
           IqAnnotationRepository(store: store, uploader: _FakeUploader());
@@ -160,8 +157,8 @@ void main() {
 
       store.objects['q-1/annotations/a.json'] =
           Uint8List.fromList(utf8.encode(_doc().toJsonString()));
-      final InkDocument? restored = await repo.loadAnnotation(
-          questionId: 'q-1', sourceAttachmentId: 'a');
+      final InkDocument? restored =
+          await repo.loadAnnotation(questionId: 'q-1', sourceAttachmentId: 'a');
       expect(restored, isNotNull);
       expect(restored!.canvasWidth, 40);
     });
