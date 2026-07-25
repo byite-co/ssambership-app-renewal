@@ -88,7 +88,13 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
             if (msgId != null) 'p_message_id': msgId,
           },
         );
-        return parseIqAttachmentRegistration(result, requestedPath: path);
+        // expectedQuestionId = RPC 에 보낸 p_question_id 와 동일한 값 —
+        // 응답이 그 질문의 것인지 파서가 fail-closed 로 대조한다.
+        return parseIqAttachmentRegistration(
+          result,
+          requestedPath: path,
+          expectedQuestionId: questionId,
+        );
       },
       removeObject: (String path) =>
           client.storage.from(bucket).remove(<String>[path]),
