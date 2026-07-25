@@ -119,6 +119,7 @@ void main() {
       Object? uploadError,
       IqAttachment? found,
       Object? findError,
+      List<dynamic>? foundRows,
     }) {
       return uploadIqAttachmentCore(
         questionId: 'q-1',
@@ -141,6 +142,11 @@ void main() {
         findRegistered: (String path) async {
           finds++;
           if (findError != null) throw findError;
+          if (foundRows != null) {
+            // v20 정정2: 실제 canonical 검증을 finder 에 배선(레포와 동일 경로).
+            return canonicalRegisteredAttachment(foundRows,
+                questionId: 'q-1', objectPath: path);
+          }
           return found;
         },
         // 실계약 미러: StateError = 서버 명시 거부(미등록 확정),
@@ -268,6 +274,38 @@ void main() {
       expect(removes, 0, reason: '손상 행을 미등록 확정으로 오해석 금지');
       expect(registers, 1, reason: 'RPC 재호출 0');
     });
+
+    // v20 정정2: question_id 키 자체가 없는 행 — projection 이 명시 선택하므로
+    // 비정상 response shape. finder throw → AMBIGUOUS 수렴.
+    List<dynamic> rowsWithoutQuestionKey() => <dynamic>[
+          <String, dynamic>{
+            'id': 'att-db',
+            'storage_path': 'q-1/1-abc.png',
+            'file_name': 'a.png',
+            'mime_type': 'image/png',
+          },
+        ];
+
+    test('v20 정정2: finder 행에 question_id 키 누락 → AMBIGUOUS·삭제 0·RPC 재호출 0',
+        () async {
+      await expectLater(
+          run(registerError: _Ambiguous(), foundRows: rowsWithoutQuestionKey()),
+          throwsA(isA<IqAttachmentAmbiguousResult>()));
+      expect(removes, 0, reason: '키 누락 행을 미등록 확정으로 오해석 금지');
+      expect(registers, 1, reason: '재호출 0 — 최초 1회뿐');
+    });
+
+    test('v20 정정2: 수동 재시도 SELECT 행에 question_id 키 누락 → 등록 RPC 0·삭제 0·AMBIGUOUS',
+        () async {
+      await expectLater(
+          run(
+              existingObjectPath: 'q-1/1-abc.png',
+              foundRows: rowsWithoutQuestionKey()),
+          throwsA(isA<IqAttachmentAmbiguousResult>()));
+      expect(registers, 0, reason: '정본 미확정 상태에서 등록 RPC 금지');
+      expect(removes, 0);
+      expect(uploads, 0);
+    });
   });
 
   group('v19 보정3 — canonicalRegisteredAttachment(0행 vs 비정상 행)', () {
@@ -319,6 +357,51 @@ void main() {
 
     test('행 존재·비정상 shape(맵 아님) → throw', () {
       expect(() => call(<dynamic>['not-a-map']), throwsFormatException);
+    });
+  });
+
+  group('v20 정정2 — question_id 는 필수 검증 필드(키 누락도 비정상 shape)', () {
+    Map<String, dynamic> base() => <String, dynamic>{
+          'id': 'att-1',
+          'storage_path': 'q-1/1.png',
+          'file_name': 'a.png',
+          'mime_type': 'image/png',
+        };
+
+    IqAttachment? call(List<dynamic> rows) =>
+        canonicalRegisteredAttachment(rows,
+            questionId: 'q-1', objectPath: 'q-1/1.png');
+
+    test('question_id 키 자체 누락 → throw(검증 생략 금지)', () {
+      expect(() => call(<dynamic>[base()]), throwsFormatException);
+    });
+
+    test('question_id null → throw', () {
+      expect(() => call(<dynamic>[base()..['question_id'] = null]),
+          throwsFormatException);
+    });
+
+    test('question_id 비문자 → throw', () {
+      expect(() => call(<dynamic>[base()..['question_id'] = 7]),
+          throwsFormatException);
+    });
+
+    test('question_id 빈 문자열·공백 → throw', () {
+      expect(() => call(<dynamic>[base()..['question_id'] = '']),
+          throwsFormatException);
+      expect(() => call(<dynamic>[base()..['question_id'] = '  ']),
+          throwsFormatException);
+    });
+
+    test('question_id 불일치 → throw', () {
+      expect(() => call(<dynamic>[base()..['question_id'] = 'q-2']),
+          throwsFormatException);
+    });
+
+    test('question_id 정확 일치만 통과', () {
+      final IqAttachment a = call(<dynamic>[base()..['question_id'] = 'q-1'])!;
+      expect(a.id, 'att-1');
+      expect(a.storagePath, 'q-1/1.png');
     });
   });
 

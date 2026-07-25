@@ -84,6 +84,9 @@ class IqAttachmentAmbiguousResult implements Exception {
 ///   throw 는 코어에서 AMBIGUOUS_SERVER_RESULT 로 수렴한다
 ///   (자동삭제 0·RPC 재호출 0·성공 표시 0 — 손상 응답을 '미등록 확정'으로
 ///   해석해 보상삭제로 진행하지 않는다).
+/// - v20 정정2: question_id 는 필수 검증 필드다 — repository projection 이
+///   명시 선택하므로 **키 누락 자체가 비정상 response shape** 이며, 누락·
+///   null·비문자·빈 문자열·불일치 전부 throw(정확 일치만 통과).
 IqAttachment? canonicalRegisteredAttachment(
   List<dynamic> rows, {
   required String questionId,
@@ -103,11 +106,9 @@ IqAttachment? canonicalRegisteredAttachment(
   if (sp is! String || sp != objectPath) {
     throw const FormatException('IQ_ATTACHMENT_ROW_PATH_MISMATCH');
   }
-  if (r.containsKey('question_id')) {
-    final Object? q = r['question_id'];
-    if (q is! String || q != questionId) {
-      throw const FormatException('IQ_ATTACHMENT_ROW_QUESTION_MISMATCH');
-    }
+  final Object? q = r['question_id'];
+  if (q is! String || q.trim().isEmpty || q != questionId) {
+    throw const FormatException('IQ_ATTACHMENT_ROW_QUESTION_MISMATCH');
   }
   return IqAttachment(
     id: id,
