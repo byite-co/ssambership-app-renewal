@@ -73,7 +73,8 @@ class _Harness {
         registers++;
         if (next is Exception) throw next;
         // 레포와 동일한 파서를 태운다 — 형태 분기를 테스트가 흉내내지 않는다.
-        return parseIqAttachmentRegistration(next, requestedPath: path);
+        return parseIqAttachmentRegistration(next,
+            requestedPath: path, expectedQuestionId: 'q-1');
       },
       removeObject: (String path) async {
         removes++;
@@ -146,7 +147,8 @@ void main() {
 
     test('레거시: 빈 문자열 반환 → 기존 AppError 문구(사용자 노출 문구 불변)', () {
       expect(
-        () => parseIqAttachmentRegistration('   ', requestedPath: 'q-1/a.png'),
+        () => parseIqAttachmentRegistration('   ',
+            requestedPath: 'q-1/a.png', expectedQuestionId: 'q-1'),
         throwsA(isA<AppError>().having((AppError e) => e.userMessage,
             'userMessage', kIqRegisterResultUnreadable)),
       );
@@ -297,40 +299,235 @@ void main() {
       expect(
         () => parseIqAttachmentRegistration(
             <String, dynamic>{'ok': false, 'attachment_id': 'x'},
-            requestedPath: 'q-1/a.png'),
+            requestedPath: 'q-1/a.png',
+            expectedQuestionId: 'q-1'),
         throwsA(isA<AppError>().having((AppError e) => e.userMessage,
             'userMessage', kIqRegisterResultUnreadable)),
       );
       expect(
-        () => parseIqAttachmentRegistration(42, requestedPath: 'q-1/a.png'),
+        () => parseIqAttachmentRegistration(42,
+            requestedPath: 'q-1/a.png', expectedQuestionId: 'q-1'),
         throwsA(isA<AppError>().having((AppError e) => e.userMessage,
             'userMessage', kIqRegisterResultUnreadable)),
       );
     });
 
     test('파서: 형태별 idempotentContract 판정(String=false · Map=true)', () {
-      final IqAttachmentRegistration legacy =
-          parseIqAttachmentRegistration('att-1', requestedPath: 'q-1/a.png');
+      final IqAttachmentRegistration legacy = parseIqAttachmentRegistration(
+          'att-1',
+          requestedPath: 'q-1/a.png',
+          expectedQuestionId: 'q-1');
       expect(legacy.idempotentContract, isFalse);
       expect(legacy.needsCanonicalRefetch, isFalse);
       expect(legacy.storagePath, 'q-1/a.png');
 
       final IqAttachmentRegistration fresh = parseIqAttachmentRegistration(
           ok(status: kIqRegisterStatusExisting, idempotentHit: true),
-          requestedPath: 'q-1/a.png');
+          requestedPath: 'q-1/a.png',
+          expectedQuestionId: 'q-1');
       expect(fresh.idempotentContract, isTrue);
       expect(fresh.idempotentHit, isTrue);
       expect(fresh.needsCanonicalRefetch, isTrue);
     });
   });
 
+  // ────────── 파서 fail-closed(v22) — question_id · storage_path 대조 ──────────
+  //
+  // 168 성공 payload 는 question_id·storage_path 를 **항상** 채워 보낸다.
+  // 그러므로 누락·불일치는 정상 계약이 아니라 응답 뒤바뀜·오라우팅 신호다.
+  // 전 거부는 기존 kIqRegisterResultUnreadable 재사용(새 문구 0건).
+  group('파서 fail-closed — 응답 귀속 대조', () {
+    /// 168 성공 payload 원형. [extra] 로 개별 키를 덮어쓰거나(값 지정),
+    /// [drop] 으로 키 자체를 제거해 '누락' 상황을 만든다.
+    Map<String, dynamic> payload({
+      Map<String, dynamic> extra = const <String, dynamic>{},
+      List<String> drop = const <String>[],
+    }) {
+      final Map<String, dynamic> m = <String, dynamic>{
+        'ok': true,
+        'status': kIqRegisterStatusCreated,
+        'idempotent_hit': false,
+        'attachment_id': 'att-new',
+        'question_id': 'q-1',
+        'storage_path': 'q-1/1-abc.png',
+        'message_id_mismatch': false,
+        ...extra,
+      };
+      for (final String k in drop) {
+        m.remove(k);
+      }
+      return m;
+    }
+
+    Matcher throwsUnreadable() => throwsA(isA<AppError>().having(
+        (AppError e) => e.userMessage,
+        'userMessage',
+        kIqRegisterResultUnreadable));
+
+    // ① question_id 가 다른 질문의 uuid — 응답 뒤바뀜/오라우팅.
+    test('① question_id 불일치(다른 uuid) → 거부·성공 반환 0', () {
+      IqAttachmentRegistration? returned;
+      expect(
+        () => returned = parseIqAttachmentRegistration(
+          payload(extra: <String, dynamic>{'question_id': 'q-2'}),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+      expect(returned, isNull, reason: '거부된 응답으로 등록 결과를 만들지 않는다');
+    });
+
+    // ② 키 자체가 없다 — 168 은 항상 채우므로 누락이 곧 이상 신호다.
+    test('② question_id 누락(null) → 거부', () {
+      expect(
+        () => parseIqAttachmentRegistration(
+          payload(drop: <String>['question_id']),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+      // 명시적 null 도 동일하게 거부한다.
+      expect(
+        () => parseIqAttachmentRegistration(
+          payload(extra: <String, dynamic>{'question_id': null}),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+    });
+
+    // ③ 타입 오염 — 숫자로 오면 toString 비교로 통과시키지 않는다.
+    test('③ question_id 가 비-String(정수) → 거부', () {
+      expect(
+        () => parseIqAttachmentRegistration(
+          payload(extra: <String, dynamic>{'question_id': 1}),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+    });
+
+    // ④ 폴백 제거의 핵심 — 예전이라면 requestedPath 로 조용히 성공했다.
+    test('④ storage_path 누락 → 거부(requestedPath 폴백 0)', () {
+      IqAttachmentRegistration? returned;
+      expect(
+        () => returned = parseIqAttachmentRegistration(
+          payload(drop: <String>['storage_path']),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+      expect(returned, isNull,
+          reason: '앱 추정 경로를 정본으로 승격하지 않는다 — 폴백 성공 0건');
+    });
+
+    // ⑤ 빈 문자열·공백도 '값 없음'과 같다.
+    test('⑤ storage_path 가 빈 문자열/공백 → 거부', () {
+      for (final String bad in <String>['', '   ']) {
+        expect(
+          () => parseIqAttachmentRegistration(
+            payload(extra: <String, dynamic>{'storage_path': bad}),
+            requestedPath: 'q-1/1-abc.png',
+            expectedQuestionId: 'q-1',
+          ),
+          throwsUnreadable(),
+          reason: 'storage_path=${bad.isEmpty ? '빈 문자열' : '공백'} 은 값 없음과 같다',
+        );
+      }
+    });
+
+    // ⑥ 자기모순 응답 — question_id 는 맞는데 경로가 다른 질문을 가리킨다.
+    //    168 서버도 split_part(v_path,'/',1) <> p_question_id 로 막는 조합이라
+    //    앱 검사는 순수 이중 방어다.
+    test('⑥ question_id 일치 + storage_path 첫 세그먼트 불일치 → 거부', () {
+      expect(
+        () => parseIqAttachmentRegistration(
+          payload(extra: <String, dynamic>{'storage_path': 'q-2/file.png'}),
+          requestedPath: 'q-1/1-abc.png',
+          expectedQuestionId: 'q-1',
+        ),
+        throwsUnreadable(),
+      );
+    });
+
+    // ⑦ 정상 계약은 언제나 통과한다 + 서버 경로가 정본이다.
+    //    ★ requestedPath 와의 **완전 일치는 요구하지 않는다** — 서버 정규화
+    //      (현행 168 은 btrim)를 앱이 거부하면 정상 계약이 깨진다.
+    test('⑦ 정상 Map(첫 세그먼트 일치) → 성공·서버 경로가 정본·완전 일치 불요', () {
+      const String requested = '  q-1/normalized.png  '; // 앱이 보낸 원값
+      final IqAttachmentRegistration r = parseIqAttachmentRegistration(
+        payload(extra: <String, dynamic>{
+          'storage_path': 'q-1/normalized.png', // 서버 btrim 결과
+        }),
+        requestedPath: requested,
+        expectedQuestionId: 'q-1',
+      );
+      expect(r.idempotentContract, isTrue);
+      expect(r.storagePath, 'q-1/normalized.png', reason: '서버 값이 경로 정본');
+      expect(r.storagePath, isNot(requested),
+          reason: 'requestedPath 와 달라도 통과 — 서버 정규화 여지를 남긴다');
+      expect(r.attachmentId, 'att-new');
+      expect(r.status, kIqRegisterStatusCreated);
+      expect(r.needsCanonicalRefetch, isFalse);
+    });
+
+    // ⑧ 레거시(String) 분기 회귀 0 — 168 미적용 배포엔 question_id 가 없다.
+    test('⑧ 레거시 String 반환 → 회귀 0(성공·앱 경로가 정본)', () {
+      final IqAttachmentRegistration r = parseIqAttachmentRegistration(
+        'att-legacy',
+        requestedPath: 'q-1/1-abc.png',
+        expectedQuestionId: 'q-1',
+      );
+      expect(r.attachmentId, 'att-legacy');
+      expect(r.storagePath, 'q-1/1-abc.png', reason: '레거시는 앱 경로가 정본');
+      expect(r.idempotentContract, isFalse);
+      expect(r.needsCanonicalRefetch, isFalse);
+      // expectedQuestionId 가 달라도 레거시 분기는 대조하지 않는다(무변경 증명).
+      final IqAttachmentRegistration other = parseIqAttachmentRegistration(
+        'att-legacy',
+        requestedPath: 'q-1/1-abc.png',
+        expectedQuestionId: 'q-9',
+      );
+      expect(other.attachmentId, 'att-legacy');
+      expect(other.storagePath, 'q-1/1-abc.png');
+    });
+
+    // ⑨ 수렴 동작 불변 — 파서 거부는 AppError(≠PostgrestException)라
+    //    코어의 모호 결과 경로를 타 SELECT 선행 확인으로 수렴한다.
+    //    RPC 재호출 0·자동삭제 0 을 호출 카운터로 증명한다.
+    test('⑨ 파서 거부 → 코어가 SELECT 선행 확인으로 성공 수렴(RPC 1회·삭제 0회)', () async {
+      final _Harness h = _Harness(
+        // question_id 가 뒤바뀐 응답 → 파서 거부 → 모호 결과 경로.
+        registerResults: <Object?>[
+          payload(extra: <String, dynamic>{'question_id': 'q-2'}),
+        ],
+        rows: <String, List<dynamic>>{
+          'q-1/1-abc.png': _dbRows(path: 'q-1/1-abc.png'),
+        },
+      );
+      final IqAttachment a = await h.run();
+      expect(h.registers, 1, reason: '등록 RPC 재호출 0');
+      expect(h.removes, 0, reason: '자동 삭제(보상삭제) 0');
+      expect(h.finds, 1, reason: 'SELECT 선행 확인 1회');
+      expect(a.id, 'att-db', reason: 'DB 행이 등록 정본');
+    });
+  });
+
   // ───────────────────────── 오류 코드 계약 ─────────────────────────
   group('168 오류 코드 계약 — 재시도 정책', () {
+    // 168 성공 payload 는 question_id 를 **항상** 채운다 — 픽스처도 실계약과
+    // 같은 형태여야 파서 fail-closed 검사를 정상 통과한다(기대값은 불변).
     Map<String, dynamic> okCreated() => <String, dynamic>{
           'ok': true,
           'status': kIqRegisterStatusCreated,
           'idempotent_hit': false,
           'attachment_id': 'att-new',
+          'question_id': 'q-1',
           'storage_path': 'q-1/1-abc.png',
           'message_id_mismatch': false,
         };

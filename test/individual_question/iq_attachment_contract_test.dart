@@ -135,7 +135,8 @@ void main() {
           if (registerError != null) throw registerError;
           // ★ 이 그룹은 **레거시 계약(String 반환 = 168 미적용)** 전용이다.
           //   신규 jsonb 계약은 별도 그룹에서 다룬다(형태 혼합 금지).
-          return parseIqAttachmentRegistration('att-1', requestedPath: path);
+          return parseIqAttachmentRegistration('att-1',
+              requestedPath: path, expectedQuestionId: 'q-1');
         },
         removeObject: (String path) async {
           removes++;
