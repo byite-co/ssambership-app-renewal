@@ -256,6 +256,70 @@ void main() {
       expect(removes, 0);
       expect(finds, 0);
     });
+
+    test('v19 보정3: finder 가 비정상 행으로 throw → AMBIGUOUS·삭제 0·RPC 재호출 0',
+        () async {
+      // 모호 등록 오류 후 SELECT 가 손상 행으로 throw(canonical 검증 실패 모사).
+      await expectLater(
+          run(
+              registerError: _Ambiguous(),
+              findError: const FormatException('IQ_ATTACHMENT_ROW_BAD_ID')),
+          throwsA(isA<IqAttachmentAmbiguousResult>()));
+      expect(removes, 0, reason: '손상 행을 미등록 확정으로 오해석 금지');
+      expect(registers, 1, reason: 'RPC 재호출 0');
+    });
+  });
+
+  group('v19 보정3 — canonicalRegisteredAttachment(0행 vs 비정상 행)', () {
+    Map<String, dynamic> row({
+      Object? id = 'att-1',
+      Object? path = 'q-1/1.png',
+      Object? question = 'q-1',
+    }) =>
+        <String, dynamic>{
+          'id': id,
+          'storage_path': path,
+          'question_id': question,
+          'file_name': 'a.png',
+          'mime_type': 'image/png',
+        };
+
+    IqAttachment? call(List<dynamic> rows) =>
+        canonicalRegisteredAttachment(rows,
+            questionId: 'q-1', objectPath: 'q-1/1.png');
+
+    test('실제 0행 → null(미등록 확정은 이 경우뿐)', () {
+      expect(call(<dynamic>[]), isNull);
+    });
+
+    test('정상 행 → DB 행 정본 생성', () {
+      final IqAttachment a = call(<dynamic>[row()])!;
+      expect(a.id, 'att-1');
+      expect(a.storagePath, 'q-1/1.png');
+    });
+
+    test('행 존재·id null → throw(AMBIGUOUS 수렴)', () {
+      expect(() => call(<dynamic>[row(id: null)]), throwsFormatException);
+    });
+
+    test('행 존재·id 비문자·빈 문자열 → throw', () {
+      expect(() => call(<dynamic>[row(id: 7)]), throwsFormatException);
+      expect(() => call(<dynamic>[row(id: '  ')]), throwsFormatException);
+    });
+
+    test('행 존재·storage_path 불일치 → throw', () {
+      expect(() => call(<dynamic>[row(path: 'q-1/other.png')]),
+          throwsFormatException);
+    });
+
+    test('행 존재·question_id 불일치 → throw', () {
+      expect(
+          () => call(<dynamic>[row(question: 'q-2')]), throwsFormatException);
+    });
+
+    test('행 존재·비정상 shape(맵 아님) → throw', () {
+      expect(() => call(<dynamic>['not-a-map']), throwsFormatException);
+    });
   });
 
   group('멘토 첨부 UI(iq_detail)', () {

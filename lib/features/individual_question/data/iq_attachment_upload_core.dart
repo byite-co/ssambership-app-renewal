@@ -77,6 +77,47 @@ class IqAttachmentAmbiguousResult implements Exception {
   String toString() => message;
 }
 
+/// v19 보정3: SELECT 응답 → 등록 정본 행 생성.
+/// - rows 가 **실제 0건**일 때만 null(미등록 확정은 이 경우뿐).
+/// - 행이 존재하는데 id 가 null·비문자·빈 문자열이거나 storage_path /
+///   question_id 가 요청과 모순이면 정본 생성 불가 — throw 하고, finder 의
+///   throw 는 코어에서 AMBIGUOUS_SERVER_RESULT 로 수렴한다
+///   (자동삭제 0·RPC 재호출 0·성공 표시 0 — 손상 응답을 '미등록 확정'으로
+///   해석해 보상삭제로 진행하지 않는다).
+IqAttachment? canonicalRegisteredAttachment(
+  List<dynamic> rows, {
+  required String questionId,
+  required String objectPath,
+}) {
+  if (rows.isEmpty) return null;
+  final Object? first = rows.first;
+  if (first is! Map) {
+    throw const FormatException('IQ_ATTACHMENT_ROW_BAD_SHAPE');
+  }
+  final Map<dynamic, dynamic> r = first;
+  final Object? id = r['id'];
+  if (id is! String || id.trim().isEmpty) {
+    throw const FormatException('IQ_ATTACHMENT_ROW_BAD_ID');
+  }
+  final Object? sp = r['storage_path'];
+  if (sp is! String || sp != objectPath) {
+    throw const FormatException('IQ_ATTACHMENT_ROW_PATH_MISMATCH');
+  }
+  if (r.containsKey('question_id')) {
+    final Object? q = r['question_id'];
+    if (q is! String || q != questionId) {
+      throw const FormatException('IQ_ATTACHMENT_ROW_QUESTION_MISMATCH');
+    }
+  }
+  return IqAttachment(
+    id: id,
+    storagePath: objectPath,
+    messageId: r['message_id'] is String ? r['message_id'] as String : null,
+    fileName: r['file_name'] is String ? r['file_name'] as String : null,
+    mimeType: r['mime_type'] is String ? r['mime_type'] as String : null,
+  );
+}
+
 Future<IqAttachment> uploadIqAttachmentCore({
   required String questionId,
   required PickedImage file,

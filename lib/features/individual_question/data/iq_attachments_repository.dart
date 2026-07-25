@@ -102,27 +102,21 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
     );
   }
 
-  /// 동일 question_id + storage_path 행 SELECT(당사자 RLS) — 0건이면 null,
-  /// SELECT 자체 실패는 그대로 throw(코어가 AMBIGUOUS 로 수렴).
+  /// 동일 question_id + storage_path 행 SELECT(당사자 RLS).
+  /// v19 보정3: null 은 '실제 0건(미등록 확정)'일 때만. 행이 존재하는데
+  /// shape 가 손상됐거나 필터와 모순이면 throw — 코어가 AMBIGUOUS 로 수렴
+  /// (보상삭제·RPC 재호출로 진행하지 않는다). SELECT 자체 실패도 throw.
   Future<IqAttachment?> _findRegistered(
       SupabaseClient client, String questionId, String path) async {
     final List<dynamic> rows = await client
         .from('individual_question_attachments')
-        .select('id, storage_path, message_id, file_name, mime_type')
+        .select(
+            'id, question_id, storage_path, message_id, file_name, mime_type')
         .eq('question_id', questionId)
         .eq('storage_path', path)
         .limit(1);
-    if (rows.isEmpty) return null;
-    final Map<String, dynamic> r = (rows.first as Map).cast<String, dynamic>();
-    final Object? id = r['id'];
-    if (id is! String) return null; // 식별 불가 행은 정본으로 쓰지 않는다.
-    return IqAttachment(
-      id: id,
-      storagePath: (r['storage_path'] as String?) ?? path,
-      messageId: r['message_id'] as String?,
-      fileName: r['file_name'] as String?,
-      mimeType: r['mime_type'] as String?,
-    );
+    return canonicalRegisteredAttachment(rows,
+        questionId: questionId, objectPath: path);
   }
 
   /// 당사자 다운로드(저장용) — RLS(iqa_storage_read_party) 경유 바이트 수신.
