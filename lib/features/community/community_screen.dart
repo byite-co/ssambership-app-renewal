@@ -31,7 +31,7 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const int _boardTab = 1;
 
   late final TabController _tab;
@@ -46,10 +46,21 @@ class _CommunityScreenState extends State<CommunityScreen>
     _tab.addListener(() {
       if (mounted) setState(() {});
     });
+    // §4: 관리자 숨김·복구 등 외부 변경 반영 — 앱 복귀(resumed) 시 목록 재조회.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 세대 토큰이 있는 paginator.refresh 라 무한 새로고침·stale 덮어쓰기 없음.
+      _boardKey.currentState?.reload();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tab.dispose();
     super.dispose();
   }

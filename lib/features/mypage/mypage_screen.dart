@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_tabs.dart';
 import '../../app/entry_guard.dart';
 import '../../core/auth/auth_service.dart';
+import '../../core/refresh/data_refresh_bus.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
@@ -55,6 +56,30 @@ class _MyPageScreenState extends State<MyPageScreen> {
   void initState() {
     super.initState();
     _future = (widget.loaderOverride ?? _repo.load)();
+    // §4: 지갑 변경 신호(IQ 예치·환불·정산 등) 수신 → 잔액·최근 내역 재조회.
+    // Future 교체 + FutureBuilder 라 늦은 이전 응답이 최신 상태를 덮지 않는다.
+    DataRefreshBus.walletGeneration.addListener(_onWalletChanged);
+  }
+
+  @override
+  void dispose() {
+    DataRefreshBus.walletGeneration.removeListener(_onWalletChanged);
+    super.dispose();
+  }
+
+  void _onWalletChanged() {
+    if (!mounted) return; // dispose 후 상태 변경 금지.
+    _reload();
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    // ★ 블록 바디: setState(() => _future = future) 는 클로저가 Future 를 반환해
+    //   'setState callback returned a Future' 로 리빌드가 취소된다.
+    final Future<MyPageData> next = (widget.loaderOverride ?? _repo.load)();
+    setState(() {
+      _future = next;
+    });
   }
 
   Future<void> _openProfileEdit(MyProfile profile) async {
@@ -63,9 +88,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
         builder: (_) => ProfileEditScreen(profile: profile),
       ),
     );
-    if (saved == true && mounted) {
-      setState(() => _future = (widget.loaderOverride ?? _repo.load)());
-    }
+    if (saved == true && mounted) _reload();
   }
 
   void _goToQuestions() {

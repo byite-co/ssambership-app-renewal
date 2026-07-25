@@ -122,28 +122,36 @@ class BoardListViewState extends State<BoardListView> {
         message: '이 분류에는 글이 없어요.',
       );
     }
-    return ListView.separated(
-      controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, 4, AppSpacing.screenH, 88),
-      itemCount: posts.length + (_pager.hasMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (BuildContext context, int i) {
-        if (i >= posts.length) {
-          // 다음 페이지 로딩 인디케이터(끝에 도달 시 자동 로드).
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return BoardPostCard(post: posts[i], onOpen: () => _open(posts[i]));
-      },
+    // §4: 외부(웹·관리자) 변경 반영용 pull-to-refresh — 세대 토큰이 있는
+    // paginator.refresh 라 늦은 응답이 최신 목록을 덮지 않는다.
+    return RefreshIndicator(
+      onRefresh: () => _pager.refresh(),
+      child: ListView.separated(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenH, 4, AppSpacing.screenH, 88),
+        itemCount: posts.length + (_pager.hasMore ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (BuildContext context, int i) {
+          if (i >= posts.length) {
+            // 다음 페이지 로딩 인디케이터(끝에 도달 시 자동 로드).
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return BoardPostCard(post: posts[i], onOpen: () => _open(posts[i]));
+        },
+      ),
     );
   }
 
   Future<void> _open(BoardPost post) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    // §4: 상세에서 댓글·반응 등 변경(pop true)이 있었을 때만 첫 페이지 재조회
+    // — 카드의 댓글수·좋아요수 stale 해소(무조건 재조회로 인한 중복 호출 없음).
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => BoardDetailScreen(
           post: post,
           read: widget.read,
@@ -151,5 +159,6 @@ class BoardListViewState extends State<BoardListView> {
         ),
       ),
     );
+    if (changed == true && mounted) await _pager.refresh();
   }
 }
