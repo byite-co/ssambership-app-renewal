@@ -7,10 +7,12 @@ import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/app_card.dart';
 import '../../../design/widgets/initial_avatar.dart';
 import '../../../design/widgets/primary_button.dart';
+import '../data/free_question_entry.dart';
 import '../data/mentor_directory_repository.dart';
 import '../data/mentor_favorites_repository.dart';
 import '../data/mentor_models.dart';
 import '../data/mentor_subject.dart';
+import 'widgets/free_question_entry_section.dart';
 import 'widgets/mentor_favorite_button.dart';
 import 'widgets/mentor_meta_item.dart';
 import '../../../app/app_tabs.dart';
@@ -139,8 +141,10 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
             future: _future,
             builder:
                 (BuildContext context, AsyncSnapshot<MentorDetailExtras> snap) {
-              final bool subscribed = snap.data?.alreadySubscribed ?? false;
-              if (subscribed) {
+              // null = 구독 여부 미확정(로딩·조회 실패) — 무료 CTA 활성화 금지.
+              final bool? subscribed =
+                  snap.hasData ? snap.data!.alreadySubscribed : null;
+              if (subscribed == true) {
                 return PrimaryButton(
                   label: '질문방으로',
                   icon: Icons.forum_rounded,
@@ -148,7 +152,27 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
                 );
               }
               // 커머스 제로: 구매 유도(구독하기) 제거 → 비상호작용 안내.
-              return const CommerceNoticeCard(text: kSubscribeNoticeText);
+              // 무료 질문(세션1 §3): 비구독 학생 전용 — 개별질문 CTA 와 독립.
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const CommerceNoticeCard(text: kSubscribeNoticeText),
+                  FreeQuestionEntrySection(
+                    mentorId: widget.item.id,
+                    mentorName: widget.item.displayName,
+                    alreadySubscribed: subscribed,
+                    onCreated: (CreatedFreeQuestion created) {
+                      // 성공: 상세 extras 재조회 + 성공 안내 + 기존 질문방
+                      // 이동 계약(_goToQuestionRoom) 재사용 — 정본 room 으로.
+                      setState(
+                          () => _future = _repo.fetchExtras(widget.item.id));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('무료 질문을 보냈어요. 질문방에서 확인할 수 있어요.')));
+                      _goToQuestionRoom(context);
+                    },
+                  ),
+                ],
+              );
             },
           ),
           // 개별질문: 구독 없이 1건씩 캐시로 질문(지정형). 학생만.
