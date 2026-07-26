@@ -9,6 +9,7 @@ import '../../../../design/widgets/app_badge.dart';
 import '../../data/community_models.dart';
 import '../../data/community_read_repository.dart';
 import '../../data/community_write_repository.dart';
+import '../../data/shortform_media_url_resolver.dart';
 import '../widgets/block_author_action.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/content_policy_gate.dart';
@@ -19,7 +20,11 @@ import 'shortform_video_port.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
 /// 숏폼 상세 — 세로 영상 재생(video_player, 탭=재생/일시정지) + 반응 + 댓글.
-/// videoUrl 이 없거나(http/https 아님 포함) 초기화 실패 시 썸네일 폴백.
+///
+/// videoUrl 정본은 Storage 참조(`shortform-videos/{userId}/{uuid}.{ext}`)라
+/// [ShortformMediaUrlResolver] 로 짧은 TTL 서명 URL 을 해석한 뒤 재생한다
+/// (legacy http(s) 절대 URL 은 해석 없이 그대로 재생 — 기존 계약 유지).
+/// 해석·초기화 실패는 크래시 없이 명시적 폴백 + 수동 재시도로 수렴한다.
 /// 작성은 '댓글'만.
 class ShortformDetailScreen extends StatefulWidget {
   const ShortformDetailScreen({
@@ -28,6 +33,7 @@ class ShortformDetailScreen extends StatefulWidget {
     required this.read,
     required this.write,
     this.videoControllerFactory = createShortformVideoController,
+    this.mediaResolver,
   });
 
   final ShortformPost post;
@@ -37,11 +43,29 @@ class ShortformDetailScreen extends StatefulWidget {
   /// 재생 컨트롤러 팩토리 — 테스트에서 fake 주입(실네트워크 재생 회피).
   final ShortformVideoControllerFactory videoControllerFactory;
 
+  /// 저장값 → 재생 URL 리졸버. null 이면 앱 전역 공유 Supabase 구현
+  /// ([sharedShortformMediaUrlResolver])을 쓴다. 테스트에서 fake 백엔드를
+  /// 물린 리졸버를 주입해 실네트워크·실 Storage 없이 전 상태를 재현한다.
+  final ShortformMediaUrlResolver? mediaResolver;
+
   @override
-  State<ShortformDetailScreen> createState() => _ShortformDetailScreenState();
+  State<ShortformDetailScreen> createState() => ShortformDetailScreenState();
 }
 
-class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
+/// 미디어 로드 단계(§5-2). resolving(참조 해석) → initializing(플레이어
+/// 초기화) → ready, 또는 noMedia/failed/invalidReference 로 수렴한다.
+enum _ShortformMediaPhase {
+  resolving,
+  noMedia,
+  initializing,
+  ready,
+  failed,
+  invalidReference,
+}
+
+/// 상태를 공개해 테스트가 [retryMedia] 로 로드 세대(viewLoadGeneration) 폐기
+/// 계약을 검증할 수 있게 한다(ShortformFeedViewState 공개와 같은 규약).
+class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
@@ -51,8 +75,15 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
   bool _busy = false;
 
   ShortformVideoController? _video;
-  bool _videoReady = false;
-  bool _videoFailed = false;
+  _ShortformMediaPhase _mediaPhase = _ShortformMediaPhase.resolving;
+
+  /// 화면 로드 세대 토큰(§4-4-B viewLoadGeneration) — 재시도가 세대를
+  /// 전진시키면 이전 세대의 늦은 응답(해석·초기화 완료)은 폐기된다.
+  /// 리졸버 내부의 resolverRequestEpoch 와는 다른 층이다.
+  int _viewLoadGeneration = 0;
+
+  ShortformMediaUrlResolver get _resolver =>
+      widget.mediaResolver ?? sharedShortformMediaUrlResolver;
 
   @override
   void initState() {
@@ -61,35 +92,73 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
     _comments =
         widget.read.comments(CommunityPostType.shortform, widget.post.id);
     _loadReactionState();
-    _initVideo();
+    _loadMedia();
     // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
     widget.write.incrementShortformView(widget.post.id);
   }
 
-  /// videoUrl 이 유효한 http(s)면 재생 준비. 없거나 초기화 실패면 썸네일 폴백.
-  Future<void> _initVideo() async {
-    final Uri? url = _validVideoUrl(widget.post.videoUrl);
-    if (url == null) return; // 썸네일 폴백(재생 없음)
-    final ShortformVideoController video = widget.videoControllerFactory(url);
+  /// 저장값을 리졸버로 해석해 재생을 준비한다. ★ build 중 진입 금지 —
+  /// initState 와 재시도([retryMedia])에서만 호출한다(§5-2).
+  ///
+  /// 늦은 이전 응답이 최신 시도를 덮지 않도록 시작 시 세대를 전진시키고,
+  /// 각 await 뒤에서 세대·mounted 를 재확인한다. 기존 컨트롤러는 새 시도
+  /// 전에 dispose 후 교체한다(§5-4).
+  Future<void> _loadMedia({bool forceRefresh = false}) async {
+    final int gen = ++_viewLoadGeneration;
+    final ShortformVideoController? old = _video;
+    _video = null;
+    if (_mediaPhase != _ShortformMediaPhase.resolving) {
+      setState(() => _mediaPhase = _ShortformMediaPhase.resolving);
+    }
+    if (old != null) await old.dispose();
+
+    final ShortformMediaResolution res = await _resolver
+        .resolve(widget.post.videoUrl, forceRefresh: forceRefresh);
+    if (!mounted || gen != _viewLoadGeneration) return; // 늦은 응답 폐기
+
+    switch (res.status) {
+      case ShortformMediaStatus.absent:
+        setState(() => _mediaPhase = _ShortformMediaPhase.noMedia);
+        return;
+      case ShortformMediaStatus.invalidReference:
+        // 참조 손상은 재시도해도 결과가 같다 — 재시도 없는 실패 UI(§5-4).
+        setState(() => _mediaPhase = _ShortformMediaPhase.invalidReference);
+        return;
+      case ShortformMediaStatus.failed:
+        setState(() => _mediaPhase = _ShortformMediaPhase.failed);
+        return;
+      case ShortformMediaStatus.resolved:
+        break;
+    }
+
+    final ShortformVideoController video =
+        widget.videoControllerFactory(res.uri!);
     _video = video; // await 전에 보관 — dispose 가 반드시 해제하도록
+    setState(() => _mediaPhase = _ShortformMediaPhase.initializing);
     try {
       await video.initialize();
-      if (!mounted) return;
-      setState(() => _videoReady = true);
+      if (!mounted || gen != _viewLoadGeneration) return; // 소유권 이전됨
+      setState(() => _mediaPhase = _ShortformMediaPhase.ready);
     } catch (_) {
-      // 재생 실패는 화면을 막지 않는다 — 썸네일 폴백(크래시 금지).
-      if (!mounted) return;
-      setState(() => _videoFailed = true);
+      // 초기화 실패는 화면을 막지 않는다 — 실패 컨트롤러를 즉시 해제하고
+      // 수동 재시도로 수렴(크래시 금지).
+      if (!mounted || gen != _viewLoadGeneration) return;
+      _video = null;
+      await video.dispose();
+      if (!mounted || gen != _viewLoadGeneration) return;
+      setState(() => _mediaPhase = _ShortformMediaPhase.failed);
     }
   }
 
-  /// http/https 절대 URL 만 재생 대상으로 인정(그 외 null → 썸네일 폴백).
-  Uri? _validVideoUrl(String? raw) {
-    final String s = raw?.trim() ?? '';
-    if (s.isEmpty) return null;
-    final Uri? u = Uri.tryParse(s);
-    if (u == null || !(u.isScheme('http') || u.isScheme('https'))) return null;
-    return u;
+  /// 미디어 재로드 진입점 — 리졸버 캐시를 강제 무효화(forceRefresh)하고 새
+  /// 세대로 다시 시도한다. 테스트가 세대 폐기 계약 검증에 직접 호출한다.
+  Future<void> retryMedia() => _loadMedia(forceRefresh: true);
+
+  /// 재시도 버튼 탭 — failed 상태에서만 1탭 = 정확히 1회 새 시도(연타 가드:
+  /// 첫 탭이 동기적으로 resolving 으로 바꿔 이후 탭은 무시된다).
+  void _onRetryTap() {
+    if (_mediaPhase != _ShortformMediaPhase.failed) return;
+    retryMedia();
   }
 
   /// 현재 사용자의 기존 숏폼 반응(좋아요/스크랩)을 로드해 초기 상태에 반영(게시판과 동일 패턴).
@@ -119,7 +188,7 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
   /// 영상 탭 → 재생/일시정지 토글.
   Future<void> _togglePlay() async {
     final ShortformVideoController? video = _video;
-    if (video == null || !_videoReady) return;
+    if (video == null || _mediaPhase != _ShortformMediaPhase.ready) return;
     if (video.isPlaying) {
       await video.pause();
     } else {
@@ -280,7 +349,8 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
               padding: EdgeInsets.zero,
               children: <Widget>[
                 // 영상 영역: 재생 준비 완료 시 플레이어(탭=재생/일시정지),
-                // 그 외(초기화 중/URL 없음/실패)는 썸네일(9:16) 폴백.
+                // 해석·초기화 중엔 썸네일(9:16) 배경, 실패·영상 없음은
+                // 명시적 문구 폴백(실패만 수동 재시도 제공).
                 _videoArea(),
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -328,35 +398,98 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
     );
   }
 
-  /// 영상 영역 — 준비 완료 전(초기화 중)·URL 없음·실패는 모두 썸네일 폴백.
+  /// 영상 영역 — 단계별 렌더(§5-2). 해석·초기화 중엔 썸네일 배경,
+  /// noMedia/failed/invalidReference 는 명시적 문구 폴백, ready 는 플레이어.
   Widget _videoArea() {
     final ShortformVideoController? video = _video;
-    if (video == null || _videoFailed || !_videoReady) {
+    if (_mediaPhase == _ShortformMediaPhase.ready && video != null) {
+      final double ratio = video.aspectRatio > 0 ? video.aspectRatio : 9 / 16;
       return AspectRatio(
-        aspectRatio: 9 / 16,
-        child: ThumbnailView(url: widget.post.thumbnailUrl),
+        aspectRatio: ratio,
+        child: GestureDetector(
+          onTap: _togglePlay,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              video.buildPlayer(),
+              // 일시정지 상태에서만 재생 어포던스 오버레이(재생 중엔 화면만).
+              // 탭은 아래 GestureDetector 가 받도록 오버레이는 히트테스트 제외.
+              if (!video.isPlaying)
+                const IgnorePointer(
+                  child: Center(
+                    child: Icon(Icons.play_circle_fill,
+                        size: 64, color: Colors.white70),
+                  ),
+                ),
+            ],
+          ),
+        ),
       );
     }
-    final double ratio = video.aspectRatio > 0 ? video.aspectRatio : 9 / 16;
+    switch (_mediaPhase) {
+      case _ShortformMediaPhase.resolving:
+        return _mediaBackdrop(
+            key: const ValueKey<String>('sf-media-resolving'));
+      case _ShortformMediaPhase.initializing:
+        return _mediaBackdrop(
+            key: const ValueKey<String>('sf-media-initializing'));
+      case _ShortformMediaPhase.noMedia:
+        // 영상이 실제로 없는 행 — 실패가 아니므로 재시도를 권하지 않는다.
+        return _mediaFallback('영상이 준비되지 않았어요.', showRetry: false);
+      case _ShortformMediaPhase.invalidReference:
+        // 참조 손상 — 재시도해도 결과가 같아 재시도 버튼을 노출하지 않는다.
+        return _mediaFallback('영상을 불러오지 못했어요.', showRetry: false);
+      case _ShortformMediaPhase.failed:
+        return _mediaFallback('영상을 불러오지 못했어요.', showRetry: true);
+      case _ShortformMediaPhase.ready:
+        // ready 인데 컨트롤러가 없으면(방어) 실패 폴백과 동일 취급.
+        return _mediaFallback('영상을 불러오지 못했어요.', showRetry: true);
+    }
+  }
+
+  /// 해석·초기화 중 배경 — 썸네일이 있으면 표시, 없으면 중립 플레이스홀더.
+  Widget _mediaBackdrop({Key? key}) {
     return AspectRatio(
-      aspectRatio: ratio,
-      child: GestureDetector(
-        onTap: _togglePlay,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            video.buildPlayer(),
-            // 일시정지 상태에서만 재생 어포던스 오버레이(재생 중엔 화면만).
-            // 탭은 아래 GestureDetector 가 받도록 오버레이는 히트테스트 제외.
-            if (!video.isPlaying)
-              const IgnorePointer(
-                child: Center(
-                  child: Icon(Icons.play_circle_fill,
-                      size: 64, color: Colors.white70),
-                ),
+      key: key,
+      aspectRatio: 9 / 16,
+      child: ThumbnailView(url: widget.post.thumbnailUrl),
+    );
+  }
+
+  /// 실패·영상 없음 폴백 — 중립 영상 배경 위 안내 문구(+ 필요 시 수동 재시도).
+  /// 자동 무한 재시도는 하지 않는다(§5-4).
+  Widget _mediaFallback(String message, {required bool showRetry}) {
+    return AspectRatio(
+      aspectRatio: 9 / 16,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          ThumbnailView(url: widget.post.thumbnailUrl),
+          ColoredBox(
+            color: const Color(0x66000000), // 문구 대비용 스크림
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.videocam_off_outlined,
+                      size: 40, color: Colors.white70),
+                  const SizedBox(height: 8),
+                  Text(message,
+                      style: AppType.caption.copyWith(color: Colors.white)),
+                  if (showRetry) ...<Widget>[
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: _onRetryTap,
+                      style:
+                          TextButton.styleFrom(foregroundColor: Colors.white),
+                      child: const Text('다시 시도'),
+                    ),
+                  ],
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
