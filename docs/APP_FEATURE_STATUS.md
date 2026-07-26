@@ -87,14 +87,14 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 ## ★ 먼저: 미완·깨짐 요약 (출시 전 판단할 것)
 
 **하드 '깨짐(에러·크래시)'은 0건.** 코어 Q&A 루프(질문 작성→답변→확인)와 조회 기능들은 실제 Supabase에 연결되어 작동한다.
-문제는 **'보이지만 실제로는 안 되는' 기능 7종**(기존 8종 중 채팅 첨부는 2026-07-02 퀵윈으로 해결)과 **인프라 대기 스텁**이다.
+문제는 아래 표에서 완료 표기를 제외한 **미해결 기능**과 **인프라 대기 스텁**이다. **[정정 2026-07-26]** 고정 건수는 유지하지 않는다. 각 행의 최신 정정 표기와 실코드 근거를 기준으로 현재 상태를 판정한다.
 
 ### 🔴 '보이지만 실제로는 안 되는' 기능 (사용자가 눌렀는데 반응 없음/저장 안 됨)
 | # | 기능 | 증상 | 근거 | 종류 |
 |---|---|---|---|---|
 | 1 | ~~**구독/충전/결제·정산·프로필편집/약관 버튼**~~ **✅ 해소(2026-07)** | 운영 도메인 확정 — 관리·약관·정산 버튼이 실제 웹을 연다(구매 유도 CTA 는 컴플라이언스로 별도 제거) | `web_bridge_config.dart` `baseUrl`(fromEnvironment, 기본=운영 도메인) | 완료 |
 | 2 | ~~채팅 이미지 첨부~~ **✅ 해결** | 업로드 + 뷰어 + 주석 진입점 모두 완료 | 퀵윈 `c32d53f`, 뷰어 PR #8 `b1fb61a` | 완료 |
-| 3 | **숏폼 영상 재생** | 재생 아이콘 보이나 눌러도 재생 안 됨(썸네일만) | `thumbnail_view.dart:6,29`, `shortform_card.dart:10`, `community_models.dart:67` | **인프라/패키지**(video player 미도입) |
+| 3 | **숏폼 영상 재생** | 전체 HTTP(S) URL 은 상세 플레이어에서 재생할 수 있으나, 웹 정본 영상 Storage 참조는 앱에서 signed URL 로 해석하지 못한다. 웹 finalize 는 `thumbnail_url` 도 NULL 로 저장하므로 앱에는 썸네일이 아니라 **중립 배경**만 보인다. 피드 카드는 중립 배경 + 상세 진입만 제공한다 | `shortform_video_port.dart`, `shortform_detail_screen.dart:64,70-93,114,331-352`, `community_read_repository.dart:80-93`, `community_models.dart:128-146` | **부분구현 — 앱 데이터 계층 + Storage 정책 실증** |
 | 4 | ~~**숏폼 좋아요/스크랩**~~ **✅ 해소** | 초기 상태 로드 구현됨 | `shortform_detail_screen.dart:46-61`(`_loadReactionState`) | 완료 |
 | 5 | **커뮤니티 조회수** | "조회 N" 표시되나 글 진입해도 증가 안 함 | `community_read_repository.dart`(incrementView 부재) | **인프라**(증분 RPC) |
 | 6 | **알림 딥링크** | 알림 눌러도 해당 글/스레드로 안 가고 탭만 전환 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152` | 앱+인프라(푸시) |
@@ -102,7 +102,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 8 | **회원가입 링크** | "웹에서 가입" 눌러도 "링크 준비 중" | `login_screen.dart:76` | 오너 설정값 |
 
 ### 🟠 미완·스텁 (기능 골격만, 실행 인프라 대기)
-- **푸시 알림 전체** — FCM 미도입 + `device_tokens` 테이블 없음 + Edge Function `send-push` 미배포 + 트리거 미연결. (`lib/core/push/*`, HANDOFF.md) → **인프라**
+- **OS 푸시 — 출시 범위 제외(App-F0)** — OS 푸시는 App-F0 정책에 따라 이번 출시 범위에서 제외됐다. `device_tokens` 테이블은 **기존재**하지만 앱의 FCM SDK·OS 권한·토큰 등록 경로는 제거되어 QA 계정 신규 행이 생기지 않는 것이 정상이다. 재도입은 별도 백로그로 관리하며, 재도입 시 Data Safety 재검토가 필요하다. 인앱 알림 목록·유형 필터·읽음 처리는 정상 작동이므로 함께 미완으로 묶지 않는다. (`lib/core/push/push_ports.dart`(포트만 존치), `lib/core/push/HANDOFF.md`) → **출시 범위 제외**
 - **커뮤니티 목록 페이징** — 전체 로드(limit/offset 없음). 데이터 많아지면 성능 저하. (`community_read_repository.dart:23-59`) → 앱만
 - **딥링크 라우팅** — 골격만(스트림 구독·경로 매핑 미구현). → 앱+인프라
 - **온보딩** — 진입→로그인 골격만(`onboarding_screen.dart:8`). → 앱만
@@ -110,17 +110,20 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 
 ### 실질 출시 판단(핵심)
 - ~~**가장 크리티컬(코어 수익 동선)**: #1 `baseUrl` 미설정~~ **✅ 해소(2026-07)** — 운영 도메인 확정으로 웹 동선 전체가 열린다. 결제 관련 잔여 판단은 스토어 정책(docs/PLAY_STORE_REVIEW_PLAN.md P0-3)이며 이 문서 범위 밖.
-- **범위 의존**: 숏폼(#3 재생)을 출시 범위에 넣으면 미완 노출 → 범위 제외하거나 가려야 함. (첨부는 업로드·이미지 뷰어·주석 모두 완료.)
-- **UX 저하(비차단)**: 딥링크·조회수·숏폼반응·알림토글·페이징·푸시 — 코어 작동엔 지장 없음.
+- **범위 의존**: 숏폼 상세 플레이어 UI는 배선됐지만 웹 정본 영상 Storage 참조의 signed URL 해석이 앱에 없어 실데이터 재생은 아직 **부분구현**이다. 현재 웹 finalize 는 `thumbnail_url` 도 NULL 로 저장하므로 중립 배경만 표시된다. 이번 출시 범위에 포함하려면 영상 URL 해석·만료 재발급, 썸네일 생성/업로드 또는 명시적 대체 UI, 실데이터 기기 QA 를 완료해야 하며, 미완이면 빈 상태 유지 또는 진입 제한을 선택한다. (첨부는 업로드·이미지 뷰어·주석 모두 완료.)
+- **UX 저하(비차단)**: 딥링크·조회수·페이징. 숏폼 반응과 알림 토글은 완료됐고, OS 푸시는 App-F0 정책상 출시 범위에서 제외됐다. 숏폼은 `video_player` 와 상세 재생 UI가 배선됐지만 정본 영상 Storage 참조를 signed URL 로 바꾸는 데이터 계층이 없어 웹 업로드 실데이터 재생은 아직 부분구현이다. 현재 웹 finalize 는 `thumbnail_url` 을 NULL 로 저장하므로 앱에는 중립 배경만 보인다. 피드 카드의 직접 재생·재생 어포던스도 앱 UI 잔여다.
 
 ---
 
 ## 집계
+
+**[정정 2026-07-26]** 변동되는 기능 상태의 고정 건수는 유지하지 않는다. 각 행의 최신 정정 표기와 실코드 근거를 기준으로 현재 상태를 판정한다.
+
 | 판정 | 건수 | 비고 |
-|---|---|---|
-| **완전작동** | 28 | 실제 Supabase 쿼리·배선 완결 (+필기·주석·첨부 업로드 — 2026-07-02 필기 시리즈 반영) |
-| **부분구현** | 6 | 일부만 동작(위 🔴; 첨부 업로드는 완료로 이동) |
-| **미완·스텁** | 6 | 골격/인프라 대기(위 🟠) |
+|---|---:|---|
+| **완전작동** | — | 고정 집계하지 않음. 탭별 상세표의 최신 판정과 실코드 근거로 판단 |
+| **부분구현** | — | 고정 집계하지 않음. 탭별 상세표의 최신 판정과 실코드 근거로 판단 |
+| **미완·스텁** | — | 고정 집계하지 않음. 탭별 상세표의 최신 판정과 실코드 근거로 판단 |
 | **깨짐** | 0 | 크래시·에러 없음 |
 
 ---
@@ -148,10 +151,10 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 게시글 상세 | 완전작동 | `board_detail_screen.dart:47,59-71,176-184` | 없음 | 앱 |
 | 댓글 목록·작성 | 완전작동 | `community_read/write_repository.dart:52-91`(select/insert) | 없음 | 앱 |
 | 좋아요/스크랩(게시판) | 완전작동 | `board_detail_screen.dart:57-110`(post_reactions toggle) | 없음 | 앱 |
-| 좋아요/스크랩(숏폼) | 부분구현 | `shortform_detail_screen.dart:42-47`(초기 상태 로드 없음 → 항상 false) | 🔴 기존 반응 안 보임 | 앱만 |
+| 좋아요/스크랩(숏폼) | 완전작동 | `shortform_detail_screen.dart:46-63`(`_loadReactionState` initState 호출), `shortform_reactions` 조회 | 없음 | 앱 |
 | 신고 | 완전작동 | `report_sheet.dart:18-78`, `write_repository.dart:105-113`(content_reports insert) | 없음 | 앱 |
 | 숏폼 목록(feed) | 완전작동 | `shortform_feed_view.dart:28,38`(shortform_posts 실쿼리) | 없음 | 앱 |
-| 숏폼 영상 재생 | 미완·스텁 | `thumbnail_view.dart:6,29`(재생 플러그인 없음, 썸네일+아이콘만) | 🔴 재생 불가 | **패키지/인프라**(video player+Storage) |
+| 숏폼 영상 재생 | 부분구현 | `shortform_video_port.dart` 와 `shortform_detail_screen.dart:70-84,114,331-352` 로 플레이어 UI·폴백·dispose 는 완료. `community_read_repository.dart:80-93`·`community_models.dart:128-146` 에는 영상 Storage 참조→signed URL 해석이 없다. 웹 `communityShortformActions.ts` 는 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail` 호출자는 0건이다 | 웹 업로드 정본 행의 `video_url` 은 Storage 참조라 현재 앱에서 재생되지 않고, `thumbnail_url` 은 NULL 이라 중립 배경만 표시된다. 피드 내 직접 재생·재생 표시도 없고, 전체 HTTP(S) URL 인 경우에만 상세 재생이 가능하다 | 앱 데이터 계층 + Storage 정책 실증 + 앱 UI 보완 |
 | 조회수 집계 | 미완 | `community_read_repository.dart`(incrementView 부재) | 🔴 조회수 안 오름 | **인프라**(증분 RPC) |
 | 목록 페이징 | 미완 | `community_read_repository.dart:23-59`(전체 로드) | 데이터 많아지면 느림 | 앱만 |
 
@@ -173,7 +176,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 유형 필터 탭 | 완전작동 | `notifications_screen.dart:177-204` | 없음 | 앱 |
 | 읽음/모두읽음 | 완전작동 | `notifications_repository.dart:56-72`(UPDATE) | 없음 | 앱 |
 | 딥링크 | 부분구현 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152`(탭 전환만) | 🔴 특정 글/스레드로 못 감 | 앱+인프라 |
-| 푸시 인프라 | 미완·스텁 | `push_ports.dart:39`, `device_token_registrar.dart:13`(_tableExists=false), `edge_function_push_sender.dart:17`(_deployed=false), `push_trigger.dart`(미연결) | 푸시 안 옴 | **인프라**(FCM+device_tokens+Edge Function) |
+| OS 푸시 | **출시 범위 제외(App-F0)** | OS 푸시는 App-F0 정책에 따라 이번 출시 범위에서 제외됐다. `device_tokens` 테이블은 기존재하지만 앱의 FCM SDK·OS 권한·토큰 등록 경로는 제거되어 QA 계정 신규 행이 생기지 않는 것이 정상이다(`lib/core/push/push_ports.dart` 포트만 존치, `lib/core/push/HANDOFF.md`) | 인앱 알림(목록·유형 필터·읽음)은 정상 작동 — OS 푸시 미수신은 의도된 범위 제외 | 출시 범위 제외 — 재도입은 별도 백로그(재도입 시 Data Safety 재검토) |
 
 ### 5) 마이페이지 (mypage) — 2026-07-06부터 하단 탭이 아니라 AppBar 우측 상단 프로필 아이콘(push)으로 진입, 하단 5번째 탭은 개별질문
 | 기능 | 판정 | 근거 | 사용자 영향 | 종류 |
@@ -184,7 +187,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 캐시 잔액+내역 | 완전작동 | `mypage_repository.dart:116-152`(cash_wallets·cash_ledger 실쿼리) | 없음 | 앱 |
 | 구독관리·정산관리 버튼 | 완전작동(2026-07 도메인 확정) | `web_bridge_actions.dart`(`openBillingManageWeb`/`openPayoutManageWeb`) → 운영 웹 열림. 충전 CTA(`openRechargeWeb`)는 컴플라이언스로 미배선 | 없음 | 앱 |
 | 설정: 로그아웃 | 완전작동 | `settings_section.dart:65-71`(AuthService.signOut) | 없음 | 앱 |
-| 설정: 알림 토글 | 부분구현(graceful) | `settings_section.dart:32-58` + `notification_settings_repository.dart`(레포 배선 존재, 서버 컬럼 대기) | 서버 미비 시 "이 기기에서만 적용" | 인프라(컬럼) |
+| 설정: 알림 토글 | 완전작동 | `settings_section.dart:64-111` + `notification_settings_repository.dart:6-16` — 정본 `notification_settings.push_enabled`/`notification_settings.groups`, RLS `select_own`/`modify_own` 기존재. 저장 실패는 원복 + 재시도 안내, 로드 실패는 기본값으로 성공 위장하지 않음 | 없음 | 앱(서버 인프라 잔여 없음) |
 | 설정: 약관·개인정보 | 완전작동(2026-07 도메인 확정) | `settings_section.dart:87-92`(`openTermsWeb`/`openPrivacyWeb`) → 운영 웹 열림 | 없음(웹 페이지 법적 문안 게시는 웹 소관) | 앱 |
 | 멘토 대시보드 | 완전작동 | `mypage_repository.dart:154-184`(rooms·threads·settlement_items 실쿼리) | 없음 | 앱 |
 
@@ -196,16 +199,16 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | ~~웹 도메인 확정~~ **✅ 완료(2026-07)** | `WebBridgeConfig.baseUrl` 기본값 = 운영 도메인(오버라이드는 `--dart-define=WEB_BASE_URL`) | 구독관리·정산·약관·개인정보·지원 | `web_bridge_config.dart` 주석 |
 | ~~Storage 버킷 + image_picker~~ **✅ 완료** | 버킷 `question-room-attachments` 실존·연결(퀵윈 `c32d53f`), `DeviceImagePicker`, 뷰어 서명 URL(PR #8) | 채팅 첨부·필기·주석·뷰어 | 완료 |
 | Realtime publication | question_messages·question_threads를 `supabase_realtime`에 포함 | 실시간 채팅(미포함시 폴백) | (S6) `thread_realtime.dart:23` |
-| 숏폼 video player | video player 패키지 + 재생 배선 | 숏폼 영상 | `thumbnail_view.dart` |
+| 숏폼 미디어 정본화 | `video_player ^2.13.0`·상세 플레이어 UI는 **완료**. 영상 잔여는 Storage ref 파싱 → 짧은 TTL signed URL 발급 → 만료 시 재발급 → 실패 폴백 및 authenticated Storage 정책 실증. 썸네일 잔여는 웹 생성/업로드·ref 저장 배선 또는 명시적 대체 UI 확정(웹 `communityShortformActions.ts` 가 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail`(`communityShortformStorage.ts`)은 호출자가 0건) | 웹 업로드 숏폼 영상·썸네일 | `shortform_video_port.dart`, `community_read_repository.dart:80-93`, `thumbnail_view.dart:20-30` |
 | 조회수 증분 RPC | `increment_*_view` RPC | 커뮤니티 조회수 | `community_*_repository` |
-| 푸시 인프라 | FCM 도입 + `device_tokens` 테이블 + Edge Function `send-push` 배포 + 트리거 연결 | 푸시·딥링크 | (S7) `lib/core/push/HANDOFF.md` |
+| ~~푸시 인프라~~ **출시 범위 제외(App-F0)** | 활성 필요 작업 없음 — `device_tokens` 테이블은 기존재하고 앱의 FCM SDK·OS 권한·토큰 등록 경로는 제거됨. 재도입은 별도 백로그(재도입 시 Data Safety 재검토) | OS 푸시(인앱 알림은 정상 작동) | (S7) `lib/core/push/HANDOFF.md` |
 | A2 서버강제(선택) | question_threads INSERT 트리거 | 주간한도 우회 방지 | `DB_VERIFY_QUERIES.md` A2-Q3 |
 | 요금제 상수 | 요금제명·가격·문항수 확정값 | 요금제 라벨 표시 | `plan_constants.dart` |
 
 ## 앱만으로 수정 가능한 것 (인프라 불필요)
 - ~~숏폼 좋아요/스크랩 초기 상태 로드~~ ✅ 완료(`shortform_detail_screen.dart:46-61`)
 - 커뮤니티 목록 페이징(limit/offset 쿼리) — `community_read_repository.dart`
-- ~~알림 토글 저장~~ 레포 배선 완료 — 잔여는 서버 컬럼(인프라)
+- ~~알림 토글 저장~~ ✅ 완료 — `notification_settings.push_enabled`/`groups` 에 저장·재로드되고 RLS `select_own`/`modify_own` 이 기존재하므로 서버 인프라 잔여 없음
 - 멘토 검색 서버필터/구독상태 다분기 — (표시·정합, CANON_SYNC_TODO 참조)
 - ~~`baseUrl` 한 줄 채우기~~ ✅ 완료(2026-07 운영 도메인 확정, fromEnvironment 구조)
 
