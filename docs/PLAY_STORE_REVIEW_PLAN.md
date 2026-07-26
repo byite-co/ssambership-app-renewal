@@ -269,7 +269,7 @@
 | 디자인 토큰 통일·Pretendard·테마 seed 중립화 (2d735e3 외) | ✅ 품질 인상 개선 (P1-1 아이콘·앱명은 별개로 잔존, 로그인 브랜드 심볼을 아이콘 소스로 재사용 가능) |
 | **웹링크 8경로 배선 — baseUrl `https://ssambership-web.vercel.app` 주입** (미커밋) | ✅ 약관 `/legal/terms`·개인정보 `/legal/privacy`·고객지원·리뷰 배선 → **P0-2 해소** (남은 일: 페이지에 실제 법적 문안 게시 확인 + Play Console URL 기재) / ⚠️ **구독·충전·결제관리(`/subscriptions`) 활성화 = P0-3 위반이 '설계'에서 '실동작'으로 전환 → 푸시 전 결제성 경로만 방안 A(조회 전용화)로 되돌릴 것.** 비결제 링크는 유지 무방 |
 | IQ(개별질문) 병합 (09b62f8, 스위치 2개 ON) | 🔶 출시 전 `kIndividualQuestionCreateEnabled` OFF 시 진입점이 완전히 숨겨지는지 확인(P0-4 재발 방지) + 캐시 소비형 디지털 재화라 P0-3 검토 대상 + Data safety 수집 항목 반영 |
-| 클라우드 `users.notification_enabled` 컬럼 추가 (DB 직접 적용) | 🔶 Data safety 폼 기재 항목 추가. git으로 롤백 불가한 실DB 변경이므로 웹 레포 마이그레이션 SQL로 정본화 필요 |
+| 클라우드 `users.notification_enabled` 컬럼 추가 (DB 직접 적용) | 🔶 **미해소** — git으로 롤백 불가한 실DB 변경이므로 웹 레포 마이그레이션 SQL로 정본화 필요.<br>**[2026-07-26 추기]** 구 `public.users.notification_enabled` 컬럼은 staging에 실재하나, 앱·웹·DB 함수 참조가 모두 0인 고아 컬럼이다. 정본은 `public.notification_settings`이며, 구 컬럼의 제거 여부는 별도 DB 스키마 정리 오너 결정으로 남긴다.<br>Data safety 기재는 `notification_settings` 기준(docs/DATA_SAFETY_FORM.md §2 각주) — 이 컬럼은 더 이상 폼 항목이 아니다. 제거를 결정할 경우 ⑴ production 에서 동일 의존성 전수 스캔 1회 재수행, ⑵ 마이그레이션 번호는 **W5 종결 후** W5 마지막 파일의 다음 번호로 할당한다. 웹 `supabase/sql/` 현존 최대는 **174**(172 는 영구 결번)이고 W5 가 **175 부터** 시작하므로, 지금 175 를 예약하면 W5 와 충돌한다. 167–174 불변 원칙은 그대로 |
 | 프로필 역할분기·마이페이지 탭 배선·연결노트 버튼 (미커밋) | ✅ 죽은 UI 감소 — P0-4 부분 해소 (잔여: 회원가입 링크 스텁, 숏폼 재생·좋아요 초기상태) |
 | 전부 미푸시 | ⚠️ 원격 기준 빌드는 여전히 P0 전건 해당 — **Phase 0: 커밋·푸시 먼저** |
 

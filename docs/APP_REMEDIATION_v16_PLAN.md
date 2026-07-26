@@ -299,8 +299,11 @@ select policyname, cmd from pg_policies where schemaname='storage' and tablename
   3. **P2-16 분류:** `app_notification.dart`의 `classifyNotificationType`(line 30–73)에 정본 type 도입 시
      `mentor_pause_notice`·`mentor_termination_notice` 두 유형을 **정본 매핑**으로 분류(현재는 키워드 방어분류라
      `other`로 숨겨질 수 있음 — line 42–48 'refund'/'order' 필터와 충돌 주의). **P1-11 enum 확정값과 함께** 교체.
-  4. **P2-17 토글:** `notification_settings_repository`가 `users.notification_enabled`(또는 정본 테이블) **DB write**로.
-     **SharedPreferences 자동 폴백 금지** — DB 저장 성공을 기준으로 UI 확정, 실패 시 재시도 오류.
+  4. **P2-17 토글:** ✅ **완료(2026-07-26 확인)** — `notification_settings_repository`가 정본 테이블
+     `notification_settings`(`push_enabled` bool·`groups` jsonb)로 **DB write** 한다. SharedPreferences 자동
+     폴백 없음 — DB 저장 성공을 기준으로 UI 확정, 실패 시 원복 + 재시도 오류.
+     근거 `notification_settings_repository.dart:6-16` · `settings_section.dart:64-111`. 이 항목은 트랙 C
+     재개 게이트(`device_tokens` 등)에 의존하지 않으며, 남은 P1-11·P2-15/16/18 과 분리해 이미 종결됐다.
   5. **P2-18 딥링크:** 허용 도메인·라우트 **화이트리스트** + 로그인 전 pending link 보관 + 임의 URL 차단.
      라우트는 P1-11 payload 규약과 일치시킨다.
 - **주의:** type CHECK 정본화는 서버 단계적 전환(백필→양쪽 신매핑→관찰→레거시 컬럼 삭제)에 맞춰 앱 매핑 교체.

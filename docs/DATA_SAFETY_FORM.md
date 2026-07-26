@@ -37,8 +37,12 @@
 | 기기 또는 기타 ID | **아니요** | — | — | App-F0: OS 푸시를 출시 범위에서 제외했다. `firebase_messaging`·게이트웨이·`register_device_token` 등록 경로가 **코드에 존재하지 않으며**(회귀 잠금: `test/push/firebase_free_test.dart`), 푸시 SDK 설정 파일도 빌드에 포함되지 않는다. 따라서 device token 을 발급·수집·전송하지 않는다. 재도입 시 이 행을 '예'로 되돌리고 설문을 재제출할 것 |
 | 위치·연락처·건강·금융 정보 등 그 외 전 카테고리 | **아니요** | — | — | 해당 권한·SDK·입력 UI 없음(매니페스트 권한 = INTERNET 1개 — 위치/연락처/센서/전화 권한 없음) |
 
-부수 저장값(설문 카테고리 해당 없음 판단, 입력자 참고): 알림 수신 설정 `users.notification_enabled`
-(`lib/features/mypage/data/notification_settings_repository.dart:14-15,41`) — 기능 설정값이며 식별·추적 용도 아님.
+부수 저장값(설문 카테고리 해당 없음 판단, 입력자 참고): 알림 수신 설정 `notification_settings.push_enabled` ·
+`notification_settings.groups`(`lib/features/mypage/data/notification_settings_repository.dart:6-16`) —
+기능 설정값이며 식별·추적 용도 아님.
+구 `users.notification_enabled` 컬럼은 staging DB 에 실재하나 앱·웹·DB 함수/뷰/정책/인덱스 참조가 모두 0인
+**고아 컬럼**이다(정본은 `notification_settings`). 컬럼 제거 여부는 별도 DB 스키마 정리 오너 결정 —
+docs/PLAY_STORE_REVIEW_PLAN.md '델타' 표 참조.
 
 ## 3. 전송·보관·삭제 경로 (설문 부속 설명용)
 
@@ -55,6 +59,8 @@
 
 1. [ ] 스토어 빌드의 `.env` 가 운영 Supabase(https) 값인지 확인 후 §1 '암호화 전송=예' 기입.
 2. [ ] `https://ssambership-web.vercel.app/account/delete` 실페이지 동작 확인 후 삭제 URL 기입.
-3. [ ] §2 표를 설문 카테고리 순서대로 옮겨 기입(수집=예 항목 8줄 · '기기 또는 기타 ID' 포함 나머지 전부 아니요).
+3. [ ] §2 표를 설문 카테고리 순서대로 옮겨 기입하고,
+   '수집=예'로 표시된 항목을 빠짐없이 입력했는지 확인
+   (표에 없는 나머지 카테고리는 전부 아니요).
 4. [ ] 개인정보처리방침 URL(`/legal/privacy`) 을 스토어 등재정보에 함께 등록(P0-2 콘솔측).
 5. [ ] 푸시(FCM): **미도입**(App-F0 에서 제거) → '기기 또는 기타 ID' 아니요로 기입. 재도입하거나 IQ 작성(on 전환) 도입 시 §2 갱신 → 설문 재제출.

@@ -23,7 +23,7 @@ QA 감사(docs/QA_REPORT_2026-07.md QA-05)에서 이 문서의 스테일 판정�
 - **가격 표시·구독하기 버튼**: 컴플라이언스 커밋 `5002c1d` 로 **앱 내 가격 UI·구매 유도 CTA 가 제거**됨(멘토 카드·상세는 `CommerceNoticeCard` 안내만). "가격 표시 완전작동"/"구독하기 버튼 부분구현" 판정은 폐기.
 - **숏폼 좋아요/스크랩**: 초기 상태 로드가 **이미 구현**됨(`shortform_detail_screen.dart:46-61` `_loadReactionState`). "항상 꺼져 보임" 판정은 폐기(과소 서술).
 - **설정 약관·개인정보**: `openTermsWeb`/`openPrivacyWeb` 배선 완료(`settings_section.dart:87-92`) + 도메인 확정 → **열람 가능**.
-- **설정 알림 토글**: 순수 "로컬 상태만"이 아니라 `NotificationSettingsRepository` 배선 존재(graceful, 실제 라인 `settings_section.dart:32-58`) — 서버 컬럼(`users.notification_enabled`) 준비 시 자동 영속화.
+- **설정 알림 토글**: 순수 "로컬 상태만"이 아니라 `NotificationSettingsRepository` 배선 존재. **[정정 2026-07-26]** 정본 테이블 `notification_settings`(`push_enabled` bool · `groups` jsonb)에서 로드/저장하는 **구현 완료** 상태다 — 서버 컬럼 대기가 아니다. 로드 실패는 기본값(전부 ON)으로 위장하지 않고 '다시 시도'를, 저장 실패는 원복 + 재시도 스낵바를 노출한다(`settings_section.dart:64-111`, `notification_settings_repository.dart:6-16`).
 - **개별질문 작성 스위치(A안, 2026-07 확정)**: `kIndividualQuestionCreateEnabled` 는 컴파일 타임 주입(`--dart-define=IQ_CREATE_ENABLED=true`)으로 전환, **스토어 빌드 기본 off**. 목록·상세·답변 확인은 유지. 게이트: docs/PLAY_STORE_REVIEW_PLAN.md.
 
 ---
@@ -35,7 +35,7 @@ QA 감사(docs/QA_REPORT_2026-07.md QA-05)에서 이 문서의 스테일 판정�
 | # | 작업 | 상태 | 비고(인프라 의존) |
 |---|---|---|---|
 | 1 | 질문 이미지 첨부 | ✅ 선택 동작 / 업로드 graceful | **버킷 필요**: `question-attachments`(+방참여자 정책) 생성 후 `attachment_upload.dart:96 _storageReady=true` |
-| 2 | 알림 설정 토글 저장 | ✅ graceful | **컬럼 필요**: `users.notification_enabled`(bool)+본인 update RLS |
+| 2 | 알림 설정 토글 저장 | ✅ 완료 | **[정정 2026-07-26]** 정본 테이블 `notification_settings`(`user_id` PK·`push_enabled` bool·`groups` jsonb·`updated_at`) + RLS `select_own`/`modify_own` **기존재** — 추가 컬럼·인프라 대기 없음 |
 | 3 | 프로필 수정 | ✅ 동작 | `users.nickname`·`grade_level` update(본인 RLS) — 이미 있으면 즉시 작동 |
 | 4 | 멘토찾기→질문방 탭 전환 | ✅ 동작 | TabNavigator 사용, 인프라 불필요 |
 | 5 | 커뮤니티 조회수 증분 | ✅ graceful | **RPC 필요/확인**: `increment_community_post_view`·`increment_shortform_post_view`(웹 사용중) |
@@ -49,10 +49,11 @@ QA 감사(docs/QA_REPORT_2026-07.md QA-05)에서 이 문서의 스테일 판정�
 
 ### ★ 오너가 Supabase에서 만들어야 할 인프라(아침에 바로) — 이 배치가 '준비되면 자동 작동'하도록 짜둠
 1. **[작업1] Storage 버킷 `question-attachments`** + '방 참여자만 read/write' 정책 → 생성 후 `lib/features/question_room/data/attachments/attachment_upload.dart:96` 의 `_storageReady=false→true`. (버킷명은 웹과 통일할 것 — 다르면 같은 파일 `bucket` 상수도 수정.)
-2. **[작업2] `users.notification_enabled` boolean 컬럼** + 본인 update RLS → 알림 토글이 자동 영속화. (컬럼명은 `notification_settings_repository.dart:16 column` 상수와 일치시킬 것.)
-3. **[작업5] 조회수 증분 RPC 존재 확인**: `increment_community_post_view(p_post_id)`·`increment_shortform_post_view(p_post_id)`. 웹이 이미 사용 중이라 있을 가능성 높음 — 없으면 조회수만 안 오름(앱은 조용히 무시, 안 죽음).
-4. **[작업8·A2] RPC `get_weekly_question_usage(p_student_id,p_mentor_id)`** 존재·정상 동작(이미 A2에서 사용). + (선택)서버측 한도 강제 트리거는 별건.
-5. **[참고] 프로필/설정/첨부는 모두 graceful** — 위 인프라가 없어도 앱은 죽지 않고 "준비 중"/로컬 유지로 동작한다.
+2. **[작업5] 조회수 증분 RPC 존재 확인**: `increment_community_post_view(p_post_id)`·`increment_shortform_post_view(p_post_id)`. 웹이 이미 사용 중이라 있을 가능성 높음 — 없으면 조회수만 안 오름(앱은 조용히 무시, 안 죽음).
+3. **[작업8·A2] RPC `get_weekly_question_usage(p_student_id,p_mentor_id)`** 존재·정상 동작(이미 A2에서 사용). + (선택)서버측 한도 강제 트리거는 별건.
+4. **[참고] 프로필/첨부는 graceful** — 위 인프라가 없어도 앱은 죽지 않고 "준비 중"/로컬 유지로 동작한다.
+
+> **[정정 2026-07-26]** 구 목록의 **[작업2] `users.notification_enabled` 컬럼 추가**는 **폐기**했다. 알림 설정 정본은 `notification_settings` 테이블이고 RLS `select_own`/`modify_own` 과 함께 이미 존재하므로 오너가 만들 인프라가 없다. 해당 항목이 지시하던 "`notification_settings_repository.dart:16 column` 상수와 일치시킬 것"은 그 `column` 상수 자체가 존재하지 않아 **실행 불가능한 지시**였다. 알림 토글은 graceful 대기가 아니라 **DB 정본 저장**이다(위 §2026-07-06(2차) 정정 참조).
 
 ---
 
@@ -97,7 +98,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 4 | ~~**숏폼 좋아요/스크랩**~~ **✅ 해소** | 초기 상태 로드 구현됨 | `shortform_detail_screen.dart:46-61`(`_loadReactionState`) | 완료 |
 | 5 | **커뮤니티 조회수** | "조회 N" 표시되나 글 진입해도 증가 안 함 | `community_read_repository.dart`(incrementView 부재) | **인프라**(증분 RPC) |
 | 6 | **알림 딥링크** | 알림 눌러도 해당 글/스레드로 안 가고 탭만 전환 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152` | 앱+인프라(푸시) |
-| 7 | **설정 알림 토글** | 레포 배선은 존재(graceful) — 서버 컬럼 없으면 "이 기기에서만 적용" 안내 | `settings_section.dart:32-58` + `notification_settings_repository.dart` | **인프라**(`users.notification_enabled` 컬럼) |
+| 7 | ~~**설정 알림 토글**~~ **✅ 해소(2026-07-26)** | 정본 테이블 `notification_settings`(`push_enabled`·`groups`)에 저장·재로드된다. 행/키 부재 = ON(서버 판정과 동일), 저장 실패는 원복 + 재시도 안내(기본값 위장 없음) | `settings_section.dart:64-111` + `notification_settings_repository.dart:6-16` | 완료 |
 | 8 | **회원가입 링크** | "웹에서 가입" 눌러도 "링크 준비 중" | `login_screen.dart:76` | 오너 설정값 |
 
 ### 🟠 미완·스텁 (기능 골격만, 실행 인프라 대기)
