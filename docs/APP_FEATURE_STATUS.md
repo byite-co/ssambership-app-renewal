@@ -21,7 +21,7 @@ QA 감사(docs/QA_REPORT_2026-07.md QA-05)에서 이 문서의 스테일 판정�
 
 - **웹 브릿지 동작**: `baseUrl` 은 더 이상 미설정이 아니다 — **운영 도메인 확정(2026-07, `https://ssambership-web.vercel.app`)**. `web_bridge_config.dart` 는 `String.fromEnvironment('WEB_BASE_URL', defaultValue: <운영 도메인>)` 구조로, 릴리즈는 주입 없이 동작하고 스테이징 테스트는 dart-define 오버라이드. 구독관리·정산·약관·개인정보·지원 버튼은 **실제 웹을 연다**.
 - **가격 표시·구독하기 버튼**: 컴플라이언스 커밋 `5002c1d` 로 **앱 내 가격 UI·구매 유도 CTA 가 제거**됨(멘토 카드·상세는 `CommerceNoticeCard` 안내만). "가격 표시 완전작동"/"구독하기 버튼 부분구현" 판정은 폐기.
-- **숏폼 좋아요/스크랩**: 초기 상태 로드가 **이미 구현**됨(`shortform_detail_screen.dart:46-61` `_loadReactionState`). "항상 꺼져 보임" 판정은 폐기(과소 서술).
+- **숏폼 좋아요/스크랩**: 초기 상태 로드가 **이미 구현**됨(`shortform_detail_screen.dart:46-63` `_loadReactionState`). "항상 꺼져 보임" 판정은 폐기(과소 서술).
 - **설정 약관·개인정보**: `openTermsWeb`/`openPrivacyWeb` 배선 완료(`settings_section.dart:87-92`) + 도메인 확정 → **열람 가능**.
 - **설정 알림 토글**: 순수 "로컬 상태만"이 아니라 `NotificationSettingsRepository` 배선 존재. **[정정 2026-07-26]** 정본 테이블 `notification_settings`(`push_enabled` bool · `groups` jsonb)에서 로드/저장하는 **구현 완료** 상태다 — 서버 컬럼 대기가 아니다. 로드 실패는 기본값(전부 ON)으로 위장하지 않고 '다시 시도'를, 저장 실패는 원복 + 재시도 스낵바를 노출한다(`settings_section.dart:64-111`, `notification_settings_repository.dart:6-16`).
 - **개별질문 작성 스위치(A안, 2026-07 확정)**: `kIndividualQuestionCreateEnabled` 는 컴파일 타임 주입(`--dart-define=IQ_CREATE_ENABLED=true`)으로 전환, **스토어 빌드 기본 off**. 목록·상세·답변 확인은 유지. 게이트: docs/PLAY_STORE_REVIEW_PLAN.md.
@@ -95,7 +95,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 1 | ~~**구독/충전/결제·정산·프로필편집/약관 버튼**~~ **✅ 해소(2026-07)** | 운영 도메인 확정 — 관리·약관·정산 버튼이 실제 웹을 연다(구매 유도 CTA 는 컴플라이언스로 별도 제거) | `web_bridge_config.dart` `baseUrl`(fromEnvironment, 기본=운영 도메인) | 완료 |
 | 2 | ~~채팅 이미지 첨부~~ **✅ 해결** | 업로드 + 뷰어 + 주석 진입점 모두 완료 | 퀵윈 `c32d53f`, 뷰어 PR #8 `b1fb61a` | 완료 |
 | 3 | **숏폼 영상 재생** | 전체 HTTP(S) URL 은 상세 플레이어에서 재생할 수 있으나, 웹 정본 영상 Storage 참조는 앱에서 signed URL 로 해석하지 못한다. 웹 finalize 는 `thumbnail_url` 도 NULL 로 저장하므로 앱에는 썸네일이 아니라 **중립 배경**만 보인다. 피드 카드는 중립 배경 + 상세 진입만 제공한다 | `shortform_video_port.dart`, `shortform_detail_screen.dart:64,70-93,114,331-352`, `community_read_repository.dart:80-93`, `community_models.dart:128-146` | **부분구현 — 앱 데이터 계층 + Storage 정책 실증** |
-| 4 | ~~**숏폼 좋아요/스크랩**~~ **✅ 해소** | 초기 상태 로드 구현됨 | `shortform_detail_screen.dart:46-61`(`_loadReactionState`) | 완료 |
+| 4 | ~~**숏폼 좋아요/스크랩**~~ **✅ 해소** | 초기 상태 로드 구현됨 | `shortform_detail_screen.dart:46-63`(`_loadReactionState`) | 완료 |
 | 5 | **커뮤니티 조회수** | "조회 N" 표시되나 글 진입해도 증가 안 함 | `community_read_repository.dart`(incrementView 부재) | **인프라**(증분 RPC) |
 | 6 | **알림 딥링크** | 알림 눌러도 해당 글/스레드로 안 가고 탭만 전환 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152` | 앱+인프라(푸시) |
 | 7 | ~~**설정 알림 토글**~~ **✅ 해소(2026-07-26)** | 정본 테이블 `notification_settings`(`push_enabled`·`groups`)에 저장·재로드된다. 행/키 부재 = ON(서버 판정과 동일), 저장 실패는 원복 + 재시도 안내(기본값 위장 없음) | `settings_section.dart:64-111` + `notification_settings_repository.dart:6-16` | 완료 |
@@ -206,7 +206,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 요금제 상수 | 요금제명·가격·문항수 확정값 | 요금제 라벨 표시 | `plan_constants.dart` |
 
 ## 앱만으로 수정 가능한 것 (인프라 불필요)
-- ~~숏폼 좋아요/스크랩 초기 상태 로드~~ ✅ 완료(`shortform_detail_screen.dart:46-61`)
+- ~~숏폼 좋아요/스크랩 초기 상태 로드~~ ✅ 완료(`shortform_detail_screen.dart:46-63`)
 - 커뮤니티 목록 페이징(limit/offset 쿼리) — `community_read_repository.dart`
 - ~~알림 토글 저장~~ ✅ 완료 — `notification_settings.push_enabled`/`groups` 에 저장·재로드되고 RLS `select_own`/`modify_own` 이 기존재하므로 서버 인프라 잔여 없음
 - 멘토 검색 서버필터/구독상태 다분기 — (표시·정합, CANON_SYNC_TODO 참조)
