@@ -2,10 +2,8 @@
     <!-- Supabase 백엔드 통신 필수 — release 소스셋은 debug/profile 매니페스트를
          병합하지 않으므로 main 에 선언해야 릴리즈 빌드에서 네트워크가 동작한다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- 푸시 알림(Android 13+/API 33): 런타임 권한 — 요청은
-         FirebasePushPermission(firebase_messaging requestPermission)이 수행.
-         선언이 없으면 요청 자체가 무시된다. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- App-F0: OS 푸시가 출시 범위에서 빠져 알림 런타임 권한 선언을 제거했다.
+         앱은 OS 알림을 표시하지 않고 알림함(인앱)만 제공한다. -->
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"

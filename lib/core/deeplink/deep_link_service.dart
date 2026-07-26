@@ -2,14 +2,16 @@ import 'dart:async';
 
 import '../../app/app_tabs.dart';
 import '../push/push_payload.dart';
-import '../push/push_service.dart';
 import 'notification_deep_link_controller.dart';
 
-/// 딥링크 서비스 — 푸시 '탭' 스트림을 구독해 탭 이동으로 변환한다.
+/// 딥링크 서비스 — 알림 '탭' payload 스트림을 탭 이동으로 변환한다.
 ///
 /// ★ 판정·중복 제거·로그인 대기는 순수 로직인 [NotificationDeepLinkController] 가
-///   담당(테스트 대상). 이 클래스는 배선만: PushService.onOpenedPayload →
-///   controller.handleTap → TabNavigator.go.
+///   담당(테스트 대상). 이 클래스는 배선만: payload 스트림 → controller.handleTap
+///   → TabNavigator.go.
+/// ★ App-F0: OS 푸시(FCM)를 제거해 **프로덕션에는 payload 생산자가 없다** —
+///   [initialize] 를 인자 없이 부르면 구독 0개로 컨트롤러만 살아 있다(로그인
+///   대기·폐기 훅은 그대로 동작). 스트림 주입은 테스트 전용 경계다.
 /// ★ payload 의 link/url 등 외부 경로는 파싱 단계(PushPayload)에서 이미 버려진다 —
 ///   어떤 URL/외부 scheme 도 실행하지 않는다.
 class DeepLinkService {
@@ -20,13 +22,12 @@ class DeepLinkService {
   NotificationDeepLinkController? _controller;
   StreamSubscription<PushPayload>? _sub;
 
-  /// 앱 시작 시 1회 초기화. ★ PushService.initialize() '이전'에 호출해야
-  /// 콜드 스타트 최초 메시지를 놓치지 않는다(main.dart 순서 유지).
-  Future<void> initialize({PushService? pushService}) async {
+  /// 앱 시작 시 1회 초기화. [openedPayloads] 를 주지 않으면 구독하지 않는다
+  /// (프로덕션 기본 — OS 푸시 미도입이라 생산자가 없다).
+  Future<void> initialize({Stream<PushPayload>? openedPayloads}) async {
     if (_controller != null) return;
-    final PushService push = pushService ?? PushService.instance;
     _controller = NotificationDeepLinkController(navigate: TabNavigator.go);
-    _sub = push.onOpenedPayload.listen(_onOpened);
+    _sub = openedPayloads?.listen(_onOpened);
   }
 
   void _onOpened(PushPayload payload) {

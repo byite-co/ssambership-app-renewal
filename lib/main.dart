@@ -9,7 +9,6 @@ import 'app/app.dart';
 import 'core/auth/auth_service.dart';
 import 'core/supabase/supabase_client.dart';
 import 'core/deeplink/deep_link_service.dart';
-import 'core/push/push_service.dart';
 import 'core/version_gate/version_gate_controller.dart';
 import 'core/web_bridge/web_session_hygiene.dart';
 
@@ -38,14 +37,10 @@ Future<void> main() async {
   // 인증/세션 부팅: 세션 복원 + 프로필(role·계정상태·구독) 로드 + auth 변화 구독.
   await AuthService.instance.bootstrap();
 
-  // 딥링크 → 푸시 순서 유지: 콜드 스타트 알림 탭 메시지를 딥링크 구독자가
-  // 먼저 받을 준비를 한 뒤 게이트웨이를 초기화한다. Firebase 설정 파일이 없으면
-  // 게이트웨이가 스스로 비활성화되고(준비 경계) 앱은 그대로 켜진다.
+  // 알림 딥링크 컨트롤러 초기화. ★ App-F0: OS 푸시(FCM)는 출시 범위가 아니라
+  // 외부 payload 생산자를 붙이지 않는다 — Firebase 초기화·토큰 등록 0회.
+  // 앱 내 알림함에서의 이동은 알림함 화면이 직접 라우팅한다.
   await DeepLinkService.instance.initialize();
-  await PushService.instance.initialize(
-    // 앱 시작 시 세션이 이미 있으면(자동 로그인) 토큰 등록까지 시도.
-    userId: SupabaseInit.clientOrNull?.auth.currentSession?.user.id,
-  );
 
   // 최소 지원 버전 게이트: runApp 전에 검사를 '시작'만 한다(await 하지 않음 —
   // 첫 프레임을 네트워크에 묶지 않는다). 셸(VersionGateShell)이 checking 동안

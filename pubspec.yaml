@@ -37,8 +37,6 @@ dependencies:
   # 숏폼 상세(P2-14): 실제 영상 재생(네트워크 mp4/HLS). 포트 뒤 격리:
   # lib/features/community/ui/shortform/shortform_video_port.dart
   video_player: ^2.13.0
-  firebase_core: ^4.12.1
-  firebase_messaging: ^16.4.3
   # 최소 지원 버전 게이트: 현재 빌드번호(buildNumber, 정수) 조회용.
   package_info_plus: ^9.0.1
   webview_flutter: ^4.14.1
