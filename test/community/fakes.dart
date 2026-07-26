@@ -257,7 +257,8 @@ BoardPost sampleBoard({
 ShortformPost sampleShortform({
   String id = 's1',
   String title = '숏폼 제목',
-  String? videoUrl, // null=썸네일 폴백, 지정 시 재생 경로 테스트
+  String? videoUrl, // null=미디어 없음, 지정 시 해석·재생 경로 테스트
+  String? thumbnailUrl, // 기본 null(웹 finalize 현재 계약) — legacy 행만 지정
   int likeCount = 5,
   int viewCount = 69,
 }) {
@@ -268,7 +269,7 @@ ShortformPost sampleShortform({
     category: 'study',
     authorLabel: '멘토쌤',
     authorRole: 'mentor',
-    thumbnailUrl: null, // 네트워크 미사용(폴백 렌더)
+    thumbnailUrl: thumbnailUrl,
     videoUrl: videoUrl,
     likeCount: likeCount,
     viewCount: viewCount,
