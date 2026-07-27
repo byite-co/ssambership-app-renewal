@@ -203,11 +203,19 @@ String iqFailureMessage(Object error) {
   if (raw.contains('MENTOR_PRICE_NOT_SET')) {
     return '이 멘토는 아직 개별질문 가격을 설정하지 않았어요.';
   }
-  if (raw.contains('NOT_QUESTION_OWNER') || raw.contains('NOT_QUESTION_MENTOR')) {
+  if (raw.contains('NOT_QUESTION_OWNER') ||
+      raw.contains('NOT_QUESTION_MENTOR')) {
     return '이 질문에 대한 권한이 없어요.';
   }
   if (raw.contains('not_answered') || raw.contains('NOT_ANSWERABLE_STATUS')) {
     return '지금 상태에서는 진행할 수 없어요. 화면을 새로고침해 주세요.';
+  }
+  if (raw.contains('REFUND_NOT_ALLOWED')) {
+    // 서버 wrapper: escrowed/open/assigned/claimed 외 상태의 취소 거부(P0-5).
+    return '지금 상태에서는 질문을 취소할 수 없어요. 화면을 새로고침해 주세요.';
+  }
+  if (raw.contains('INDIVIDUAL_QUESTION_REFUND_FAILED')) {
+    return '환불을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
   }
   if (raw.contains('already_released')) {
     return '이미 정산이 완료된 질문이에요.';
@@ -430,10 +438,9 @@ class IqEscrowResult {
       status: map['status'] == null
           ? null
           : iqStatusFromDb(map['status'] as String?),
-      walletBalanceCents:
-          map['wallet_balance_cents'] == null
-              ? null
-              : _parseInt(map['wallet_balance_cents']),
+      walletBalanceCents: map['wallet_balance_cents'] == null
+          ? null
+          : _parseInt(map['wallet_balance_cents']),
     );
   }
 }

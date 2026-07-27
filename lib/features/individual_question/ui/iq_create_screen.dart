@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/ink/ink_document.dart';
+import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/tokens/typography.dart';
@@ -355,6 +356,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         idempotencyKey: 'iqapp-${DateTime.now().microsecondsSinceEpoch}',
       );
       _created = created;
+      // §4: 생성(캐시 예치)은 잔액·원장에 영향 — 지갑 표면 무효화 신호.
+      DataRefreshBus.bumpWallet();
       if (!mounted) return;
       if (_images.isEmpty) {
         _finishSuccess();
@@ -389,8 +392,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
       ),
       body: FutureBuilder<IqCreatePrefill>(
         future: _future,
-        builder:
-            (BuildContext context, AsyncSnapshot<IqCreatePrefill> snap) {
+        builder: (BuildContext context, AsyncSnapshot<IqCreatePrefill> snap) {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -398,7 +400,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('정보를 불러오지 못했어요.\n${friendlyError(snap.error ?? '')}',
+                child: Text(
+                    '정보를 불러오지 못했어요.\n${friendlyError(snap.error ?? '')}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: ColorTokens.danger)),
               ),
@@ -415,8 +418,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         widget.isDirect ? prefill.pricing?.amountCents : _openAmountCents;
     final bool insufficient =
         priceCents != null && prefill.balanceCents < priceCents;
-    final bool directPriceMissing =
-        widget.isDirect && prefill.pricing == null;
+    final bool directPriceMissing = widget.isDirect && prefill.pricing == null;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -592,9 +594,8 @@ class _AttachArea extends StatelessWidget {
                             button: true,
                             label: '첨부 삭제',
                             child: GestureDetector(
-                              onTap: onRemove == null
-                                  ? null
-                                  : () => onRemove!(i),
+                              onTap:
+                                  onRemove == null ? null : () => onRemove!(i),
                               child: Container(
                                 decoration: const BoxDecoration(
                                   color: Colors.black54,

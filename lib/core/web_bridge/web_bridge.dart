@@ -2,7 +2,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'web_bridge_config.dart';
 
-/// 웹 열기 결과. notConfigured = baseUrl 미확정(안내 폴백), failed = 열기 실패.
+/// 웹 열기 결과. notConfigured = baseUrl 미확정(안내 폴백),
+/// failed = 열기 실패 또는 URL 검증 탈락(https/허용 호스트 아님 — 열지 않음).
 enum WebOpenResult { opened, notConfigured, failed }
 
 /// URL 열기 함수(주입 가능 — 테스트에서 fake).
@@ -61,10 +62,13 @@ class WebBridge {
   Future<WebOpenResult> openAccountDelete({String source = 'app'}) =>
       _open(WebBridgeConfig.accountDeletePath, <String, String>{'src': source});
 
-  /// URL 조립(테스트/검토용 — 실제 열기와 동일한 규칙). baseUrl 미확정이면 null.
-  Uri? buildUri(String path, [Map<String, String> query = const <String, String>{}]) {
+  /// URL 조립(테스트/검토용). baseUrl 미확정/파싱 불가면 null.
+  /// ★ 조립만 한다 — 실제 열기 전 검증은 [isAllowedUri] 가 한다.
+  Uri? buildUri(String path,
+      [Map<String, String> query = const <String, String>{}]) {
     if (_baseUrl.isEmpty || path.isEmpty) return null;
-    final Uri base = Uri.parse('$_baseUrl$path');
+    final Uri? base = Uri.tryParse('$_baseUrl$path');
+    if (base == null) return null;
     if (query.isEmpty) return base;
     return base.replace(queryParameters: <String, String>{
       ...base.queryParameters,
@@ -72,9 +76,29 @@ class WebBridge {
     });
   }
 
+  /// 열어도 되는 URL 인지(P3-7 하드닝) — 어긋나면 열지 않는다.
+  ///
+  /// - https 만 허용(http 등 다른 스킴 차단).
+  /// - 호스트는 설정된 base 호스트와 **정확히 같거나** 그 서브도메인만 허용.
+  ///   서브도메인 판정은 반드시 '.' 를 붙인 접미사 비교로 한다 —
+  ///   `evilssambership.com` 이 `.ssambership.com` 허용목록을 통과하면 안 되고,
+  ///   `ssambership.com.evil.com` 같은 접두 위장도 통과하면 안 된다.
+  bool isAllowedUri(Uri uri) {
+    if (_baseUrl.isEmpty) return false;
+    final Uri? base = Uri.tryParse(_baseUrl);
+    if (base == null) return false;
+    final String baseHost = base.host.toLowerCase();
+    if (baseHost.isEmpty) return false;
+    if (uri.scheme != 'https') return false; // https 강제
+    final String host = uri.host.toLowerCase();
+    return host == baseHost || host.endsWith('.$baseHost');
+  }
+
   Future<WebOpenResult> _open(String path, Map<String, String> query) async {
+    if (_baseUrl.isEmpty) return WebOpenResult.notConfigured; // 미확정 → 안내 폴백.
     final Uri? uri = buildUri(path, query);
-    if (uri == null) return WebOpenResult.notConfigured; // baseUrl 미확정 → 안내 폴백.
+    // 조립 실패 또는 검증 탈락(http/타 호스트) → 열지 않고 실패 반환.
+    if (uri == null || !isAllowedUri(uri)) return WebOpenResult.failed;
     final bool ok = await _launcher(uri);
     return ok ? WebOpenResult.opened : WebOpenResult.failed;
   }

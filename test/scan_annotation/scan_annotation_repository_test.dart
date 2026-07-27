@@ -39,7 +39,7 @@ class _FakeUploader implements AttachmentUploaderPort {
   bool get isReady => true;
 
   @override
-  Future<QuestionAttachment> upload({
+  Future<AttachmentUploadResult> upload({
     required String roomId,
     required String threadId,
     String? messageId,
@@ -49,11 +49,14 @@ class _FakeUploader implements AttachmentUploaderPort {
     this.roomId = roomId;
     this.threadId = threadId;
     this.image = image;
-    return QuestionAttachment(
-      id: 'att-1',
-      threadId: threadId,
-      storagePath: '$roomId/$threadId/x.png',
-      createdAt: DateTime(2026, 7, 1),
+    return AttachmentUploadResult(
+      attachment: QuestionAttachment(
+        id: 'att-1',
+        threadId: threadId,
+        storagePath: '$roomId/$threadId/x.png',
+        createdAt: DateTime(2026, 7, 1),
+      ),
+      answeredTransition: false,
     );
   }
 }
@@ -76,8 +79,7 @@ InkDocument _doc() => const InkDocument(
     );
 
 void main() {
-  test('submit: 평탄화 PNG는 기존 첨부 파이프라인으로, 원본은 첨부 id 경로에 upsert',
-      () async {
+  test('submit: 평탄화 PNG는 기존 첨부 파이프라인으로, 원본은 첨부 id 경로에 upsert', () async {
     final _FakeDocStore ds = _FakeDocStore();
     final _FakeUploader up = _FakeUploader();
     final ScanAnnotationRepository repo =

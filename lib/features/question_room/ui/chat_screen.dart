@@ -6,6 +6,7 @@ import '../../../design/tokens/color_tokens.dart';
 import '../data/attachments/attachment_upload.dart';
 import '../data/attachments/attachment_url_resolver.dart';
 import '../data/attachments/device_image_picker.dart';
+import '../data/attachments/trusted_attachment_url.dart';
 import '../data/models/question_attachment.dart';
 import '../data/models/question_message.dart';
 import '../data/models/question_thread.dart';
@@ -141,11 +142,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// 파일(비이미지) 첨부 탭 → 단기 서명 URL 발급 후 외부 앱으로 열기(첨부 v2 §2-6).
+  /// 발급 URL 이 우리 스토리지 호스트가 아니면 열지 않는다(P3-7 임의 URL 차단).
   Future<void> _openFile(QuestionAttachment a) async {
     try {
       final String url = await _resolver.signedUrl(a.storagePath);
-      final bool ok = await launchUrl(Uri.parse(url),
-          mode: LaunchMode.externalApplication);
+      final Uri uri = Uri.parse(url);
+      if (!isTrustedAttachmentUri(uri)) {
+        _showError('파일을 열 수 없어요. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      final bool ok =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok) _showError('파일을 열 수 없어요. 잠시 후 다시 시도해 주세요.');
     } catch (e) {
       _showError('파일을 여는 데 실패했어요. ${friendlyError(e)}');
@@ -192,15 +199,20 @@ class _ChatScreenState extends State<ChatScreen> {
     final PickedImage? pending = _pending;
     if ((body.isEmpty && pending == null) || _sending) return;
     setState(() => _sending = true);
+    bool attachmentDone = pending == null; // 첨부 없으면 정리할 것도 없음.
     try {
       QuestionMessage? sent;
       if (body.isNotEmpty) {
-        sent = await _write.appendMessage(threadId: widget.thread.id, body: body);
+        final AppendedMessage appended =
+            await _write.appendMessage(threadId: widget.thread.id, body: body);
+        sent = appended.message;
         _input.clear();
         _messages?.add(sent); // 낙관적 반영(실시간과 중복돼도 무시됨).
       }
       if (pending != null) {
-        await _uploadPending(pending, messageId: sent?.id);
+        // 첨부 성공 시에만 pending 제거(P2-19). 실패하면 미리보기를 유지해
+        // 본문 성공·첨부 실패가 '전체 성공'으로 보이지 않게 한다.
+        attachmentDone = await _uploadPending(pending, messageId: sent?.id);
       }
     } catch (e) {
       _showError('전송에 실패했어요. ${friendlyError(e)}');
@@ -208,17 +220,19 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _sending = false;
-          _pending = null;
+          if (attachmentDone) _pending = null;
         });
       }
     }
   }
 
-  Future<void> _uploadPending(PickedImage image, {String? messageId}) async {
+  /// 대기 첨부 업로드. 성공(=pending 정리 가능)이면 true.
+  /// 오류를 삼키지 않는다 — 실패 사유를 표시하고 false 를 돌려준다(P2-19).
+  Future<bool> _uploadPending(PickedImage image, {String? messageId}) async {
     if (!widget.uploader.isReady) {
       // 저장소 미준비(버킷 없음) → 안내만(골격). 텍스트는 이미 전송됨.
       _showError('이미지 첨부는 준비 중이에요. (저장소 설정 인수인계)');
-      return;
+      return false;
     }
     try {
       await widget.uploader.upload(
@@ -228,8 +242,10 @@ class _ChatScreenState extends State<ChatScreen> {
         image: image,
       );
       await _refresh(); // 첨부 반영.
+      return true;
     } catch (e) {
       _showError('이미지 첨부에 실패했어요. ${friendlyError(e)}');
+      return false;
     }
   }
 
@@ -270,8 +286,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// 선택한(전송 전) 이미지에 주석 달기(S15). 완료 시 평탄화 PNG 가 새 첨부로

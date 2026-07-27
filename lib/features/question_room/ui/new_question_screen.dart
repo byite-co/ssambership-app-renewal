@@ -13,21 +13,29 @@ import '../data/question_room_read_repository.dart';
 import '../data/question_room_write_repository.dart';
 import '../../../shared/errors/friendly_error.dart';
 
-/// 새 질문 작성. 제목·내용·과목(선택) → 스레드 생성 + 첫 메시지 append.
+/// 새 질문 작성. 제목·내용·과목(선택) → 서버 원자 생성 RPC 한 번(P1-8).
 /// 활성 구독·잔여>0 확인은 호출부(질문영역)에서 게이팅하지만, 실패 에러는 그대로 노출한다.
 class NewQuestionScreen extends StatefulWidget {
-  const NewQuestionScreen({super.key, required this.room});
+  const NewQuestionScreen({
+    super.key,
+    required this.room,
+    this.readRepository = const QuestionRoomReadRepository(),
+    this.writeRepository = const QuestionRoomWriteRepository(),
+  });
 
   final Room room;
+
+  /// 테스트 주입 지점(기본: 운영 레포).
+  final QuestionRoomReadRepository readRepository;
+  final QuestionRoomWriteRepository writeRepository;
 
   @override
   State<NewQuestionScreen> createState() => _NewQuestionScreenState();
 }
 
 class _NewQuestionScreenState extends State<NewQuestionScreen> {
-  final QuestionRoomWriteRepository _write =
-      const QuestionRoomWriteRepository();
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
+  QuestionRoomWriteRepository get _write => widget.writeRepository;
+  QuestionRoomReadRepository get _read => widget.readRepository;
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
 
@@ -65,15 +73,25 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
     if (body.isEmpty || _busy) return;
     setState(() => _busy = true);
     try {
-      // A2: INSERT '직전' 주간한도 검사(읽기전용 RPC). can_ask=false 면 생성 차단.
-      // ★ 한계: 이는 '클라이언트 검사'라 앱을 우회한 직접 INSERT는 못 막는다.
-      //   서버측 강제는 question_threads INSERT 트리거가 필요하다(출시 후 백엔드 보강).
-      //   RPC 실패(usage==null)면 판정 불가 → 흐름을 막지 않고 진행(보수적: DB도 미강제).
+      // A2: 제출 '직전' 주간한도 검사(읽기전용 RPC) — UX 사전검사일 뿐이고
+      // 최종 판정은 생성 RPC(서버 트랜잭션)가 한다.
+      // ★ fail-closed(P2-13): 조회 실패(usage==null)=판정 불가면 제출을 막고
+      //   재시도를 안내한다(과거 fail-open 제거).
       final WeeklyQuestionUsage? usage = await _read.weeklyUsage(
         studentId: widget.room.studentId,
         mentorId: widget.room.mentorId,
       );
-      if (usage != null && !usage.canAsk) {
+      if (usage == null) {
+        if (mounted) {
+          setState(() => _busy = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('질문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.')),
+          );
+        }
+        return;
+      }
+      if (!usage.canAsk) {
         if (mounted) {
           setState(() => _busy = false);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -89,12 +107,14 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
         final int existing = (await _read.threads(widget.room.id)).length;
         title = autoQuestionTitle(existing);
       }
-      final QuestionThread thread = await _write.createThread(
+      // P1-8: 생성은 서버 원자 RPC 한 번 — thread+첫 메시지+사용량 소비가 한 트랜잭션.
+      // 실패하면 빈 thread/로컬 성공 상태가 남지 않는다(별도 append 호출 없음).
+      await _write.createThread(
         roomId: widget.room.id,
         title: title,
         subject: _subjectCode,
+        firstMessageBody: body,
       );
-      await _write.appendMessage(threadId: thread.id, body: body);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -150,9 +170,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
     // 로딩 전(_mentorCodes==null)에는 잠가 두어, 로드 후 후보에서 빠질 값이
     // 미리 선택되는 문제를 막는다. 로드되면 '해당 멘토 담당 과목만' 노출(전체 폴백 없음).
     final bool loaded = _mentorCodes != null;
-    final List<String> codes = loaded
-        ? mentorSubjectCodesStrict(_mentorCodes!)
-        : const <String>[];
+    final List<String> codes =
+        loaded ? mentorSubjectCodesStrict(_mentorCodes!) : const <String>[];
     final List<DropdownMenuItem<String?>> items = <DropdownMenuItem<String?>>[
       const DropdownMenuItem<String?>(value: null, child: Text('선택 안 함')),
       for (final String code in codes)
@@ -171,8 +190,7 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
           value: _subjectCode,
           dropdownColor: ColorTokens.surface,
           style: AppType.body,
-          hint: Text(loaded ? '선택 안 함' : '과목 불러오는 중…',
-              style: AppType.body),
+          hint: Text(loaded ? '선택 안 함' : '과목 불러오는 중…', style: AppType.body),
           items: items,
           // 로딩 중에는 비활성(onChanged=null) — 로드 후 제한된 후보로만 선택.
           onChanged:

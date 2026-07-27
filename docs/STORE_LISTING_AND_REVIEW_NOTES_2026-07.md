@@ -6,7 +6,7 @@
 
 ## 1. 앱 기본 정보
 
-- 패키지명: `com.ssambership.app` (확정 — 최초 등록 후 변경 불가)
+- 패키지명(Play/Android): `com.ssambership.edu` (2026-07-22 수렴 — 최초 등록 후 변경 불가). iOS 번들ID 는 `com.ssambership.app` (별도).
 - 앱 이름(표시): `쌤버십`
 - 카테고리(권장): 교육 (Education)
 - 기본 언어: 한국어

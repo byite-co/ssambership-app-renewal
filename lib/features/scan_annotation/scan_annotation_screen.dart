@@ -8,6 +8,7 @@ import '../../core/ink/ink_coordinate_mapper.dart';
 import '../../core/ink/ink_document.dart';
 import '../../core/ink/ink_input_mode.dart';
 import '../../core/ink/scribble_ink_adapter.dart';
+import '../../core/scan/image_downscaler.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../core/ink/widgets/ink_toolbar.dart';
 import 'annotation_flattener.dart';
@@ -106,16 +107,19 @@ class _ScanAnnotationScreenState extends State<ScanAnnotationScreen> {
   }
 
   Future<void> _loadBackground() async {
+    // P2-20: 초대형 배경은 합성 '전에' 장변을 §6-4 캡(2560px)으로 줄인다 —
+    // 평탄화가 배경 원본 해상도로 출력되므로, 여기서 줄여야 OOM·초과 출력이 없다.
+    // (스트로크는 정규화(0..1) 좌표라 배경 축소와 무관하게 위치가 보존된다.)
     final ui.Image image = widget.backgroundImageOverride ??
-        await AnnotationFlattener.decodeImage(widget.background);
+        await AnnotationFlattener.decodeImage(
+            await downscaleFlattenBackground(widget.background));
     if (!mounted) {
       if (widget.backgroundImageOverride == null) image.dispose();
       return;
     }
     setState(() {
       _bg = image;
-      _imageSize =
-          Size(image.width.toDouble(), image.height.toDouble());
+      _imageSize = Size(image.width.toDouble(), image.height.toDouble());
     });
   }
 
@@ -154,7 +158,10 @@ class _ScanAnnotationScreenState extends State<ScanAnnotationScreen> {
   /// '완료' — 스트로크를 정규화해 문서로 만들고, 평탄화 PNG 를 첨부로 전송한다.
   /// 빈 주석이면 전송 없이 닫는다(결과 null).
   Future<void> _onDone() async {
-    if (_mapper == null || _fitted == null || _bg == null || _imageSize == null) {
+    if (_mapper == null ||
+        _fitted == null ||
+        _bg == null ||
+        _imageSize == null) {
       return;
     }
     final Map<String, dynamic> normalized = AnnotationSketch.transform(
@@ -234,8 +241,7 @@ class _ScanAnnotationScreenState extends State<ScanAnnotationScreen> {
     }
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final Size viewport =
-            Size(constraints.maxWidth, constraints.maxHeight);
+        final Size viewport = Size(constraints.maxWidth, constraints.maxHeight);
         final InkCoordinateMapper mapper = InkCoordinateMapper.contain(
           imageSize: imageSize,
           viewport: viewport,

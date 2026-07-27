@@ -73,7 +73,8 @@ class _RoomItem {
   String get mentorName => mentor?.displayName ?? '멘토';
 }
 
-class _StudentRoomListState extends State<_StudentRoomList> {
+class _StudentRoomListState extends State<_StudentRoomList>
+    with WidgetsBindingObserver {
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final MentorLookupRepository _mentors = const MentorLookupRepository();
 
@@ -84,6 +85,20 @@ class _StudentRoomListState extends State<_StudentRoomList> {
   void initState() {
     super.initState();
     _future = _load();
+    // §4: 웹에서 구독·결제 후 앱 복귀 시 방 목록·구독 상태 재조회
+    // (IndexedStack 탭이라 재빌드가 없으므로 lifecycle 신호로 갱신).
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<_RoomItem>> _load() async {
@@ -100,8 +115,7 @@ class _StudentRoomListState extends State<_StudentRoomList> {
     final Map<String, WeeklyQuestionUsage?> usageByMentor =
         <String, WeeklyQuestionUsage?>{};
     if (studentId != null) {
-      final Set<String> mentorIds =
-          rooms.map((Room r) => r.mentorId).toSet();
+      final Set<String> mentorIds = rooms.map((Room r) => r.mentorId).toSet();
       await Future.wait(mentorIds.map((String mentorId) async {
         usageByMentor[mentorId] =
             await _repo.weeklyUsage(studentId: studentId, mentorId: mentorId);
@@ -117,7 +131,10 @@ class _StudentRoomListState extends State<_StudentRoomList> {
         .toList();
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    if (!mounted) return; // §4: dispose 후 setState 금지.
+    setState(() => _future = _load());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +179,8 @@ class _StudentRoomListState extends State<_StudentRoomList> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return _ErrorView(message: '목록을 불러오지 못했어요.\n${friendlyError(snap.error!)}');
+          return _ErrorView(
+              message: '목록을 불러오지 못했어요.\n${friendlyError(snap.error!)}');
         }
         final List<_RoomItem> all = snap.data ?? <_RoomItem>[];
         if (all.isEmpty) {

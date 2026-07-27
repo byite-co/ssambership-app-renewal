@@ -30,4 +30,12 @@ class Formatters {
     final String mm = dt.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
   }
+
+  /// '2026년 7월 25일 15:30' — 서버가 준 마감 시각 표시용(기기 로컬로 변환).
+  /// 탈퇴 취소 마감(`cancelable_until`)처럼 **서버 정본 시각**을 그릴 때만 쓴다.
+  /// 클라이언트에서 마감을 계산하지 않는다.
+  static String dateTimeMinute(DateTime dt) {
+    final DateTime local = dt.toLocal();
+    return '${koreanDate(local)} ${hourMinute(local)}';
+  }
 }

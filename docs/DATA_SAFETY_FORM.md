@@ -1,6 +1,7 @@
 # Play Console — Data safety 설문 초안 (P1-5)
 
 > 작성일: 2026-07-12 · 대상: `ssambership_app` v0.1.0+1 · 기준 코드: master `c1b005f` + 스토어 잔존물 배치
+> 갱신: 2026-07-26 (App-F0) — **OS 푸시(FCM) 제거 반영**. firebase_core/firebase_messaging 의존성·게이트웨이·디바이스 토큰 등록·알림 런타임 권한 선언을 전부 삭제했다. '기기 또는 기타 ID' 수집 = **아니요**.
 > 성격: **근거 있는 초안** — 실제 콘솔 설문 입력은 사람이 한다. 각 응답의 코드 근거(파일:라인)를 함께 적어
 > 입력자가 코드를 다시 뒤지지 않고 검증·기입할 수 있게 한다. 코드가 바뀌면 이 문서를 먼저 갱신할 것.
 >
@@ -13,7 +14,7 @@
 
 | 설문 문항 | 응답 | 근거 |
 |---|---|---|
-| 앱이 필수 사용자 데이터를 수집·공유하는가 | **수집: 예 · 공유: 아니요** | 아래 §2 수집 항목표. 제3자 SDK(광고·분석·크래시) 없음 — `pubspec.yaml` 의존성에 firebase/analytics/crashlytics 부재 |
+| 앱이 필수 사용자 데이터를 수집·공유하는가 | **수집: 예 · 공유: 아니요** | 아래 §2 수집 항목표. 광고·분석·크래시 SDK 없음 — `pubspec.yaml` 에 analytics/crashlytics/광고 SDK 부재. **App-F0 이후 Firebase SDK 도 없다**(firebase_core/firebase_messaging 제거) — 데이터 저장·전송은 Supabase 단일 백엔드뿐. 제3자 푸시 전송 서비스로 나가는 식별자가 없다 |
 | 전송 중 데이터 암호화 | **예** | 운영 백엔드는 Supabase 원격(`https://<ref>.supabase.co`) — `.env.example:7-8` 운영 예시, `lib/core/config/app_config.dart:24-27`(`_isRemote` 분기). 로컬 http 는 dev 전용(`SUPABASE_URL=http://127.0.0.1`) |
 | 사용자가 데이터 삭제를 요청할 수 있는가 | **예** | 인앱 진입 `lib/features/mypage/ui/sections/settings_section.dart:143-147`('회원 탈퇴') → 확인 다이얼로그(:49-75) → `openAccountDeleteWeb` → 웹 `/account/delete`(`lib/core/web_bridge/web_bridge_config.dart:35-38`). 콘솔 '삭제 요청 URL' 칸: `https://ssambership-web.vercel.app/account/delete` |
 
@@ -33,8 +34,8 @@
 | 파일 및 문서 | **아니요(서버 미전송)** | — | — | PDF 는 온디바이스 래스터화(pdfx) 후 이미지로만 업로드 — 원본 문서 파일을 서버로 보내지 않음(`lib/core/scan/` 포트) |
 | 메시지 → 기타 인앱 메시지(질문·답변) | **예** | 선택 | 앱 기능 | 질문방 메시지·IQ 답변 — `lib/features/individual_question/data/individual_question_repository.dart:12`(RPC `answer_individual_question` 등), 질문방 전송 `chat_screen.dart` |
 | 앱 활동 → 기타 사용자 생성 콘텐츠(게시글·댓글) | **예** | 선택 | 앱 기능 | 게시글 `lib/features/community/data/community_write_repository.dart:119-138`(`community_posts` insert), 댓글 :98-115(`community_comments` insert), 신고 :140-156(`content_reports`), 차단 목록 `lib/features/community/data/user_blocks_repository.dart:101`(`user_blocks` insert) |
-| 기기 또는 기타 ID | **아니요(현재)** | — | — | 푸시 미도입 — `lib/core/push/device_token_registrar.dart:13`(`_tableExists=false`, `isReady` 상시 false, `device_tokens` 테이블 미존재), pubspec 에 firebase_messaging 없음. **도입 시 이 표와 설문을 갱신할 것** |
-| 위치·연락처·건강·금융 정보 등 그 외 전 카테고리 | **아니요** | — | — | 해당 권한·SDK·입력 UI 없음(매니페스트 권한 = INTERNET 1개) |
+| 기기 또는 기타 ID | **아니요** | — | — | App-F0: OS 푸시를 출시 범위에서 제외했다. `firebase_messaging`·게이트웨이·`register_device_token` 등록 경로가 **코드에 존재하지 않으며**(회귀 잠금: `test/push/firebase_free_test.dart`), 푸시 SDK 설정 파일도 빌드에 포함되지 않는다. 따라서 device token 을 발급·수집·전송하지 않는다. 재도입 시 이 행을 '예'로 되돌리고 설문을 재제출할 것 |
+| 위치·연락처·건강·금융 정보 등 그 외 전 카테고리 | **아니요** | — | — | 해당 권한·SDK·입력 UI 없음(매니페스트 권한 = INTERNET 1개 — 위치/연락처/센서/전화 권한 없음) |
 
 부수 저장값(설문 카테고리 해당 없음 판단, 입력자 참고): 알림 수신 설정 `users.notification_enabled`
 (`lib/features/mypage/data/notification_settings_repository.dart:14-15,41`) — 기능 설정값이며 식별·추적 용도 아님.
@@ -54,6 +55,6 @@
 
 1. [ ] 스토어 빌드의 `.env` 가 운영 Supabase(https) 값인지 확인 후 §1 '암호화 전송=예' 기입.
 2. [ ] `https://ssambership-web.vercel.app/account/delete` 실페이지 동작 확인 후 삭제 URL 기입.
-3. [ ] §2 표를 설문 카테고리 순서대로 옮겨 기입(수집=예 항목 8줄 · 나머지 전부 아니요).
+3. [ ] §2 표를 설문 카테고리 순서대로 옮겨 기입(수집=예 항목 8줄 · '기기 또는 기타 ID' 포함 나머지 전부 아니요).
 4. [ ] 개인정보처리방침 URL(`/legal/privacy`) 을 스토어 등재정보에 함께 등록(P0-2 콘솔측).
-5. [ ] 푸시(FCM)·IQ 작성(on 전환) 도입 시 이 문서 §2 갱신 → 설문 재제출.
+5. [ ] 푸시(FCM): **미도입**(App-F0 에서 제거) → '기기 또는 기타 ID' 아니요로 기입. 재도입하거나 IQ 작성(on 전환) 도입 시 §2 갱신 → 설문 재제출.

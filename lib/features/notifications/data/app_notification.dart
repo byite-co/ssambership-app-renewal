@@ -1,76 +1,16 @@
-/// 알림 도메인 모델 + 유형 분류.
+/// 알림 도메인 모델.
 ///
-/// ★ 앱 범위: 질문방 · 구독/결제 · 개별질문(IQ) 알림을 노출한다.
-///   맞춤의뢰(CR)·환불은 앱 출시 제외 → [NotificationKind.other] 로 분류해 숨긴다.
+/// ★ 타입 판별은 키워드 포함 매칭이 아니라 [NotificationEventType.fromCode]
+///   (정확 일치 17종)만 쓴다. 목록 밖 타입은 unknown → 기타(kind other)로
+///   '일반 알림'으로 표시하되 숨기지 않는다(환불 포함). 맞춤의뢰 2종만
+///   CR 게이트 OFF 로 레포 쿼리 단계에서 제외된다(서버 계약 17종 불변 —
+///   notification_types.kGatedNotificationTypeCodes 참조).
 ///   type 원문(영문 코드)은 화면에 노출하지 않고, 한글 유형 라벨/본문만 쓴다.
 library;
 
-/// 알림 유형(앱 범위). other = 앱에서 표시하지 않음(CR·환불·미지).
-enum NotificationKind { questionRoom, subscription, individualQuestion, other }
+import 'notification_types.dart';
 
-/// 유형 한글 라벨(코드 비노출).
-String notificationKindLabel(NotificationKind kind) {
-  switch (kind) {
-    case NotificationKind.questionRoom:
-      return '질문방';
-    case NotificationKind.subscription:
-      return '구독·결제';
-    case NotificationKind.individualQuestion:
-      return '개별질문';
-    case NotificationKind.other:
-      return '기타';
-  }
-}
-
-/// notifications.type(자유 텍스트) → 앱 범위 유형.
-///
-/// 실제 type 어휘는 RLS로 anon 조회가 막혀 확정 열람 불가 → 키워드로 방어적 분류한다.
-/// 개별질문(IQ)을 먼저 판별하고(환불 알림도 IQ 화면에서 확인),
-/// 제외 대상(CR·환불)을 걸러 other 로 보낸 뒤, 구독/질문방을 판별한다.
-NotificationKind classifyNotificationType(String? type) {
-  final String t = (type ?? '').toLowerCase();
-
-  // 개별질문(IQ) — 환불·정산 등 IQ 파생 알림도 여기로(refund 필터보다 먼저).
-  if (t.contains('individual_question') || t.startsWith('iq_')) {
-    return NotificationKind.individualQuestion;
-  }
-
-  // 앱 범위 밖: 맞춤의뢰(CR)·환불.
-  // ★ 'order' 포함 — 웹은 맞춤의뢰 주문방 메시지를 type='new_order_message' 로 보낸다.
-  //   'message' 키워드가 아래 질문방 분기에 걸려 오분류되던 문제(XV-CR-NOTIF) 차단.
-  //   앱 범위 유형(question/subscription/IQ)에는 'order' 가 없어 오탐 위험 없음.
-  if (t.contains('custom_request') ||
-      t.contains('custom_order') ||
-      t.contains('order') ||
-      t.contains('refund') ||
-      t.startsWith('cr_')) {
-    return NotificationKind.other;
-  }
-
-  // 구독·결제(웹 정본 키워드: subscri/billing/payment/pay/wallet/cash/renew).
-  if (t.contains('subscription') ||
-      t.contains('billing') ||
-      t.contains('payment') ||
-      t.contains('pay') ||
-      t.contains('wallet') ||
-      t.contains('cash') ||
-      t.contains('renew')) {
-    return NotificationKind.subscription;
-  }
-
-  // 질문방(웹 정본: question/qna/thread/answer/message/room/note).
-  if (t.contains('question') ||
-      t.contains('qna') ||
-      t.contains('thread') ||
-      t.contains('answer') ||
-      t.contains('message') ||
-      t.contains('room') ||
-      t.contains('note')) {
-    return NotificationKind.questionRoom;
-  }
-
-  return NotificationKind.other;
-}
+export 'notification_types.dart';
 
 /// 본문이 비어 있을 때의 유형별 폴백(날조 아님 — 유형 안내만).
 String _fallbackBody(NotificationKind kind) {
@@ -81,6 +21,8 @@ String _fallbackBody(NotificationKind kind) {
       return '구독·결제 관련 알림이에요.';
     case NotificationKind.individualQuestion:
       return '개별질문에 새 소식이 있어요.';
+    case NotificationKind.customRequest:
+      return '맞춤의뢰 소식이 있어요.';
     case NotificationKind.other:
       return '새 알림이 있어요.';
   }
@@ -90,41 +32,87 @@ String _fallbackBody(NotificationKind kind) {
 class AppNotification {
   const AppNotification({
     required this.id,
-    required this.kind,
+    required this.eventType,
     required this.body,
     required this.isRead,
     required this.createdAt,
+    this.title,
+    this.roomId,
+    this.threadId,
+    this.questionId,
   });
 
   final String id;
-  final NotificationKind kind;
+
+  /// 서버 type 정확 매핑(목록 밖 = unknown).
+  final NotificationEventType eventType;
+
+  /// data.title(서버 작성 제목). 없으면 본문만 표시.
+  final String? title;
+
   final String body;
   final bool isRead;
   final DateTime createdAt;
 
-  /// 앱에서 노출할 범위인지(질문방·구독만).
-  bool get inAppScope => kind != NotificationKind.other;
+  /// metadata.room_id — 질문방 정밀 딥링크 후속용(현재는 탭 이동만).
+  final String? roomId;
+
+  /// metadata.thread_id — 질문 스레드 정밀 딥링크 후속용.
+  final String? threadId;
+
+  /// metadata.question_id — 개별질문 정밀 딥링크 후속용.
+  final String? questionId;
+
+  /// 표시 분류(필터 칩·배지) — 타입에서 파생.
+  NotificationKind get kind => notificationKindOf(eventType);
 
   AppNotification copyWith({bool? isRead}) => AppNotification(
         id: id,
-        kind: kind,
+        eventType: eventType,
+        title: title,
         body: body,
         isRead: isRead ?? this.isRead,
         createdAt: createdAt,
+        roomId: roomId,
+        threadId: threadId,
+        questionId: questionId,
       );
 
+  /// 서버 행 → 모델. 누락 필드에 관대(크래시 금지): 모르는 타입은 unknown,
+  /// 읽음은 is_read 우선 + 레거시 read 폴백, 빈 본문은 유형별 폴백.
   factory AppNotification.fromMap(Map<String, dynamic> map) {
-    final NotificationKind kind = classifyNotificationType(map['type'] as String?);
+    final NotificationEventType eventType =
+        NotificationEventType.fromCode(map['type'] as String?);
+    final NotificationKind kind = notificationKindOf(eventType);
     final String rawBody = (map['body'] as String?)?.trim() ?? '';
-    final bool read = (map['is_read'] as bool?) ?? (map['read'] as bool?) ?? false;
+    final bool read =
+        (map['is_read'] as bool?) ?? (map['read'] as bool?) ?? false;
+    final Map<String, dynamic> data = _asMap(map['data']);
+    final Map<String, dynamic> metadata = _asMap(map['metadata']);
     return AppNotification(
       id: map['id'] as String,
-      kind: kind,
+      eventType: eventType,
+      title: _nonEmptyString(data['title']),
       body: rawBody.isEmpty ? _fallbackBody(kind) : rawBody,
       isRead: read,
       createdAt: _parseTime(map['created_at']),
+      roomId: _nonEmptyString(metadata['room_id']),
+      threadId: _nonEmptyString(metadata['thread_id']),
+      questionId: _nonEmptyString(metadata['question_id']),
     );
   }
+}
+
+Map<String, dynamic> _asMap(Object? v) {
+  if (v is Map<String, dynamic>) return v;
+  if (v is Map) return v.map((Object? k, Object? val) => MapEntry('$k', val));
+  return const <String, dynamic>{};
+}
+
+String? _nonEmptyString(Object? v) {
+  if (v == null) return null;
+  final String s = '$v'.trim();
+  return s.isEmpty ? null : s;
 }
 
 DateTime _parseTime(Object? v) {

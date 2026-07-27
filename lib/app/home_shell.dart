@@ -5,10 +5,12 @@ import '../core/auth/auth_service.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
+import '../features/mypage/data/mypage_models.dart';
 import '../features/mypage/mypage_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
 
@@ -21,7 +23,10 @@ import 'entry_guard.dart';
 /// 질문방·알림·개별질문·마이페이지를 누르면 "로그인이 필요해요" 안내와 함께
 /// 로그인 화면으로 보낸다.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.myPageLoaderOverride});
+
+  /// 테스트용 마이페이지 데이터 주입(loaderOverride 패턴) — 실사용은 null.
+  final Future<MyPageData> Function()? myPageLoaderOverride;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -84,14 +89,23 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// 우측 상단 프로필(원형) → 마이페이지 push. 게스트는 로그인 안내로 보낸다.
-  void _openMyPage() {
+  ///
+  /// 마이페이지 안의 '알림'·'받은 질문 보기' 등 탭 이동 액션은 **pop 결과(탭 index)**
+  /// 로 돌아온다 — push 된 마이페이지가 화면을 덮은 채 숨은 탭 index 만 바뀌던
+  /// 무반응 구조를 제거한다(route 를 닫고 나서 실제 보이는 탭을 전환).
+  Future<void> _openMyPage() async {
     if (AuthService.instance.isGuest) {
       context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const _MyPagePage()),
+    final int? tab = await Navigator.of(context).push<int>(
+      MaterialPageRoute<int>(
+        builder: (_) =>
+            _MyPagePage(loaderOverride: widget.myPageLoaderOverride),
+      ),
     );
+    if (!mounted || tab == null) return;
+    _onSelect(tab);
   }
 
   @override
@@ -107,7 +121,14 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: _pages),
+      // §5-1: 탈퇴 예약 상시 배너 — 어느 탭에 있어도 보이도록 셸 레벨에 둔다.
+      // 노출·취소버튼 판정은 전부 서버 정본(DeletionNoticeController).
+      body: Column(
+        children: <Widget>[
+          const WithdrawalPendingBanner(),
+          Expanded(child: IndexedStack(index: _index, children: _pages)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _onSelect,
@@ -157,14 +178,24 @@ class _ProfileCircleButton extends StatelessWidget {
 
 /// 마이페이지 push 라우트 래퍼.
 /// MyPageScreen 은 본문만 그리므로(자체 Scaffold 없음) 여기서 AppBar 를 씌운다.
+/// 탭 이동 액션(알림·받은 질문 보기·질문하러 가기)은 이 route 를 **pop 하면서
+/// 목적지 탭 index 를 반환**한다 — HomeShell 이 받아 실제 보이는 탭을 전환한다.
 class _MyPagePage extends StatelessWidget {
-  const _MyPagePage();
+  const _MyPagePage({this.loaderOverride});
+
+  final Future<MyPageData> Function()? loaderOverride;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text(AppConstants.myPageTitle)),
-      body: const MyPageScreen(),
+      body: MyPageScreen(
+        loaderOverride: loaderOverride,
+        onOpenQuestionsTab: () =>
+            Navigator.of(context).pop(AppTab.questionRoom),
+        onOpenNotifications: () =>
+            Navigator.of(context).pop(AppTab.notifications),
+      ),
     );
   }
 }

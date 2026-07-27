@@ -1,7 +1,7 @@
 name: ssambership_app
 description: "쌤버십 모바일 앱 — 기존 웹(Next.js)의 컴패니언. 읽기 중심·Commerce-Zero(앱 내 결제 없음)."
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.0+4
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -34,9 +34,20 @@ dependencies:
   # PDF 스캔(S19): 페이지 -> PNG 래스터화(Android/iOS 네이티브 렌더 - pdfium/CoreGraphics).
   # 기획안 §7-2 1순위. 어댑터: lib/core/scan/pdf_rasterizer.dart (포트 뒤 격리).
   pdfx: ^2.9.2
+  # 숏폼 상세(P2-14): 실제 영상 재생(네트워크 mp4/HLS). 포트 뒤 격리:
+  # lib/features/community/ui/shortform/shortform_video_port.dart
+  video_player: ^2.13.0
+  # 최소 지원 버전 게이트: 현재 빌드번호(buildNumber, 정수) 조회용.
+  package_info_plus: ^9.0.1
+  webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.13.0
+  webview_flutter_wkwebview: ^3.26.0
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # e2e(integration_test) — flutter drive + chromedriver(web)로 실서버(staging) 검증.
+  integration_test:
     sdk: flutter
   flutter_lints: ^4.0.0
   # 런처 아이콘 생성(브랜딩) — 소스 PNG 1개에서 Android/iOS 아이콘 생성.

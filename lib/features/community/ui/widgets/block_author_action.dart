@@ -4,7 +4,8 @@ import '../../data/user_blocks_repository.dart';
 
 /// 작성자 차단 확인 다이얼로그 → 차단 실행(공용). 차단 성공 시 true.
 ///
-/// [table]: 'community_posts' | 'community_comments' | 'shortform_posts'.
+/// [table]: 'community_posts' | 'comments'(게시판 댓글 — v16 정본) |
+/// 'community_comments'(숏폼 댓글) | 'shortform_posts'.
 /// author_id 는 [contentId]로 서버에서 조회해 차단하므로 화면에 노출하지 않는다.
 Future<bool> confirmAndBlockAuthor(
   BuildContext context, {

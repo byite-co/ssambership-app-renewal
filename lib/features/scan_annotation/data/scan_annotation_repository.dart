@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/ink/ink_document.dart';
 import '../../../core/ink/ink_storage_paths.dart';
+import '../../../core/scan/image_downscaler.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import '../../question_room/data/attachments/attachment_upload.dart';
@@ -56,16 +57,23 @@ class ScanAnnotationRepository {
     required Uint8List flattenedPng,
     String fileName = 'annotation.png',
   }) async {
-    // 1) 평탄화 PNG → 기존 첨부 파이프라인으로 전송(중복 구현 금지).
-    final QuestionAttachment attachment = await _uploader.upload(
+    // P2-20: 평탄화 PNG 도 일반 첨부와 같은 크기 규약(§6-4)을 통과시킨다 —
+    // 5MB 초과면 축소(불투명 배경이라 대개 JPEG 재인코딩), 파일명·MIME 도 함께 맞춘다
+    // (IQ 경로 iq_annotation_repository.submitAnnotation 과 동일 파이프라인).
+    final PickedImage image = await downscaleIfOversized(PickedImage(
+      bytes: flattenedPng,
+      fileName: fileName,
+      mimeType: 'image/png',
+    ));
+
+    // 1) 평탄화 이미지 → 기존 첨부 파이프라인으로 전송(중복 구현 금지).
+    //    등록은 서버 RPC(P2-19) — 실패 시 업로더가 고아 객체를 보상 삭제한다.
+    final AttachmentUploadResult uploaded = await _uploader.upload(
       roomId: roomId,
       threadId: threadId,
-      image: PickedImage(
-        bytes: flattenedPng,
-        fileName: fileName,
-        mimeType: 'image/png',
-      ),
+      image: image,
     );
+    final QuestionAttachment attachment = uploaded.attachment;
 
     // 2) 재편집용 원본(ink.json)을 전송된 첨부 id 기준 경로에 upsert.
     await _docStore.upsertDocument(

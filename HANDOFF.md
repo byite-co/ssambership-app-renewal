@@ -148,16 +148,16 @@ flutter build appbundle
   - 구독 구현: `lib/features/question_room/data/thread_realtime.dart`(`SupabaseThreadRealtime`, `onPostgresChanges`).
 - **하면**: 새 메시지·상태 변경이 **새로고침 없이 즉시** 반영. 미포함이어도 앱은 **폴백**으로 동작함 — 전송 후 재조회 + AppBar **새로고침 버튼**(`chat_screen.dart:_refresh` line 109 / 버튼 line 196, `mentor_answer_screen.dart` 동일).
 
-### 3-4. 푸시 알림 (FCM) — S7 골격 활성화
-- **왜**: 클라이언트 **골격만** 있음(포트 기본이 `Disabled/Noop`, Firebase 미도입, 서버 미배포). 아래를 채워야 실제 발송/수신.
-- **어디에 무엇을** (`lib/core/push/`, 상세 원본: `lib/core/push/HANDOFF.md`):
-  1. **Firebase 도입**: `pubspec.yaml` 에 `firebase_core`·`firebase_messaging` 추가(현재 없음). `flutterfire configure`(→ `firebase_options.dart`), `Firebase.initializeApp()`, Android `google-services.json`·Gradle 플러그인·`POST_NOTIFICATIONS`(Android 13+). 그 뒤 `PushTokenProvider`/`PushPermissionPort` 실제 구현 주입.
-  2. **device_tokens 테이블 생성**(현재 미존재) → `SupabaseDeviceTokenRegistrar._tableExists = false` **(device_token_registrar.dart:13)** → `true`. DDL은 `lib/core/push/HANDOFF.md`(테이블 `device_tokens`, 컬럼 `user_id·token·platform·created_at·updated_at`, RLS 본인 토큰만).
-  3. **Edge Function `send-push` 배포** → `EdgeFunctionPushSender._deployed = false` **(edge_function_push_sender.dart:17)** → `true`. 함수명 상수 `functionName = 'send-push'`(line 14). 입력 `{to_user_id, title, body, data}`.
-  4. **발송 트리거 연결**(현재 **미연결** — 메서드만 존재): `lib/core/push/push_trigger.dart` 의
-     `onMentorAnswered(...)` / `onNewQuestionForMentor(...)` / `onNewMessageForStudent(...)` 를 **질문방 이벤트 성공 직후** 호출(멘토 답변 전송·학생 새 질문/메시지). 상대 user_id 는 `mentor_student_rooms.student_id/mentor_id` 로 구함.
-  5. **"알림 다시 켜기"**: `PushService.instance.requestPermissionAgain(userId: ...)` 를 마이페이지(S11) 설정에 연결.
-- **하면**: 권한 팝업 → 토큰 발급/등록 → 답변 등 이벤트 → 푸시 수신 → 탭 시 관련 화면 이동. **실기기 검증 필요**(에뮬레이터는 FCM 제한).
+### 3-4. 푸시 알림 (FCM) — 수신·토큰 등록 (상태: WAITING_EXTERNAL_FIREBASE_CONFIG)
+- **원칙(2026-07-21 확정)**: **발송은 서버 outbox worker 단독**(`record_domain_notification` → `notification_outbox` → deliveries). **앱은 수신·토큰 등록만 담당** — FCM HTTP·Edge Function invoke 등 클라이언트 발송 경로는 **제거됐고 다시 만들지 말 것**(과거 `push_trigger.dart`/`edge_function_push_sender.dart` 삭제됨).
+- **코드는 완료**(`lib/core/push/` + `lib/core/deeplink/`, 상세: `lib/core/push/HANDOFF.md`):
+  - `firebase_core`/`firebase_messaging` 의존성 추가됨. `FirebasePushGateway` 가 **준비 경계** — Firebase 설정 파일이 없으면 초기화 실패를 삼키고 푸시만 조용히 비활성(앱은 정상 구동).
+  - 토큰 수명주기: 로그인/세션 복원 시 RPC `register_device_token(p_token, p_platform)` 로 등록(서버가 ON CONFLICT 재소유 — 계정 전환은 재등록만), 토큰 회전 시 재등록, 로그아웃은 **signOut '이전'** 본인 행 `revoked_at` UPDATE(RPC `revoke_device_token` 은 권한 없음 — 호출 금지).
+  - 수신 → 딥링크: 알림 '탭'(onMessageOpenedApp/getInitialMessage) → 정본 17종 `notificationDestinationOf` 의 **탭 이동만**(`TabNavigator.go`) — payload 의 link/url 은 무시. 중복 수신 dedup + 비로그인 pending(TTL 15분).
+- **남은 외부 작업**(파일 날조 금지 — `lib/core/push/HANDOFF.md` 활성화 절차):
+  1. `android/app/google-services.json` 배치 + `com.google.gms.google-services` gradle 플러그인 추가(json 없이 플러그인만 넣으면 빌드 깨짐 — 의도적 미적용).
+  2. iOS(macOS): `GoogleService-Info.plist` + Push Notifications capability(aps-environment) + APNs 키 등록 + `pod install`.
+  3. 실기기 검증(에뮬레이터는 FCM 제한).
 
 ### 3-5. 색·디자인 확정
 - **왜**: 색 토큰 hex가 임시 placeholder. 화면 레이아웃/기능은 완성이나 최종 비주얼 미확정.
@@ -167,7 +167,7 @@ flutter build appbundle
 ### 3-6. 빌드·출시
 - **pubspec.lock 은 커밋한다**(앱 저장소 표준 — 팀·CI·출시 빌드가 같은 의존성 해석을 재현. 2026-07-07 S19 에서 .gitignore 제외를 제거하고 정책 전환).
 - **네이티브 폴더**: `android/`·`ios/` (현재 untracked 상태로 존재). 없거나 갱신 필요 시:
-  `flutter create . --org com.ssambership --project-name ssambership_app --platforms=android,ios` (기존 `lib/`·`pubspec.yaml` 보존, 누락 폴더만 생성). 패키지명 `com.ssambership.app` 확정(2026-07 — Android applicationId·iOS 번들ID 통일).
+  `flutter create . --org com.ssambership --project-name ssambership_app --platforms=android,ios` (기존 `lib/`·`pubspec.yaml` 보존, 누락 폴더만 생성). 패키지 계약(2026-07-22 갱신): **Android** applicationId/namespace=`com.ssambership.edu` (Play 등록 package — 기존 `com.ssambership.app` 은 Play 요구로 `.edu` 로 수렴), **iOS** 번들ID=`com.ssambership.app` (이번 Android 작업에서 변경 없음). Firebase Android 앱 등록 시 package 는 반드시 `com.ssambership.edu`.
 - **.env 원격 전환**(출시): 로컬 → 원격 production 값 교체(README 참조)
   `SUPABASE_URL=https://<project-ref>.supabase.co` / `SUPABASE_ANON_KEY=<remote-anon-key>`. 원격이면 플랫폼 분기 없이 그대로 사용.
 - **Android**: 릴리스 빌드·서명 키·Play Store 등록. **iOS**: 번들ID·서명·App Store 등록.
@@ -228,6 +228,6 @@ test/         위젯·로직 테스트(250개, DB 비의존). 폴더: data/ widg
 1. `web_bridge_config.dart` `baseUrl` 채우기 → 결제 동선 즉시 켜짐.
 2. ✅ 이미지 첨부 **연결 완료**(버킷 `question-room-attachments` 실존 + `_storageReady=true` + `DeviceImagePicker`) — 첨부 퀵윈. **전송된 이미지 뷰어(서명 URL)·전송 후 주석 진입점도 완료(PR #8)**.
 3. `supabase_realtime` publication에 질문 테이블 포함 → 실시간 켜짐(없어도 폴백 동작).
-4. Firebase 도입 + `device_tokens` DDL(`_tableExists=true`) + `send-push` 배포(`_deployed=true`) + `PushTrigger` 연결 → 푸시 켜짐.
+4. Firebase 설정 파일(google-services.json/GoogleService-Info.plist) + gradle 플러그인·APNs 만 채우면 푸시 수신 켜짐 — **발송은 서버 outbox worker 단독, 앱은 수신·토큰 등록만**(클라이언트 발송 경로 만들지 말 것).
 5. `color_tokens.dart` hex 확정.
 6. `.env` 원격 전환 + Android/iOS 빌드·서명·스토어 등록.

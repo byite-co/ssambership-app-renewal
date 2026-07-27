@@ -39,8 +39,8 @@ void main() {
   });
 
   test('프리미엄(limit 999)은 큰 잔여수 대신 "질문 가능"으로 표시', () {
-    final WeeklyQuestionUsage u = WeeklyQuestionUsage.fromRpc(
-        rpc(used: 1, limit: 999, remaining: 998, canAsk: true, tier: 'premium'))!;
+    final WeeklyQuestionUsage u = WeeklyQuestionUsage.fromRpc(rpc(
+        used: 1, limit: 999, remaining: 998, canAsk: true, tier: 'premium'))!;
     expect(u.isEffectivelyUnlimited, isTrue);
     expect(u.remainingLabel, '이번 주 질문 가능');
   });
@@ -68,8 +68,8 @@ void main() {
 
   group('planQuotaLabel (마이페이지 구독 카드용, RPC 값만 사용)', () {
     test('일반 플랜은 "주 N개 질문 · 잔여 X/N"', () {
-      final WeeklyQuestionUsage u = WeeklyQuestionUsage.fromRpc(
-          rpc(used: 3, limit: 9, remaining: 6, canAsk: true, tier: 'standard'))!;
+      final WeeklyQuestionUsage u = WeeklyQuestionUsage.fromRpc(rpc(
+          used: 3, limit: 9, remaining: 6, canAsk: true, tier: 'standard'))!;
       expect(u.planQuotaLabel, '주 9개 질문 · 잔여 6/9');
     });
 

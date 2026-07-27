@@ -319,7 +319,7 @@ flutter build appbundle
 
 ## 🔑 릴리즈 키 생성 절차 (사람 작업 — 코드/세션에 키 절대 반입 금지)
 
-앱 코드는 `android/key.properties` 가 **있으면 release 키, 없으면 debug 폴백**으로 서명한다(build.gradle.kts — 빌드는 항상 성공). 스토어 업로드 전 아래 절차로 키를 만들고 채운다.
+앱 코드는 `android/key.properties` 가 **있으면 release(업로드) 키로 서명**한다. **없으면 release 산출물 빌드는 즉시 실패**한다(build.gradle.kts — debug 서명 AAB 의 오업로드를 원천 차단). CI 파이프라인 검증처럼 debug 폴백이 의도된 경우에만 `-PallowInsecureSigning=true`(env `ORG_GRADLE_PROJECT_allowInsecureSigning=true`) 로 빌드하며 그 산출물은 제출 불가다. 스토어 업로드 전 아래 절차로 키를 만들고 채운다.
 
 1. **keystore 생성** (오너 로컬 PC에서 — 클라우드 세션·레포에서 실행 금지):
    ```bash

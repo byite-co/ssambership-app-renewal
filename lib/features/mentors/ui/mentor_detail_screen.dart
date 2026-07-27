@@ -7,14 +7,18 @@ import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/app_card.dart';
 import '../../../design/widgets/initial_avatar.dart';
 import '../../../design/widgets/primary_button.dart';
+import '../data/free_question_entry.dart';
 import '../data/mentor_directory_repository.dart';
 import '../data/mentor_favorites_repository.dart';
 import '../data/mentor_models.dart';
+import '../data/mentor_subject.dart';
+import 'widgets/free_question_entry_section.dart';
 import 'widgets/mentor_favorite_button.dart';
 import 'widgets/mentor_meta_item.dart';
 import '../../../app/app_tabs.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/commerce/commerce_policy.dart';
+import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/widgets/secondary_button.dart';
 import '../../../shared/widgets/commerce_notice_card.dart';
 import '../../individual_question/iq_flags.dart';
@@ -22,11 +26,17 @@ import '../../individual_question/ui/iq_create_screen.dart';
 
 /// 멘토 상세(열람 전용). 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
 /// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](웹 브릿지).
+///
+/// §4-2 최신성: 구독은 앱 밖(웹)에서 일어나므로(Commerce-Zero — 앱 내 구독 진입 없음)
+/// 구독 성공 후 앱으로 돌아오면 **resume 재조회**가 정본 경로다. 앱 안에서 구독 상태
+/// 변화를 알게 된 지점은 [DataRefreshBus.bumpSubscription] 으로 보완한다.
+/// 두 경로 모두 세대 토큰(`_extrasGeneration`)을 지나 늦은 이전 응답을 폐기한다.
 class MentorDetailScreen extends StatefulWidget {
   const MentorDetailScreen({
     super.key,
     required this.item,
     this.initialFavorited = false,
+    this.extrasLoaderOverride,
   });
 
   final MentorListItem item;
@@ -34,20 +44,74 @@ class MentorDetailScreen extends StatefulWidget {
   /// 목록에서 넘어올 때의 찜 상태(하트 초기값). 상세에서 토글하면 서버 반영.
   final bool initialFavorited;
 
+  /// 테스트용 extras 로더 주입(loaderOverride 패턴) — 실사용은 null.
+  final Future<MentorDetailExtras> Function()? extrasLoaderOverride;
+
   @override
   State<MentorDetailScreen> createState() => _MentorDetailScreenState();
 }
 
-class _MentorDetailScreenState extends State<MentorDetailScreen> {
+class _MentorDetailScreenState extends State<MentorDetailScreen>
+    with WidgetsBindingObserver {
   final MentorDirectoryRepository _repo = const MentorDirectoryRepository();
   final MentorFavoritesRepository _favRepo = const MentorFavoritesRepository();
-  late Future<MentorDetailExtras> _future;
   late bool _favorited = widget.initialFavorited;
+
+  /// 마지막 '정상 완료' extras 스냅샷. 재조회 중에도 이 값을 계속 그린다 —
+  /// 재조회 때마다 구독 CTA 가 미확정(null)으로 깜빡이던 문제를 막는다.
+  MentorDetailExtras? _extras;
+
+  /// 아직 한 번도 정상 완료하지 못한 첫 로드 진행 중인지(활동 통계 '불러오는 중…').
+  bool _loading = true;
+
+  /// 늦게 도착한 이전 재조회 응답 폐기용 세대 토큰(mypage v20 계약과 동일).
+  int _extrasGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _future = _repo.fetchExtras(widget.item.id);
+    _reloadExtras();
+    // 웹에서 구독을 마치고 앱으로 복귀 → 구독 여부 재조회(CTA stale 제거).
+    WidgetsBinding.instance.addObserver(this);
+    // 앱 안에서 알게 된 구독 상태 변화 신호.
+    DataRefreshBus.subscriptionGeneration.addListener(_onSubscriptionChanged);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reloadExtras();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    DataRefreshBus.subscriptionGeneration
+        .removeListener(_onSubscriptionChanged);
+    super.dispose();
+  }
+
+  void _onSubscriptionChanged() {
+    if (!mounted) return; // dispose 후 상태 변경 금지.
+    _reloadExtras();
+  }
+
+  /// extras 재조회 — 상태 갱신은 loader 완료 지점에서만. 실패해도 마지막 정상
+  /// 스냅샷을 지우지 않는다(최초 로드 실패는 기존과 동일하게 빈 extras 로 렌더).
+  void _reloadExtras() {
+    if (!mounted) return;
+    final int gen = ++_extrasGeneration;
+    final Future<MentorDetailExtras> next = (widget.extrasLoaderOverride ??
+        () => _repo.fetchExtras(widget.item.id))();
+    next.then((MentorDetailExtras data) {
+      if (!mounted || gen != _extrasGeneration) return; // 늦은 이전 응답 폐기
+      setState(() {
+        _extras = data;
+        _loading = false;
+      });
+    }).catchError((Object _) {
+      if (!mounted || gen != _extrasGeneration) return;
+      setState(() => _loading = false); // 마지막 정상 스냅샷은 보존
+    });
   }
 
   /// 하트 탭 — 비로그인이면 로그인 유도, 아니면 낙관적 토글 후 서버 반영(실패 시 되돌림).
@@ -89,7 +153,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
             AppSpacing.screenH, 16, AppSpacing.screenH, 24),
         children: <Widget>[
           _Header(item: m),
-          if (m.subjects.isNotEmpty) ...<Widget>[
+          if (m.subjectViews.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.cardGap),
             _Section(
               icon: Icons.menu_book_rounded,
@@ -98,8 +162,9 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
                 spacing: 6,
                 runSpacing: 6,
                 children: <Widget>[
-                  for (final String s in m.subjects)
-                    AppBadge(label: s),
+                  // canonical 한글 라벨만 노출(raw 코드 노출 금지).
+                  for (final MentorSubject s in m.subjectViews)
+                    AppBadge(label: s.label),
                 ],
               ),
             ),
@@ -115,30 +180,22 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.cardGap),
-          FutureBuilder<MentorDetailExtras>(
-            future: _future,
-            builder: (BuildContext context,
-                AsyncSnapshot<MentorDetailExtras> snap) {
-              final MentorDetailExtras extras =
-                  snap.data ?? const MentorDetailExtras();
-              return _Section(
-                title: '활동',
-                child: _StatsView(
-                  extras: extras,
-                  loading: snap.connectionState != ConnectionState.done,
-                ),
-              );
-            },
+          _Section(
+            title: '활동',
+            child: _StatsView(
+              extras: _extras ?? const MentorDetailExtras(),
+              // 첫 정상 응답 전까지만 '불러오는 중…' — 재조회 중에는 직전 값을 유지.
+              loading: _loading && _extras == null,
+            ),
           ),
           // 컴플라이언스: 요금제 섹션(가격 숫자·안내문) 제거 — 결제 유도 방지.
           // 구독 CTA는 가격 없이 이동만 유지.
           const SizedBox(height: AppSpacing.s24),
-          FutureBuilder<MentorDetailExtras>(
-            future: _future,
-            builder: (BuildContext context,
-                AsyncSnapshot<MentorDetailExtras> snap) {
-              final bool subscribed = snap.data?.alreadySubscribed ?? false;
-              if (subscribed) {
+          Builder(
+            builder: (BuildContext context) {
+              // null = 구독 여부 미확정(첫 로딩·조회 실패) — 무료 CTA 활성화 금지.
+              final bool? subscribed = _extras?.alreadySubscribed;
+              if (subscribed == true) {
                 return PrimaryButton(
                   label: '질문방으로',
                   icon: Icons.forum_rounded,
@@ -146,7 +203,26 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
                 );
               }
               // 커머스 제로: 구매 유도(구독하기) 제거 → 비상호작용 안내.
-              return const CommerceNoticeCard(text: kSubscribeNoticeText);
+              // 무료 질문(세션1 §3): 비구독 학생 전용 — 개별질문 CTA 와 독립.
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const CommerceNoticeCard(text: kSubscribeNoticeText),
+                  FreeQuestionEntrySection(
+                    mentorId: widget.item.id,
+                    mentorName: widget.item.displayName,
+                    alreadySubscribed: subscribed,
+                    onCreated: (CreatedFreeQuestion created) {
+                      // 성공: 상세 extras 재조회 + 성공 안내 + 기존 질문방
+                      // 이동 계약(_goToQuestionRoom) 재사용 — 정본 room 으로.
+                      _reloadExtras();
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('무료 질문을 보냈어요. 질문방에서 확인할 수 있어요.')));
+                      _goToQuestionRoom(context);
+                    },
+                  ),
+                ],
+              );
             },
           ),
           // 개별질문: 구독 없이 1건씩 캐시로 질문(지정형). 학생만.

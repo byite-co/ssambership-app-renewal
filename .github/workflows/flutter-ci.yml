@@ -80,6 +80,11 @@ jobs:
         id: build
         if: always()
         continue-on-error: true
+        env:
+          # 파이프라인 검증 전용 — keystore 없이 debug 서명 폴백을 '명시적으로' 허용한다.
+          # (기본 동작은 keystore 부재 시 release 빌드 실패 → 제출용 AAB 는 오너 로컬에서만.)
+          # 이 산출물은 스토어 제출 불가(NOT-for-submission — 자리표시 .env + debug 서명).
+          ORG_GRADLE_PROJECT_allowInsecureSigning: "true"
         run: |
           set -o pipefail
           flutter build appbundle --release 2>&1 | tee /tmp/build.log

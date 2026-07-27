@@ -40,7 +40,8 @@ class _FakeHandle implements PdfDocumentHandle {
   bool closed = false;
 
   @override
-  Future<Uint8List> renderPage(int pageIndex, {required double longSide}) async {
+  Future<Uint8List> renderPage(int pageIndex,
+      {required double longSide}) async {
     renders.add((pageIndex, longSide));
     return _kTinyPng;
   }
@@ -89,6 +90,7 @@ class _FakeIqAttachments implements IqAttachmentsPort {
     required String questionId,
     required PickedImage image,
     String? messageId,
+    String? existingObjectPath,
   }) async {
     uploaded.add(image.fileName);
     return IqAttachment(id: 'a${uploaded.length}', storagePath: 'p');
@@ -167,9 +169,7 @@ void main() {
           builder: (BuildContext context) => TextButton(
             onPressed: () async {
               out = await expandScanPick(context,
-                  picked: _pdf('워크북.pdf'),
-                  rasterizer: rasterizer,
-                  maxCount: 5);
+                  picked: _pdf('워크북.pdf'), rasterizer: rasterizer, maxCount: 5);
             },
             child: const Text('go'),
           ),
@@ -251,8 +251,7 @@ void main() {
       expect(handle.closed, isTrue);
     });
 
-    testWidgets('썸네일은 보이는 칸만 지연 렌더(50페이지 문제집 보호)',
-        (WidgetTester tester) async {
+    testWidgets('썸네일은 보이는 칸만 지연 렌더(50페이지 문제집 보호)', (WidgetTester tester) async {
       final _FakeHandle handle = _FakeHandle(50);
       await tester.pumpWidget(_iqCreate(
         scan: _FakeScanPort(_pdf('두꺼운문제집.pdf')),
@@ -267,8 +266,7 @@ void main() {
       expect(thumbs.length, lessThan(50)); // 전 페이지 선렌더 금지.
     });
 
-    testWidgets('선택 상한 초과 → 즉시 안내 + 선택 유지 안 됨',
-        (WidgetTester tester) async {
+    testWidgets('선택 상한 초과 → 즉시 안내 + 선택 유지 안 됨', (WidgetTester tester) async {
       final _FakeHandle handle = _FakeHandle(8);
       await tester.pumpWidget(_iqCreate(
         scan: _FakeScanPort(_pdf('문제집.pdf')),
@@ -285,8 +283,7 @@ void main() {
       expect(find.text('가져오기 (5)'), findsOneWidget); // 6번째는 무시.
     });
 
-    testWidgets('남은 슬롯 연동: 기존 4장이면 그리드 상한이 1',
-        (WidgetTester tester) async {
+    testWidgets('남은 슬롯 연동: 기존 4장이면 그리드 상한이 1', (WidgetTester tester) async {
       final _FakeHandle handle = _FakeHandle(3);
       final _MutableScanPort port = _MutableScanPort(_image('img.png'));
       await tester.pumpWidget(_iqCreate(
@@ -314,8 +311,7 @@ void main() {
       expect(find.text('문제 스캔 첨부 (5/5)'), findsOneWidget);
     });
 
-    testWidgets('암호화/손상 PDF → 폴백 문구 스낵바(§6-4)',
-        (WidgetTester tester) async {
+    testWidgets('암호화/손상 PDF → 폴백 문구 스낵바(§6-4)', (WidgetTester tester) async {
       await tester.pumpWidget(_iqCreate(
         scan: _FakeScanPort(_pdf('잠긴.pdf')),
         rasterizer:

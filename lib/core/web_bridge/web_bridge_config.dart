@@ -15,7 +15,7 @@ class WebBridgeConfig {
   /// 조립하므로 슬래시를 붙이면 '//' 이중슬래시가 난다.
   static const String baseUrl = String.fromEnvironment(
     'WEB_BASE_URL',
-    defaultValue: 'https://ssambership-web.vercel.app',
+    defaultValue: 'https://ssambership.com', // 운영 도메인(오너 확정, 2026-07)
   );
 
   /// 관리(구독·정산)/프로필 웹 경로. 실제 Next.js 라우트와 대조해 확정(2026-07 실측).
@@ -23,14 +23,19 @@ class WebBridgeConfig {
   ///   P0-3 死배선 정리(2026-07-12). 재도입은 정책 판단 확정 후.
   static const String billingManagePath =
       '/subscriptions'; // app/(student)/subscriptions (구독 취소·관리)
-  static const String payoutManagePath = '/mentor/payouts'; // app/(mentor)/mentor/payouts
-  static const String profileEditPath = '/mentor/profile'; // app/(mentor)/mentor/profile
+  static const String payoutManagePath =
+      '/mentor/payouts'; // app/(mentor)/mentor/payouts
+  static const String profileEditPath =
+      '/mentor/profile'; // app/(mentor)/mentor/profile
 
   /// 정보/지원/리뷰 웹 경로(마이페이지 행 배선용, 실측 라우트).
   static const String termsPath = '/legal/terms'; // app/(public)/legal/terms
-  static const String privacyPath = '/legal/privacy'; // app/(public)/legal/privacy
-  static const String supportPath = '/support'; // app/(public)/support (고객센터·FAQ 허브)
-  static const String reviewsPath = '/mentor/reviews'; // app/(mentor)/mentor/reviews
+  static const String privacyPath =
+      '/legal/privacy'; // app/(public)/legal/privacy
+  static const String supportPath =
+      '/support'; // app/(public)/support (고객센터·FAQ 허브)
+  static const String reviewsPath =
+      '/mentor/reviews'; // app/(mentor)/mentor/reviews
 
   /// 회원 탈퇴(계정 삭제) — 앱은 삭제하지 않고 웹 페이지만 연다.
   static const String accountDeletePath =

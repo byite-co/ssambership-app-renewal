@@ -168,7 +168,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 기능 | 판정 | 근거 | 사용자 영향 | 종류 |
 |---|---|---|---|---|
 | 알림 목록 로드 | 완전작동 | `notifications_repository.dart:38-43`(notifications 실쿼리) | 없음 | 앱 |
-| 유형 표시(3종+기타) | 완전작동 | `app_notification.dart:27-58`(분류) | 공지·리뷰 등은 '기타'로 뭉침(의도) | 앱 |
+| 유형 표시(질문방·구독결제·개별질문+기타) | 완전작동 | `app_notification.dart`(분류), `notification_types.dart`(CR 게이트 2종 exact 제외), `notifications_repository.dart`(DB 단계 제외) | 공지·리뷰 등은 '기타'로 표시. 맞춤의뢰 2종은 출시 게이트 OFF로 미노출(서버 17종 계약 불변) — 2026-07-24 QA4 | 앱 |
 | 유형 필터 탭 | 완전작동 | `notifications_screen.dart:177-204` | 없음 | 앱 |
 | 읽음/모두읽음 | 완전작동 | `notifications_repository.dart:56-72`(UPDATE) | 없음 | 앱 |
 | 딥링크 | 부분구현 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152`(탭 전환만) | 🔴 특정 글/스레드로 못 감 | 앱+인프라 |

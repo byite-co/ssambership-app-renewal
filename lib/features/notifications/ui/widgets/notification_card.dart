@@ -54,6 +54,15 @@ class NotificationCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          if (notification.title != null) ...<Widget>[
+            Text(
+              notification.title!,
+              style: AppType.cardTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+          ],
           Text(
             notification.body,
             style: AppType.body,

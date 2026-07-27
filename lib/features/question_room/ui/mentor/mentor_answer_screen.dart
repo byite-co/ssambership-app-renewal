@@ -7,6 +7,7 @@ import '../../../../design/typography_tokens.dart';
 import '../../data/attachments/attachment_upload.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
 import '../../data/attachments/device_image_picker.dart';
+import '../../data/attachments/trusted_attachment_url.dart';
 import '../../data/models/question_attachment.dart';
 import '../../data/models/question_message.dart';
 import '../../data/models/question_thread.dart';
@@ -127,11 +128,17 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   }
 
   /// 파일(비이미지) 첨부 탭 → 단기 서명 URL 발급 후 외부 앱으로 열기(첨부 v2 §2-6).
+  /// 발급 URL 이 우리 스토리지 호스트가 아니면 열지 않는다(P3-7 임의 URL 차단).
   Future<void> _openFile(QuestionAttachment a) async {
     try {
       final String url = await _resolver.signedUrl(a.storagePath);
-      final bool ok = await launchUrl(Uri.parse(url),
-          mode: LaunchMode.externalApplication);
+      final Uri uri = Uri.parse(url);
+      if (!isTrustedAttachmentUri(uri)) {
+        _showError('파일을 열 수 없어요. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      final bool ok =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok) _showError('파일을 열 수 없어요. 잠시 후 다시 시도해 주세요.');
     } catch (e) {
       _showError('파일을 여는 데 실패했어요. ${friendlyError(e)}');
@@ -186,25 +193,25 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     final PickedImage? pending = _pending;
     if ((body.isEmpty && pending == null) || _sending) return;
     setState(() => _sending = true);
+    bool attachmentDone = pending == null; // 첨부 없으면 정리할 것도 없음.
     try {
       QuestionMessage? sent;
       if (body.isNotEmpty) {
-        sent = await _write.appendMessage(threadId: widget.thread.id, body: body);
+        // P1-8: 첫 멘토 답변의 pending→answered 전이 + question_answered 알림은
+        // 서버 RPC 가 원자적으로 수행한다. 앱은 별도 status UPDATE 없이
+        // 전이 신호(answeredTransition)만 상태칩에 반영한다.
+        final AppendedMessage appended =
+            await _write.appendMessage(threadId: widget.thread.id, body: body);
+        sent = appended.message;
         _input.clear();
         _messages?.add(sent);
-        // 답변 전송 = 첫 답변이면 '답변 대기' → '진행 중' 전이.
-        if (_status == ThreadStatus.pending) {
-          try {
-            final QuestionThread updated =
-                await _write.markThreadAnswered(widget.thread.id);
-            if (mounted) setState(() => _status = updated.status);
-          } catch (_) {
-            // 전이 실패해도 메시지는 이미 전송됨 — 상태는 다음 갱신에서 반영.
-          }
+        if (appended.answeredTransition && mounted) {
+          setState(() => _status = ThreadStatus.answered);
         }
       }
       if (pending != null) {
-        await _uploadPending(pending, messageId: sent?.id);
+        // 첨부 성공 시에만 pending 제거(P2-19) — 실패하면 미리보기 유지.
+        attachmentDone = await _uploadPending(pending, messageId: sent?.id);
       }
     } catch (e) {
       _showError('전송에 실패했어요. ${friendlyError(e)}');
@@ -212,27 +219,35 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
       if (mounted) {
         setState(() {
           _sending = false;
-          _pending = null;
+          if (attachmentDone) _pending = null;
         });
       }
     }
   }
 
-  Future<void> _uploadPending(PickedImage image, {String? messageId}) async {
+  /// 대기 첨부 업로드. 성공(=pending 정리 가능)이면 true.
+  /// 오류를 삼키지 않는다 — 실패 사유를 표시하고 false 를 돌려준다(P2-19).
+  /// 멘토 첫 첨부가 답변이 되는 경우(answeredTransition)도 서버가 판정한다.
+  Future<bool> _uploadPending(PickedImage image, {String? messageId}) async {
     if (!widget.uploader.isReady) {
       _showError('이미지 첨부는 준비 중이에요. (저장소 설정 인수인계)');
-      return;
+      return false;
     }
     try {
-      await widget.uploader.upload(
+      final AttachmentUploadResult result = await widget.uploader.upload(
         roomId: widget.thread.roomId,
         threadId: widget.thread.id,
         messageId: messageId,
         image: image,
       );
+      if (result.answeredTransition && mounted) {
+        setState(() => _status = ThreadStatus.answered);
+      }
       await _refresh();
+      return true;
     } catch (e) {
       _showError('이미지 첨부에 실패했어요. ${friendlyError(e)}');
+      return false;
     }
   }
 
@@ -273,8 +288,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override

@@ -238,8 +238,8 @@ $P1 exec-out screencap -p > docs/qa/2026-07/A-4-1.png
 $P1 shell ls -l /sdcard/DCIM/Camera/ | tail -5
 
 # 재인코딩 산출물 pull(디버그 빌드 전제 — run-as 가능). 앱 캐시에서 방금 생성된 jpg 를 찾는다.
-$P1 shell run-as com.ssambership.app sh -c 'ls -lt cache cache/*/ 2>/dev/null | head -20'
-$P1 exec-out run-as com.ssambership.app cat <캐시의 최신 jpg 경로> \
+$P1 shell run-as com.ssambership.edu sh -c 'ls -lt cache cache/*/ 2>/dev/null | head -20'
+$P1 exec-out run-as com.ssambership.edu cat <캐시의 최신 jpg 경로> \
   > docs/qa/2026-07/A-4-2.jpg
 ls -l docs/qa/2026-07/A-4-2.jpg        # 바이트 크기
 # 장변(px) 확인 — magick identify 또는 python 등 가용 도구 사용

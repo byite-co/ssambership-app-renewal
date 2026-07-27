@@ -15,21 +15,27 @@ import '../widgets/content_policy_gate.dart';
 import '../widgets/reaction_bar.dart';
 import '../widgets/report_sheet.dart';
 import '../widgets/thumbnail_view.dart';
+import 'shortform_video_port.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
-/// 숏폼 상세 — 세로 영상 영역(썸네일+재생 어포던스) + 반응 + 댓글.
-/// ★ 실제 영상 재생 플러그인 없음(썸네일/재생 아이콘). 작성은 '댓글'만.
+/// 숏폼 상세 — 세로 영상 재생(video_player, 탭=재생/일시정지) + 반응 + 댓글.
+/// videoUrl 이 없거나(http/https 아님 포함) 초기화 실패 시 썸네일 폴백.
+/// 작성은 '댓글'만.
 class ShortformDetailScreen extends StatefulWidget {
   const ShortformDetailScreen({
     super.key,
     required this.post,
     required this.read,
     required this.write,
+    this.videoControllerFactory = createShortformVideoController,
   });
 
   final ShortformPost post;
   final CommunityReadRepository read;
   final CommunityWriteRepository write;
+
+  /// 재생 컨트롤러 팩토리 — 테스트에서 fake 주입(실네트워크 재생 회피).
+  final ShortformVideoControllerFactory videoControllerFactory;
 
   @override
   State<ShortformDetailScreen> createState() => _ShortformDetailScreenState();
@@ -44,6 +50,10 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
   late int _likeCount;
   bool _busy = false;
 
+  ShortformVideoController? _video;
+  bool _videoReady = false;
+  bool _videoFailed = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,8 +61,35 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
     _comments =
         widget.read.comments(CommunityPostType.shortform, widget.post.id);
     _loadReactionState();
+    _initVideo();
     // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
     widget.write.incrementShortformView(widget.post.id);
+  }
+
+  /// videoUrl 이 유효한 http(s)면 재생 준비. 없거나 초기화 실패면 썸네일 폴백.
+  Future<void> _initVideo() async {
+    final Uri? url = _validVideoUrl(widget.post.videoUrl);
+    if (url == null) return; // 썸네일 폴백(재생 없음)
+    final ShortformVideoController video = widget.videoControllerFactory(url);
+    _video = video; // await 전에 보관 — dispose 가 반드시 해제하도록
+    try {
+      await video.initialize();
+      if (!mounted) return;
+      setState(() => _videoReady = true);
+    } catch (_) {
+      // 재생 실패는 화면을 막지 않는다 — 썸네일 폴백(크래시 금지).
+      if (!mounted) return;
+      setState(() => _videoFailed = true);
+    }
+  }
+
+  /// http/https 절대 URL 만 재생 대상으로 인정(그 외 null → 썸네일 폴백).
+  Uri? _validVideoUrl(String? raw) {
+    final String s = raw?.trim() ?? '';
+    if (s.isEmpty) return null;
+    final Uri? u = Uri.tryParse(s);
+    if (u == null || !(u.isScheme('http') || u.isScheme('https'))) return null;
+    return u;
   }
 
   /// 현재 사용자의 기존 숏폼 반응(좋아요/스크랩)을 로드해 초기 상태에 반영(게시판과 동일 패턴).
@@ -74,8 +111,22 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
 
   @override
   void dispose() {
+    _video?.dispose(); // ★ 재생 자원 해제(네이티브 플레이어 누수 방지)
     _input.dispose();
     super.dispose();
+  }
+
+  /// 영상 탭 → 재생/일시정지 토글.
+  Future<void> _togglePlay() async {
+    final ShortformVideoController? video = _video;
+    if (video == null || !_videoReady) return;
+    if (video.isPlaying) {
+      await video.pause();
+    } else {
+      await video.play();
+    }
+    if (!mounted) return;
+    setState(() {}); // 재생/일시정지 오버레이 갱신
   }
 
   Future<void> _toggleLike() async {
@@ -186,6 +237,7 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
         postId: widget.post.id,
         body: body,
       );
+      if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
       setState(() {
         _comments =
@@ -227,11 +279,9 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: <Widget>[
-                // 세로 영상 영역(9:16). 실제 재생 대신 썸네일+재생 아이콘.
-                AspectRatio(
-                  aspectRatio: 9 / 16,
-                  child: ThumbnailView(url: p.thumbnailUrl),
-                ),
+                // 영상 영역: 재생 준비 완료 시 플레이어(탭=재생/일시정지),
+                // 그 외(초기화 중/URL 없음/실패)는 썸네일(9:16) 폴백.
+                _videoArea(),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -245,8 +295,7 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
                             const SizedBox(width: 6),
                           Text(p.authorName, style: AppType.caption),
                           const Spacer(),
-                          Text('조회 ${p.viewCount}',
-                              style: AppType.caption),
+                          Text('조회 ${p.viewCount}', style: AppType.caption),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.titleBody),
@@ -275,6 +324,39 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
           ),
           _inputBar(),
         ],
+      ),
+    );
+  }
+
+  /// 영상 영역 — 준비 완료 전(초기화 중)·URL 없음·실패는 모두 썸네일 폴백.
+  Widget _videoArea() {
+    final ShortformVideoController? video = _video;
+    if (video == null || _videoFailed || !_videoReady) {
+      return AspectRatio(
+        aspectRatio: 9 / 16,
+        child: ThumbnailView(url: widget.post.thumbnailUrl),
+      );
+    }
+    final double ratio = video.aspectRatio > 0 ? video.aspectRatio : 9 / 16;
+    return AspectRatio(
+      aspectRatio: ratio,
+      child: GestureDetector(
+        onTap: _togglePlay,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            video.buildPlayer(),
+            // 일시정지 상태에서만 재생 어포던스 오버레이(재생 중엔 화면만).
+            // 탭은 아래 GestureDetector 가 받도록 오버레이는 히트테스트 제외.
+            if (!video.isPlaying)
+              const IgnorePointer(
+                child: Center(
+                  child: Icon(Icons.play_circle_fill,
+                      size: 64, color: Colors.white70),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -355,7 +437,8 @@ class _ShortformDetailScreenState extends State<ShortformDetailScreen> {
             ),
             IconButton(
               icon: Icon(Icons.send_rounded,
-                  color: _busy ? ColorTokens.muted : AppAccent.of(context).accent),
+                  color:
+                      _busy ? ColorTokens.muted : AppAccent.of(context).accent),
               onPressed: _busy ? null : _send,
             ),
           ],

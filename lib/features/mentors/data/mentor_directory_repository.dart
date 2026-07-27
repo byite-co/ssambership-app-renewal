@@ -16,6 +16,11 @@ import 'mentor_models.dart';
 class MentorDirectoryRepository {
   const MentorDirectoryRepository();
 
+  /// 디렉터리 RPC 의 검증된 최대 범위(웹과 동일). 서버 함수 상한도 200(스테이징 실측
+  /// 2026-07: `least(coalesce(p_limit,80),200)`). 검색·필터를 전체 집합에 적용하려면
+  /// 이 범위를 한 번에 로드한다.
+  static const int directoryMaxLimit = 200;
+
   SupabaseClient get _client {
     final SupabaseClient? c = SupabaseInit.clientOrNull;
     if (c == null) {
@@ -56,6 +61,14 @@ class MentorDirectoryRepository {
             ))
         .toList();
   }
+
+  /// 전체 공개 멘토를 한 번에 로드한다 — 검색·과목 필터·정렬을 **전체 집합**에 적용하기
+  /// 위함(최신 N명 창 검색 금지).
+  ///
+  /// RPC `mentor_directory_list_v2` 는 커서/서버 검색을 지원하지 않고 `p_limit` 만 받으며
+  /// 서버 상한이 200 이다. 현재 공개 멘토 수는 이 상한 이내라 누락이 없다.
+  /// SERVER_CURSOR_FOLLOWUP: 공개 멘토가 200 을 초과하면 서버 커서/검색 RPC 가 필요하다.
+  Future<List<MentorListItem>> listComplete() => list(limit: directoryMaxLimit);
 
   /// 상세 화면 추가 정보(평균 답변시간 + 내 구독 여부). 프로필·요금제는 목록에서
   /// 받은 항목을 재사용하므로 여기서는 부족한 부분만 채운다.
@@ -167,7 +180,9 @@ class MentorDirectoryRepository {
     for (final Map<String, dynamic> r in rows) {
       final String? mentorId = r['mentor_id'] as String?;
       if (mentorId == null) continue;
-      out.putIfAbsent(mentorId, () => <MentorPlan>[]).add(MentorPlan.fromMap(r));
+      out
+          .putIfAbsent(mentorId, () => <MentorPlan>[])
+          .add(MentorPlan.fromMap(r));
     }
     return out;
   }

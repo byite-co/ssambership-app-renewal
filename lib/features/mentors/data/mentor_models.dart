@@ -7,6 +7,7 @@
 //
 // ★ 내부 id·딥링크·코드값은 화면에 노출하지 않는다(표시명/한글 라벨만 사용).
 import '../format/mentor_price_format.dart';
+import 'mentor_subject.dart';
 
 /// 멘토 공개 요금제 1건(가격 표시 전용 — 결제 트리거 없음).
 class MentorPlan {
@@ -19,7 +20,7 @@ class MentorPlan {
 
   final String planTier; // limited / standard / premium (화면 미노출)
   final int amountCents; // 예) 2990000 → 29,900원
-  final String? label; // 멘토가 붙인 표기(예: '베이직(주4)'). 없으면 등급명 사용.
+  final String? label; // 멘토가 붙인 표기(예: '라이트'/'스탠다드'/'프리미엄'). 없으면 등급명 사용.
   final bool isActive;
 
   /// 원 단위 가격(amount_cents / 100).
@@ -58,7 +59,9 @@ class MentorProfileInfo {
   final String? universityName;
   final String? departmentName;
 
-  /// 지도 과목(이미 한글 라벨로 내려온다 — 예: ['수학','영어']). 그대로 칩 표시.
+  /// 지도 과목 **원본 값**(DB `teaching_subjects`). 정본 코드(`math`)·한글 라벨(`수학`)·
+  /// 레거시 값이 혼재할 수 있다 → 화면 표시·필터·검색은 [MentorListItem.subjectViews]
+  /// (canonical)로 처리하고, 이 raw 리스트를 화면에 직접 노출하지 않는다.
   final List<String> teachingSubjects;
   final String? introLine;
   final String? verificationStatus; // 'approved' 등
@@ -134,35 +137,28 @@ class MentorListItem {
     return '멘토';
   }
 
-  List<String> get subjects => profile?.teachingSubjects ?? const <String>[];
+  /// 화면·필터·검색용 canonical 과목(순서 보존·중복 제거·빈 값 제외). 카드/상세는
+  /// 여기서 [MentorSubject.label](한글)만 표시한다 — raw 코드는 화면에 새지 않는다.
+  List<MentorSubject> get subjectViews =>
+      canonicalizeSubjects(profile?.teachingSubjects ?? const <String>[]);
+
   bool get isVerified => profile?.isVerified ?? false;
 
-  /// 최저가 요금제(없으면 null → '요금제 문의').
-  MentorPlan? get minPlan {
-    if (plans.isEmpty) return null;
-    MentorPlan best = plans.first;
-    for (final MentorPlan p in plans) {
-      if (p.amountCents < best.amountCents) best = p;
-    }
-    return best;
-  }
-
-  /// 카드용 요금 요약. 미확정(요금제 없음)이면 '요금제 문의'(가격 날조 금지).
-  String get priceSummary {
-    final MentorPlan? m = minPlan;
-    if (m == null) return '요금제 문의';
-    return '${formatWon(m.won)}부터';
-  }
-
   /// 검색 매칭용 텍스트(이름·학교·전공·과목).
+  ///
+  /// 과목은 raw(레거시·코드 검색 호환)와 canonical 한글 라벨을 모두 포함해 `수학`(라벨)·
+  /// `math`(raw) 어느 쪽으로 검색해도 매칭된다. 대소문자 무시는 호출부에서 처리한다.
   String get searchHaystack {
     final StringBuffer b = StringBuffer(displayName);
     final MentorProfileInfo? p = profile;
     if (p != null) {
       if (p.universityName != null) b.write(' ${p.universityName}');
       if (p.departmentName != null) b.write(' ${p.departmentName}');
-      for (final String s in p.teachingSubjects) {
-        b.write(' $s');
+      for (final String raw in p.teachingSubjects) {
+        b.write(' $raw'); // raw(코드/레거시) 검색 호환
+      }
+      for (final MentorSubject s in subjectViews) {
+        b.write(' ${s.label}'); // 한글 라벨 검색
       }
     }
     return b.toString();
@@ -194,7 +190,8 @@ class MentorListItem {
       fullName: map['full_name'] as String?,
       nickname: map['nickname'] as String?,
       status: map['status'] as String?,
-      createdAt: created is String ? DateTime.tryParse(created)?.toLocal() : null,
+      createdAt:
+          created is String ? DateTime.tryParse(created)?.toLocal() : null,
     );
   }
 }

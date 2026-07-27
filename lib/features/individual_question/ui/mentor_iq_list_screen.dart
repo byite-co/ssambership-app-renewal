@@ -65,7 +65,10 @@ class _MentorIqListScreenState extends State<MentorIqListScreen> {
     return MentorIqListData(open: open, mine: mine);
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    if (!mounted) return; // §4: dispose 후 setState 금지(호출부 산재 방어 일원화).
+    setState(() => _future = _load());
+  }
 
   Future<void> _claim(OpenIndividualQuestion q) async {
     if (_claiming) return;
@@ -148,88 +151,87 @@ class _MentorIqListScreenState extends State<MentorIqListScreen> {
 
   Widget _buildBody() {
     return FutureBuilder<MentorIqListData>(
-        future: _future,
-        builder:
-            (BuildContext context, AsyncSnapshot<MentorIqListData> snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('개별질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
-            );
-          }
-          final MentorIqListData data = snap.data ??
-              const MentorIqListData(
-                open: <OpenIndividualQuestion>[],
-                mine: <IndividualQuestion>[],
-              );
-          if (data.open.isEmpty && data.mine.isEmpty) {
-            return const EmptyState(
-              icon: Icons.help_outline,
-              title: '아직 개별질문이 없어요',
-              message: '학생이 지정하거나 공개로 올린 질문이 여기에 보여요.',
-            );
-          }
-          // 유형 필터 적용(새 조회 없음, in-memory).
-          // '수락 대기(공개형)' 섹션은 정의상 공개·대기 → 필터가 all/공개·대기일 때만.
-          // '내 질문'(지정 + 내가 수락한 공개형)은 유형 필터를 각 행에 적용.
-          final List<OpenIndividualQuestion> open =
-              iqShowOpenWaitingSection(_filter)
-                  ? data.open
-                  : const <OpenIndividualQuestion>[];
-          final List<IndividualQuestion> mine = data.mine
-              .where((IndividualQuestion q) => iqMatchesTypeFilter(q, _filter))
-              .toList(growable: false);
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenH, 12, AppSpacing.screenH, 24),
-              children: <Widget>[
-                _typeFilterChips(),
-                const SizedBox(height: 12),
-                if (open.isNotEmpty) ...<Widget>[
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text('수락 대기 (공개형)', style: AppTypography.caption),
-                  ),
-                  for (final OpenIndividualQuestion q in open)
-                    IqOpenQuestionCard(
-                      question: q,
-                      onClaim: _claiming ? null : () => _claim(q),
-                    ),
-                  const SizedBox(height: 12),
-                ],
-                if (mine.isNotEmpty) ...<Widget>[
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text('내 질문', style: AppTypography.caption),
-                  ),
-                  for (final IndividualQuestion q in mine)
-                    IqQuestionCard(
-                      question: q,
-                      onTap: () => _openDetail(q),
-                    ),
-                ],
-                if (open.isEmpty && mine.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 24),
-                    child: Text(
-                      '이 조건의 질문이 없어요.',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.caption,
-                    ),
-                  ),
-              ],
+      future: _future,
+      builder: (BuildContext context, AsyncSnapshot<MentorIqListData> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('개별질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: ColorTokens.danger)),
             ),
           );
-        },
+        }
+        final MentorIqListData data = snap.data ??
+            const MentorIqListData(
+              open: <OpenIndividualQuestion>[],
+              mine: <IndividualQuestion>[],
+            );
+        if (data.open.isEmpty && data.mine.isEmpty) {
+          return const EmptyState(
+            icon: Icons.help_outline,
+            title: '아직 개별질문이 없어요',
+            message: '학생이 지정하거나 공개로 올린 질문이 여기에 보여요.',
+          );
+        }
+        // 유형 필터 적용(새 조회 없음, in-memory).
+        // '수락 대기(공개형)' 섹션은 정의상 공개·대기 → 필터가 all/공개·대기일 때만.
+        // '내 질문'(지정 + 내가 수락한 공개형)은 유형 필터를 각 행에 적용.
+        final List<OpenIndividualQuestion> open =
+            iqShowOpenWaitingSection(_filter)
+                ? data.open
+                : const <OpenIndividualQuestion>[];
+        final List<IndividualQuestion> mine = data.mine
+            .where((IndividualQuestion q) => iqMatchesTypeFilter(q, _filter))
+            .toList(growable: false);
+        return RefreshIndicator(
+          onRefresh: () async => _refresh(),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+            children: <Widget>[
+              _typeFilterChips(),
+              const SizedBox(height: 12),
+              if (open.isNotEmpty) ...<Widget>[
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 8),
+                  child: Text('수락 대기 (공개형)', style: AppTypography.caption),
+                ),
+                for (final OpenIndividualQuestion q in open)
+                  IqOpenQuestionCard(
+                    question: q,
+                    onClaim: _claiming ? null : () => _claim(q),
+                  ),
+                const SizedBox(height: 12),
+              ],
+              if (mine.isNotEmpty) ...<Widget>[
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 8),
+                  child: Text('내 질문', style: AppTypography.caption),
+                ),
+                for (final IndividualQuestion q in mine)
+                  IqQuestionCard(
+                    question: q,
+                    onTap: () => _openDetail(q),
+                  ),
+              ],
+              if (open.isEmpty && mine.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: Text(
+                    '이 조건의 질문이 없어요.',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.caption,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

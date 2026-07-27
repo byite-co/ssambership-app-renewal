@@ -1,42 +1,36 @@
-import 'push_payload.dart';
-import 'push_types.dart';
+// 알림 권한 '포트'(추상 경계) — **OS 푸시는 이번 출시 범위가 아니다**.
+//
+// App-F0 에서 Firebase/FCM SDK·초기화·디바이스 토큰·OS 알림 권한 요청을 전부
+// 제거했다. 남은 것은 설정 화면이 참조하는 최소 추상뿐이며, 기본 구현은
+// 아무 것도 하지 않는 [DisabledPushPermission] 다.
+//
+// ★ 앱 내 알림함(서버 notifications 조회·읽음·페이지네이션·17종 라우팅)은
+//   그대로 유지된다 — 그것은 OS 푸시가 아니라 인앱 데이터다.
+// ★ 여기에 어떤 구현도 '사용 가능한 것처럼' 두지 않는다. 권한을 요청하는
+//   경로가 없으므로 [PushPermissionStatus.granted] 는 이 빌드에서 발생하지 않는다.
 
-/// 푸시 인프라 '포트'(추상 경계). ★ 패키지·서버 없이 컴파일되도록 기본은 Disabled/Noop.
-///   실제 구현(FCM 토큰·OS 권한·Edge Function)은 동업자 인수인계(HANDOFF.md 참조).
+// 알림 권한 상태(플랫폼 무관 추상).
+enum PushPermissionStatus {
+  /// 아직 물어보지 않음 — OS 푸시 미도입 빌드의 고정값.
+  notDetermined,
 
-/// FCM 등에서 디바이스 토큰을 얻는 포트. 실제 구현은 firebase_messaging 도입 후.
-abstract class PushTokenProvider {
-  /// 토큰 발급/획득. 미도입이면 null.
-  Future<String?> getToken();
+  /// 허용됨. 이 빌드에서는 발생하지 않는다(요청 경로 없음).
+  granted,
 
-  /// 토큰 갱신 스트림(회전 시 재등록용).
-  Stream<String> get onTokenRefresh;
+  /// 거부됨. 이 빌드에서는 발생하지 않는다(요청 경로 없음).
+  denied;
 
-  /// 사용 가능 여부(패키지·플랫폼 준비).
-  bool get isAvailable;
+  bool get isGranted => this == PushPermissionStatus.granted;
 }
 
-/// 기본: 미도입(firebase_messaging 없음) — 토큰 없음.
-class DisabledPushTokenProvider implements PushTokenProvider {
-  const DisabledPushTokenProvider();
-
-  @override
-  bool get isAvailable => false;
-
-  @override
-  Future<String?> getToken() async => null;
-
-  @override
-  Stream<String> get onTokenRefresh => const Stream<String>.empty();
-}
-
-/// OS 알림 권한 포트. 실제 권한 팝업은 모바일 빌드(인수인계).
+/// OS 알림 권한 조회 포트. 이 빌드에는 실제 구현이 없다(요청하지 않는다).
 abstract class PushPermissionPort {
   Future<PushPermissionStatus> current();
   Future<PushPermissionStatus> request();
 }
 
-/// 기본: 미결정 고정(권한 API 미연결). 실제 구현이 붙기 전까지 골격 동작.
+/// 기본이자 유일한 구현 — 조회는 항상 미결정, 요청은 no-op.
+/// 권한 팝업을 띄우지 않고 OS 푸시를 약속하지도 않는다.
 class DisabledPushPermission implements PushPermissionPort {
   const DisabledPushPermission();
 
@@ -47,56 +41,4 @@ class DisabledPushPermission implements PushPermissionPort {
   @override
   Future<PushPermissionStatus> request() async =>
       PushPermissionStatus.notDetermined;
-}
-
-/// 디바이스 토큰을 사용자 계정에 등록/해제하는 포트(device_tokens 테이블 대상).
-abstract class DeviceTokenRegistrarPort {
-  /// 등록 가능 상태(테이블·권한 준비). 미준비면 서비스가 등록을 건너뛴다.
-  bool get isReady;
-
-  Future<void> register({
-    required String userId,
-    required String token,
-    String platform,
-  });
-
-  Future<void> unregister({required String token});
-}
-
-/// 기본: 미등록(테이블 미존재 등) — 아무 것도 하지 않음.
-class NoopDeviceTokenRegistrar implements DeviceTokenRegistrarPort {
-  const NoopDeviceTokenRegistrar();
-
-  @override
-  bool get isReady => false;
-
-  @override
-  Future<void> register({
-    required String userId,
-    required String token,
-    String platform = 'android',
-  }) async {}
-
-  @override
-  Future<void> unregister({required String token}) async {}
-}
-
-/// 서버(Edge Function)로 푸시 발송을 요청하는 포트. 실제 배포·호출은 인수인계.
-abstract class PushSenderPort {
-  /// 발송 가능 상태(Edge Function 배포됨). 미배포면 트리거가 건너뛴다.
-  bool get isReady;
-
-  /// 특정 사용자에게 payload 발송 요청.
-  Future<void> send(PushPayload payload, {required String toUserId});
-}
-
-/// 기본: 미배포 — 발송하지 않음(트리거 지점만 준비).
-class NoopPushSender implements PushSenderPort {
-  const NoopPushSender();
-
-  @override
-  bool get isReady => false;
-
-  @override
-  Future<void> send(PushPayload payload, {required String toUserId}) async {}
 }

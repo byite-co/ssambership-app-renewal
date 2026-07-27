@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'subscription_status.dart';
+
 /// 권한/구독 상태(읽기 전용).
 ///
 /// ★ Commerce-Zero: 앱은 결제하지 않고 '상태를 읽기만' 한다.
@@ -10,7 +12,8 @@ class Entitlement {
     this.planTier,
   });
 
-  /// 활성 구독 여부(subscriptions.status == 'active').
+  /// 구독 자격 보유 여부([SubscriptionStatuses.entitled] — active 또는
+  /// 잔여 기간이 살아 있는 cancel_scheduled).
   final bool hasActiveSubscription;
 
   /// 활성 구독의 plan_tier (limited|standard|premium). 없으면 null.
@@ -26,9 +29,11 @@ class Entitlement {
 class EntitlementReader {
   EntitlementReader._();
 
-  /// 학생 본인의 활성 구독을 읽는다. status == 'active' 면 활성으로 본다.
+  /// 학생 본인의 자격 있는 구독을 읽는다.
   ///
-  /// ※ past_due / cancel_scheduled 등 세밀한 정책은 지금 다루지 않는다(S3).
+  /// ※ 자격 집합은 [SubscriptionStatuses.entitled] 정본을 따른다 —
+  ///   `active` 와 `cancel_scheduled`(해지 예약이지만 잔여 기간 유효).
+  ///   past_due·pending·canceled·expired·refunded 는 자격 없음.
   ///   결제는 하지 않고 상태만 읽는다.
   static Future<Entitlement> fetchForStudent(
     SupabaseClient client,
@@ -39,10 +44,16 @@ class EntitlementReader {
           .from('subscriptions')
           .select('status, plan_tier')
           .eq('student_id', studentId)
-          .eq('status', 'active')
-          .limit(1);
+          .inFilter('status', SubscriptionStatuses.entitledList);
       if (rows.isEmpty) return Entitlement.none;
-      final Map<String, dynamic> row = rows.first;
+      // 자격 행이 여럿이면 plan_tier 는 더 나은 상태(active)의 것을 쓴다.
+      final Map<String, dynamic> row = rows.reduce(
+        (Map<String, dynamic> a, Map<String, dynamic> b) =>
+            SubscriptionStatuses.rank(b['status'] as String?) >
+                    SubscriptionStatuses.rank(a['status'] as String?)
+                ? b
+                : a,
+      );
       return Entitlement(
         hasActiveSubscription: true,
         planTier: (row['plan_tier'] as String?)?.trim(),

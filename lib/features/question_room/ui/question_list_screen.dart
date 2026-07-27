@@ -20,27 +20,33 @@ import '../../../shared/widgets/commerce_notice_card.dart';
 import 'widgets/thread_card.dart';
 import '../../../shared/errors/friendly_error.dart';
 
-/// 질문 영역(3뎁스). 스레드 카드 목록(최신순) + 새 질문 + 연결노트 플로팅.
+/// 질문 영역(3뎁스, 학생 전용 화면). 스레드 카드 목록(최신순) + 새 질문 + 연결노트.
+/// 멘토는 mentor_question_list_screen 을 쓴다 — 오답 표시 액션은 이 화면에만 있다.
 class QuestionListScreen extends StatefulWidget {
   const QuestionListScreen({
     super.key,
     required this.room,
     required this.mentorName,
     this.sub,
+    this.readRepository = const QuestionRoomReadRepository(),
+    this.writeRepository = const QuestionRoomWriteRepository(),
   });
 
   final Room room;
   final String mentorName;
   final SubscriptionSummary? sub;
 
+  /// 테스트 주입 지점(기본: 운영 레포).
+  final QuestionRoomReadRepository readRepository;
+  final QuestionRoomWriteRepository writeRepository;
+
   @override
   State<QuestionListScreen> createState() => _QuestionListScreenState();
 }
 
 class _QuestionListScreenState extends State<QuestionListScreen> {
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
-  final QuestionRoomWriteRepository _write =
-      const QuestionRoomWriteRepository();
+  QuestionRoomReadRepository get _read => widget.readRepository;
+  QuestionRoomWriteRepository get _write => widget.writeRepository;
 
   late Future<List<QuestionThread>> _future;
   bool _busy = false;
@@ -56,6 +62,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   }
 
   void _refresh() {
+    if (!mounted) return; // §4: dispose 후 setState 금지.
     // ★ 블록 바디로: setState(() => _future = future)는 클로저가 Future를 반환해
     //   'setState callback returned a Future' 예외로 리빌드가 취소된다(목록 미갱신).
     setState(() {
@@ -86,7 +93,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
             onPressed: _openNotes,
             icon: const Icon(Icons.sticky_note_2_outlined, size: 20),
             label: const Text('연결노트'),
-            style: TextButton.styleFrom(foregroundColor: AppAccent.of(context).accent),
+            style: TextButton.styleFrom(
+                foregroundColor: AppAccent.of(context).accent),
           ),
           const SizedBox(width: 4),
         ],
@@ -105,7 +113,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text('질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
+                      child: Text(
+                          '질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: ColorTokens.danger)),
                     ),
@@ -125,12 +134,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                   itemBuilder: (BuildContext context, int i) => ThreadCard(
                     thread: threads[i],
                     onOpen: () => _openChat(threads[i]),
-                    bottomAction: threads[i].status == ThreadStatus.answered
-                        ? SecondaryButton(
-                            label: '답변 확인 완료',
-                            onPressed: () => _confirm(threads[i]),
-                          )
-                        : null,
+                    bottomAction: _threadActions(threads[i]),
                   ),
                 );
               },
@@ -224,6 +228,54 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  /// 카드 하단 액션 묶음(학생 전용): 답변 확인 + 오답 표시 토글.
+  /// 오답 토글은 답변이 달린 뒤(answered/confirmed)에만 노출한다.
+  Widget? _threadActions(QuestionThread t) {
+    final bool answeredOnce =
+        t.status == ThreadStatus.answered || t.status == ThreadStatus.confirmed;
+    final List<Widget> actions = <Widget>[
+      if (t.status == ThreadStatus.answered)
+        SecondaryButton(
+          label: '답변 확인 완료',
+          onPressed: () => _confirm(t),
+        ),
+      if (answeredOnce)
+        TextButton(
+          onPressed: _busy ? null : () => _toggleWrongAnswer(t),
+          child: Text(t.isWrongAnswer ? '오답 표시 해제' : '오답으로 표시'),
+        ),
+    ];
+    if (actions.isEmpty) return null;
+    if (actions.length == 1) return actions.single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        actions.first,
+        const SizedBox(height: 4),
+        actions.last,
+      ],
+    );
+  }
+
+  /// 오답 표시/해제 — 서버 RPC(qna_flag_wrong_answer)만 호출(P2-13 후속).
+  /// 성공 시 목록 재조회로 수렴, 실패 시 로컬 상태를 바꾸지 않고 재시도 안내.
+  Future<void> _toggleWrongAnswer(QuestionThread t) async {
+    setState(() => _busy = true);
+    try {
+      await _write.flagWrongAnswer(t.id, isWrong: !t.isWrongAnswer);
+      if (mounted) _refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오답 표시에 실패했어요. ${friendlyError(e)}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 }
 
 /// 질문 0개 빈 상태 — 웹 기준 3단계 안내.
@@ -291,7 +343,8 @@ class InitialAvatarLike extends StatelessWidget {
       ),
       child: Text(label,
           style: TextStyle(
-              color: AppAccent.of(context).accent, fontWeight: FontWeight.w800)),
+              color: AppAccent.of(context).accent,
+              fontWeight: FontWeight.w800)),
     );
   }
 }

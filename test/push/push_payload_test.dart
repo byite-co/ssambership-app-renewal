@@ -1,72 +1,90 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/push/push_payload.dart';
-import 'package:ssambership_app/core/push/push_types.dart';
+import 'package:ssambership_app/features/notifications/data/notification_types.dart';
 
-/// payload/타깃 명세(순수). 실제 전송 없이 구조·문구·딥링크 타깃만 검증.
+/// 수신 payload 파싱(순수). 발송 빌더는 제거됨 — 발송은 서버 outbox worker 단독.
 void main() {
-  group('PushPayloadBuilder.questionAnswered', () {
-    test('타입·타깃·문구·data 구성', () {
-      final PushPayload p = PushPayloadBuilder.questionAnswered(
-        threadId: 'th-1',
-        threadTitle: '미분 질문',
+  group('PushPayload.fromRemote', () {
+    test('type 은 정본 17종 코드로 정확 일치 매핑된다', () {
+      final PushPayload p = PushPayload.fromRemote(
+        const <String, dynamic>{'type': 'question_answered', 'room_id': 'r-1'},
+        title: '답변',
+        body: '내용',
       );
-      expect(p.type, PushType.questionAnswered);
-      expect(p.target.kind, PushTargetKind.questionThread);
-      expect(p.target.threadId, 'th-1'); // 딥링크 타깃(데이터)
-      expect(p.title, '답변이 도착했어요');
-      expect(p.body.contains('미분 질문'), isTrue);
-      // data 에 type 코드 + thread_id(딥링크). 화면 문구엔 내부 id 없음.
-      expect(p.toData()['type'], 'question_answered');
-      expect(p.toData()['thread_id'], 'th-1');
-      expect(p.title.contains('th-1'), isFalse);
-      expect(p.body.contains('th-1'), isFalse);
+      expect(p.type, NotificationEventType.questionAnswered);
+      expect(p.roomId, 'r-1');
+      expect(p.title, '답변');
+      expect(p.body, '내용');
     });
 
-    test('제목 없으면 일반 문구로 폴백', () {
-      final PushPayload p = PushPayloadBuilder.questionAnswered(threadId: 'th-1');
-      expect(p.body, '멘토가 답변을 남겼어요.');
+    test('목록 밖 타입·빈 타입은 unknown(키워드 포함 매칭 금지)', () {
+      expect(
+        PushPayload.fromRemote(const <String, dynamic>{'type': 'made_up'}).type,
+        NotificationEventType.unknown,
+      );
+      expect(
+        PushPayload.fromRemote(const <String, dynamic>{}).type,
+        NotificationEventType.unknown,
+      );
+      // 부분 문자열 매칭 금지: 접두어가 같아도 정확 일치가 아니면 unknown.
+      expect(
+        PushPayload.fromRemote(
+            const <String, dynamic>{'type': 'question_answered_v2'}).type,
+        NotificationEventType.unknown,
+      );
     });
-  });
 
-  group('questionMessageReceived 방향별 문구', () {
-    test('멘토에게(toMentor=true)', () {
-      final PushPayload p = PushPayloadBuilder.questionMessageReceived(
-          threadId: 't', toMentor: true);
-      expect(p.title, '새 질문이 도착했어요');
-      expect(p.type, PushType.questionMessageReceived);
+    test('id 필드: room_id/thread_id/question_id 를 개별 보관, 빈 값은 null', () {
+      final PushPayload p = PushPayload.fromRemote(const <String, dynamic>{
+        'type': 'individual_question_answered',
+        'thread_id': 't-1',
+        'question_id': 'q-1',
+        'room_id': '  ',
+      });
+      expect(p.threadId, 't-1');
+      expect(p.questionId, 'q-1');
+      expect(p.roomId, isNull); // 공백만 → null.
     });
-    test('학생에게(toMentor=false)', () {
-      final PushPayload p = PushPayloadBuilder.questionMessageReceived(
-          threadId: 't', toMentor: false);
-      expect(p.title, '새 메시지가 도착했어요');
-    });
-  });
 
-  group('PushTarget.fromData', () {
-    test('thread_id 있으면 questionThread', () {
-      final PushTarget t = PushTarget.fromData(<String, dynamic>{'thread_id': 'x'});
-      expect(t.kind, PushTargetKind.questionThread);
-      expect(t.threadId, 'x');
+    test('eventId: notification_id 우선, 없으면 event_key, 둘 다 없으면 빈 문자열', () {
+      expect(
+        PushPayload.fromRemote(const <String, dynamic>{
+          'notification_id': 'n-1',
+          'event_key': 'ek-1',
+        }).eventId,
+        'n-1',
+      );
+      expect(
+        PushPayload.fromRemote(const <String, dynamic>{'event_key': 'ek-1'})
+            .eventId,
+        'ek-1',
+      );
+      expect(PushPayload.fromRemote(const <String, dynamic>{}).eventId, '');
     });
-    test('없으면 none', () {
-      expect(PushTarget.fromData(<String, dynamic>{}).kind, PushTargetKind.none);
+
+    test('외부 경로 필드(link/url)는 파싱 단계에서 버려진다(보관 필드 없음)', () {
+      final PushPayload p = PushPayload.fromRemote(const <String, dynamic>{
+        'type': 'subscription_expired',
+        'link': 'https://evil.example/wallet/charge',
+        'url': 'intent://malicious',
+      });
+      // PushPayload 는 link/url 을 담을 자리가 아예 없다 — 타입/id/eventId 만.
+      expect(p.type, NotificationEventType.subscriptionExpired);
+      expect(p.roomId, isNull);
+      expect(p.threadId, isNull);
+      expect(p.questionId, isNull);
+      expect(p.eventId, '');
     });
-  });
 
-  test('PushPayload.fromRemote: data → type/타깃 복원', () {
-    final PushPayload p = PushPayload.fromRemote(
-      <String, dynamic>{'type': 'question_answered', 'thread_id': 'th-9'},
-      title: '답변',
-      body: '내용',
-    );
-    expect(p.type, PushType.questionAnswered);
-    expect(p.target.threadId, 'th-9');
-  });
-
-  test('PushType code ↔ fromCode 왕복, 미지 코드는 unknown', () {
-    for (final PushType t in PushType.values) {
-      expect(PushType.fromCode(t.code), t);
-    }
-    expect(PushType.fromCode('made_up'), PushType.unknown);
+    test('문자열 아닌 값은 무시한다(형 안전)', () {
+      final PushPayload p = PushPayload.fromRemote(const <String, dynamic>{
+        'type': 42,
+        'room_id': 7,
+        'notification_id': true,
+      });
+      expect(p.type, NotificationEventType.unknown);
+      expect(p.roomId, isNull);
+      expect(p.eventId, '');
+    });
   });
 }

@@ -20,7 +20,7 @@ flutter analyze
 flutter run            # 에뮬레이터/시뮬레이터 선택
 ```
 - `flutter create .` 는 기존 `lib/`·`pubspec.yaml` 을 보존하고 `android/`·`ios/` 등 누락 폴더만 생성합니다.
-- 패키지명/번들ID: `com.ssambership.app` 권장(`--org com.ssambership`).
+- 앱 ID(현재 계약): Android package `com.ssambership.edu`, iOS 번들ID `com.ssambership.app` (`--org com.ssambership`).
 
 ## 환경 변수 (.env)
 - 개발은 **로컬 Supabase** 를 사용합니다. `.env` 에 로컬 값만 둡니다.

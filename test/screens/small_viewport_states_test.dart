@@ -87,8 +87,7 @@ void main() {
       smallViewport(tester);
       await expectNoOverflow(
         tester,
-        StudentIqListScreen(
-            loaderOverride: () async => <IndividualQuestion>[]),
+        StudentIqListScreen(loaderOverride: () async => <IndividualQuestion>[]),
         reason: '학생 IQ 목록 빈 상태 오버플로',
       );
     });
@@ -123,8 +122,7 @@ void main() {
       );
       await expectNoOverflow(
         tester,
-        MentorIqListScreen(
-            loaderOverride: () async => throw Exception('오류')),
+        MentorIqListScreen(loaderOverride: () async => throw Exception('오류')),
       );
     });
   });
@@ -189,8 +187,7 @@ void main() {
         MyPageScreen(
           loaderOverride: () async => const MyPageData(
             role: AppRole.student,
-            profile:
-                MyProfile(name: '김학생', roleLabel: '학생', email: 's@x.com'),
+            profile: MyProfile(name: '김학생', roleLabel: '학생', email: 's@x.com'),
           ),
         ),
         reason: '마이페이지 학생 오버플로',
@@ -245,16 +242,19 @@ class _FakeNotifications implements NotificationsRepository {
   final bool throws;
 
   @override
-  Future<NotificationsPage> fetch({int limit = 20, int offset = 0}) {
+  Future<NotificationsPage> fetch({
+    NotificationCursor? after,
+    int pageSize = 20,
+  }) {
     if (loading) return Completer<NotificationsPage>().future;
     if (throws) throw Exception('네트워크 오류');
     return Future<NotificationsPage>.value(
-        const NotificationsPage(items: <AppNotification>[], hasMore: false));
+        const NotificationsPage(items: <AppNotification>[], hasNext: false));
   }
 
   @override
   Future<void> markRead(String id) async {}
 
   @override
-  Future<void> markAllRead(List<String> ids) async {}
+  Future<int> markAllRead() async => 0;
 }

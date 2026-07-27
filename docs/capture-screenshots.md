@@ -42,10 +42,10 @@ cd C:\dev\ssambership_app
 flutter run -d emulator-5554
 ```
 
-- 앱 패키지: `com.ssambership.app`
+- 앱 패키지: `com.ssambership.edu`
 - 앱이 홈으로 튕겼을 때 재실행(세션 유지):
   ```powershell
-  adb -s emulator-5554 shell monkey -p com.ssambership.app -c android.intent.category.LAUNCHER 1
+  adb -s emulator-5554 shell monkey -p com.ssambership.edu -c android.intent.category.LAUNCHER 1
   ```
 
 ### 1-4. 개별질문(IQ) 플래그

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import '../role_accent.dart';
 import '../tokens/color_tokens.dart';
 import '../tokens/dimens.dart';
 
 /// 주요 액션 버튼.
-/// ★ 강조색은 역할색(학생 파랑/멘토 초록)을 따른다 — AppAccent.of(context).
+/// ★ 색 위계(2026-07 QA4): 액션 CTA 는 역할 정체성 색이 아니라 **고정 액션
+///   파랑**(ColorTokens.accent = #2563EB)을 쓴다 — 멘토 테마에서도 동일.
+///   멘토 정체성(초록)은 배지·탭·아이콘·장식(AppAccent 경유)에만 남긴다.
+///   위험 액션은 기존 danger, 중립/취소는 기존 neutral 계열 그대로.
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
     super.key,
@@ -32,12 +34,11 @@ class PrimaryButton extends StatelessWidget {
             ],
           );
 
-    final RoleAccent ra = AppAccent.of(context);
     final Widget button = FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(
-        backgroundColor: ra.accent,
-        foregroundColor: ra.onAccent,
+        backgroundColor: ColorTokens.accent,
+        foregroundColor: Colors.white,
         disabledBackgroundColor: ColorTokens.muted,
         disabledForegroundColor: ColorTokens.secondary,
         minimumSize: const Size(0, 52),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 import 'package:ssambership_app/features/community/ui/board/board_detail_screen.dart';
+import 'package:ssambership_app/features/community/ui/widgets/content_policy_gate.dart';
 
 import 'fakes.dart';
 
@@ -24,8 +25,7 @@ BoardDetailScreen _screen(FakeCommunityWrite write) => BoardDetailScreen(
     );
 
 void main() {
-  testWidgets('상세에 본문·댓글·좋아요·신고 요소가 있다',
-      (WidgetTester tester) async {
+  testWidgets('상세에 본문·댓글·좋아요·신고 요소가 있다', (WidgetTester tester) async {
     _bigSurface(tester);
     await tester.pumpWidget(_wrap(_screen(FakeCommunityWrite())));
     await tester.pumpAndSettle();
@@ -38,8 +38,7 @@ void main() {
     expect(find.byType(TextField), findsOneWidget); // 댓글 입력창
   });
 
-  testWidgets('좋아요 탭 → write.toggle 호출 + 카운트 증가',
-      (WidgetTester tester) async {
+  testWidgets('좋아요 탭 → write.toggle 호출 + 카운트 증가', (WidgetTester tester) async {
     _bigSurface(tester);
     final FakeCommunityWrite write = FakeCommunityWrite();
     await tester.pumpWidget(_wrap(_screen(write)));
@@ -70,5 +69,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(write.reportCalls, 1);
     expect(write.lastReportReason, 'inappropriate'); // 기본 선택 사유
+    expect(write.lastReportTargetType, 'community_post'); // 글 신고 대상 유지
+  });
+
+  testWidgets('댓글 신고 → 대상 테이블은 정본 comments(target_type=comment)',
+      (WidgetTester tester) async {
+    _bigSurface(tester);
+    final FakeCommunityWrite write = FakeCommunityWrite();
+    await tester.pumpWidget(_wrap(_screen(write)));
+    await tester.pumpAndSettle();
+
+    // 댓글 타일의 ⋯ 메뉴 → 신고 → 시트에서 접수.
+    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('신고'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('신고 접수'));
+    await tester.pumpAndSettle();
+
+    expect(write.reportCalls, 1);
+    expect(write.lastReportTargetType, 'comment'); // ★ v16 정본 전환
+    expect(write.lastReportTargetId, 'c1');
+  });
+
+  testWidgets('댓글 등록은 게시판 타입·평면(parentId 없음)으로 호출된다',
+      (WidgetTester tester) async {
+    _bigSurface(tester);
+    // 정책 동의 다이얼로그는 별도 테스트(content_policy_gate_test)에서 검증 — 여기선 통과.
+    ContentPolicyGate.agreedThisSession = true;
+    addTearDown(() => ContentPolicyGate.agreedThisSession = false);
+    final FakeCommunityWrite write = FakeCommunityWrite();
+    await tester.pumpWidget(_wrap(_screen(write)));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), '새 댓글');
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(write.commentCalls, 1);
+    expect(write.lastCommentPostType, CommunityPostType.board);
+    expect(write.lastCommentParentId, isNull); // 평면 UI — 답글 미전송
+  });
+
+  testWidgets('댓글 헤더 수는 표시 중인 댓글 리스트 길이와 일치한다', (WidgetTester tester) async {
+    _bigSurface(tester);
+    await tester.pumpWidget(_wrap(_screen(FakeCommunityWrite())));
+    await tester.pumpAndSettle();
+
+    // 헤더는 리스트 길이(1) — 카드/반응바의 comment_count(서버 유지 컬럼)와 별개 표기.
+    expect(find.text('댓글 1'), findsOneWidget);
   });
 }

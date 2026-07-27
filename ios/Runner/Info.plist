@@ -12,6 +12,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- App-F0: OS 푸시(APNs)는 출시 범위가 아니다. 푸시 entitlement·백그라운드
+	     원격 알림 모드·푸시 SDK 설정 파일을 두지 않는다. 앱은 알림함(인앱)만 제공한다. -->
 	<!-- image_picker(질문 첨부): 사진 선택 시 필요. 없으면 iOS 런타임 크래시. -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>질문에 첨부할 이미지를 선택하기 위해 사진 보관함 접근이 필요해요.</string>

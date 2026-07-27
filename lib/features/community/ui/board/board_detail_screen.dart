@@ -46,6 +46,13 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   late int _likeCount;
   bool _busy = false;
 
+  /// §4: 이 상세에서 서버 상태가 바뀌었는지(댓글·반응·차단). pop(true) 로
+  /// 목록에 알리고, 목록은 그때만 첫 페이지를 재조회한다.
+  bool _changed = false;
+
+  /// §4: 댓글 수 최신값(목록 스냅샷 p.commentCount 의 상세 내 stale 해소).
+  int? _commentCountOverride;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +97,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         type: CommunityWriteRepository.reactionLike,
         on: next,
       );
+      _changed = true; // like_count 서버 변경 — 목록 카드 갱신 필요.
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -109,6 +117,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         type: CommunityWriteRepository.reactionScrap,
         on: next,
       );
+      _changed = true;
       _snack(next ? '스크랩했어요.' : '스크랩을 해제했어요.');
     } catch (e) {
       if (!mounted) return;
@@ -142,13 +151,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 
-  /// 댓글 신고 → content_reports(target_type='community_comment').
+  /// 댓글 신고 → content_reports(target_type='comment' — 정본 comments 행.
+  /// v16 정본 전환: 게시판 댓글의 신고 대상 테이블은 comments).
   Future<void> _reportComment(String commentId) async {
     final String? reason = await showReportSheet(context);
     if (reason == null) return;
     try {
       await widget.write.report(
-        targetType: 'community_comment',
+        targetType: 'comment',
         targetId: commentId,
         reason: reason,
       );
@@ -159,18 +169,35 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   }
 
   /// 댓글 작성자 차단 → 성공 시 댓글 목록 재조회(차단 작성자 댓글 숨김).
+  /// 게시판 댓글은 정본 comments 행에서 author_id 를 찾는다(v16 정본 전환).
   Future<void> _blockCommentAuthor(String commentId) async {
     final bool blocked = await confirmAndBlockAuthor(
       context,
-      table: 'community_comments',
+      table: 'comments',
       contentId: commentId,
     );
     if (blocked && mounted) {
-      setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.board, widget.post.id);
-      });
+      _changed = true;
+      _reloadComments();
     }
+  }
+
+  /// 댓글 재조회 + 댓글 수 동기화. Future 교체 방식이라 FutureBuilder 가
+  /// 최신 future 만 반영(늦은 응답이 덮지 않음), 콜백은 mounted 가드.
+  void _reloadComments() {
+    final Future<List<CommunityComment>> next =
+        widget.read.comments(CommunityPostType.board, widget.post.id);
+    // ★ 블록 바디: 화살표로 Future 를 대입하면 'setState callback returned a
+    //   Future' 로 리빌드가 취소된다(§4 공통 함정).
+    setState(() {
+      _comments = next;
+    });
+    next.then((List<CommunityComment> list) {
+      if (!mounted) return;
+      setState(() => _commentCountOverride = list.length);
+    }).catchError((Object _) {
+      // 재조회 실패 시 기존 표시값 유지(정상 데이터를 지우지 않는다).
+    });
   }
 
   Future<void> _send() async {
@@ -186,11 +213,10 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         postId: widget.post.id,
         body: body,
       );
+      if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
-      setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.board, widget.post.id);
-      });
+      _changed = true;
+      _reloadComments();
     } catch (e) {
       _snack('댓글 등록에 실패했어요. ${friendlyError(e)}');
     } finally {
@@ -200,13 +226,23 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
     final BoardPost p = widget.post;
+    // §4: 뒤로가기에도 변경 여부(_changed)를 목록에 전달(iq_detail 과 동일 패턴).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) Navigator.of(context).pop(_changed);
+      },
+      child: _buildScaffold(p),
+    );
+  }
+
+  Widget _buildScaffold(BoardPost p) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('게시글'),
@@ -232,7 +268,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                 Row(
                   children: <Widget>[
                     AppBadge(
-                        label: communityCategoryLabel(p.category), tinted: true),
+                        label: communityCategoryLabel(p.category),
+                        tinted: true),
                     const Spacer(),
                     Text(Formatters.relativeKorean(p.createdAt),
                         style: AppType.caption),
@@ -252,7 +289,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                 ),
                 const SizedBox(height: AppSpacing.s16),
                 Text(
-                  p.body?.trim().isNotEmpty == true ? p.body!.trim() : '(내용 없음)',
+                  p.body?.trim().isNotEmpty == true
+                      ? p.body!.trim()
+                      : '(내용 없음)',
                   style: AppType.body,
                 ),
                 const SizedBox(height: AppSpacing.s24),
@@ -260,7 +299,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   liked: _liked,
                   scrapped: _scrapped,
                   likeCount: _likeCount,
-                  commentCount: p.commentCount,
+                  commentCount: _commentCountOverride ?? p.commentCount,
                   onToggleLike: _toggleLike,
                   onToggleScrap: _toggleScrap,
                   onReport: _report,
@@ -352,7 +391,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             ),
             IconButton(
               icon: Icon(Icons.send_rounded,
-                  color: _busy ? ColorTokens.muted : AppAccent.of(context).accent),
+                  color:
+                      _busy ? ColorTokens.muted : AppAccent.of(context).accent),
               onPressed: _busy ? null : _send,
             ),
           ],

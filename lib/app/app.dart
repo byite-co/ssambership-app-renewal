@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/auth/auth_service.dart';
+import '../core/version_gate/version_gate_controller.dart';
+import '../core/version_gate/version_gate_shell.dart';
 import '../design/theme.dart';
 import '../shared/constants/app_constants.dart';
 import 'router.dart';
@@ -22,6 +24,13 @@ class SsambershipApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(AuthService.instance.currentRole),
           routerConfig: AppRouter.router,
+          // 최소 지원 버전 게이트 — 라우터(Navigator) '위'에 얹는다.
+          // 통과 전에는 어떤 라우트(로그인 전·후 무관)로도 들어갈 수 없다.
+          // 검사 시작은 main() 이 runApp 직전에 한다(VersionGateController.start).
+          builder: (BuildContext context, Widget? child) => VersionGateShell(
+            controller: VersionGateController.instance,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

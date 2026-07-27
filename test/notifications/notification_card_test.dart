@@ -5,12 +5,14 @@ import 'package:ssambership_app/features/notifications/ui/widgets/notification_c
 
 AppNotification _n({
   bool read = false,
-  NotificationKind kind = NotificationKind.questionRoom,
+  NotificationEventType eventType = NotificationEventType.questionAnswered,
   String body = '새 답변이 있어요',
+  String? title,
 }) =>
     AppNotification(
       id: '1',
-      kind: kind,
+      eventType: eventType,
+      title: title,
       body: body,
       isRead: read,
       createdAt: DateTime(2026, 7, 1, 10, 0),
@@ -19,8 +21,7 @@ AppNotification _n({
 Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
-  testWidgets('유형칩·본문·읽음 버튼 렌더 + 탭/읽음 콜백',
-      (WidgetTester tester) async {
+  testWidgets('유형칩·본문·읽음 버튼 렌더 + 탭/읽음 콜백', (WidgetTester tester) async {
     int open = 0;
     int read = 0;
     await tester.pumpWidget(_wrap(NotificationCard(
@@ -50,5 +51,38 @@ void main() {
       onMarkRead: () {},
     )));
     expect(find.text('읽음'), findsNothing);
+  });
+
+  testWidgets('data.title 이 있으면 제목도 렌더', (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(NotificationCard(
+      notification: _n(title: '새 답변 도착', body: '본문 미리보기'),
+      onOpen: () {},
+      onMarkRead: () {},
+    )));
+    expect(find.text('새 답변 도착'), findsOneWidget);
+    expect(find.text('본문 미리보기'), findsOneWidget);
+  });
+
+  testWidgets('맞춤의뢰·기타 유형도 한글 칩으로 렌더(코드 비노출)', (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(NotificationCard(
+      notification: _n(
+        eventType: NotificationEventType.newOrderMessage,
+        body: '맞춤의뢰 소식이 있어요.',
+      ),
+      onOpen: () {},
+      onMarkRead: () {},
+    )));
+    expect(find.text('맞춤의뢰'), findsOneWidget);
+    expect(find.textContaining('new_order_message'), findsNothing);
+
+    await tester.pumpWidget(_wrap(NotificationCard(
+      notification: _n(
+        eventType: NotificationEventType.unknown,
+        body: '새 알림이 있어요.',
+      ),
+      onOpen: () {},
+      onMarkRead: () {},
+    )));
+    expect(find.text('기타'), findsOneWidget);
   });
 }

@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/push/push_ports.dart';
+import '../../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../../design/role_accent.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
-import '../../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../../design/widgets/secondary_button.dart';
 import '../../../../features/community/ui/blocks/blocked_users_screen.dart';
 import '../../../../shared/constants/app_constants.dart';
+import '../../../../shared/errors/friendly_error.dart';
 import '../../data/notification_settings_repository.dart';
+import '../account_delete_screen.dart';
 import '../widgets/mypage_section.dart';
 
-/// 설정 섹션 — 알림 토글·약관/개인정보·앱 버전·로그아웃.
-/// 로그아웃은 기존 AuthService.signOut() 을 [onLogout] 으로 주입받아 호출(테스트 가능).
+/// 설정 섹션 — 알림 설정(마스터+그룹별)·약관/개인정보·앱 버전·로그아웃.
+///
+/// 알림 설정은 정본 테이블(notification_settings)에서 로드/저장:
+/// - 로드 실패 → 기본값 위장 없이 '다시 시도' 안내.
+/// - 토글은 낙관적 반영 후 저장 실패 시 원복 + 스낵바(재시도 가능).
+/// - OS 알림 권한 거부는 서버 설정과 '별개'의 안내로만 표시(요청은 푸시 라인 소관).
 class SettingsSection extends StatefulWidget {
-  const SettingsSection({super.key, required this.onLogout, this.showLogout = true});
+  const SettingsSection({
+    super.key,
+    required this.onLogout,
+    this.showLogout = true,
+    this.settingsRepository = const NotificationSettingsRepository(),
+    this.permissionPort = const DisabledPushPermission(),
+  });
 
   /// 로그아웃 동작(기본: AuthService.signOut). 화면에서 주입.
   final VoidCallback onLogout;
@@ -21,73 +34,188 @@ class SettingsSection extends StatefulWidget {
   /// 실제 세션이 있을 때만 로그아웃 노출(게스트 방어).
   final bool showLogout;
 
+  /// 알림 설정 저장소(테스트: 페이크 주입).
+  final NotificationSettingsPort settingsRepository;
+
+  /// OS 알림 권한 조회 포트(기본: 미연결 Disabled — 요청은 하지 않는다).
+  final PushPermissionPort permissionPort;
+
   @override
   State<SettingsSection> createState() => _SettingsSectionState();
 }
 
 class _SettingsSectionState extends State<SettingsSection> {
-  final NotificationSettingsRepository _settings =
-      const NotificationSettingsRepository();
+  /// 로드 결과 3상태: 로딩(null·에러 null) / 성공(settings) / 실패(error).
+  NotificationSettings? _settings;
+  Object? _loadError;
+  bool _loading = true;
 
-  // 알림 토글. 저장된 값이 있으면 로드해 초기화(없으면 기본 켜짐). 저장은 graceful.
-  bool _notify = true;
+  /// 저장 중이면 토글 잠금(중복 저장 방지).
   bool _saving = false;
+
+  PushPermissionStatus _permission = PushPermissionStatus.notDetermined;
 
   @override
   void initState() {
     super.initState();
-    _loadNotify();
+    _load();
   }
 
-  Future<void> _loadNotify() async {
-    final bool? saved = await _settings.loadEnabled();
-    if (saved != null && mounted) setState(() => _notify = saved);
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    // OS 권한은 별도 조회 — 실패해도 설정 로드와 무관(미결정 유지).
+    try {
+      final PushPermissionStatus p = await widget.permissionPort.current();
+      if (mounted) setState(() => _permission = p);
+    } catch (_) {}
+    try {
+      final NotificationSettings s = await widget.settingsRepository.load();
+      if (!mounted) return;
+      setState(() {
+        _settings = s;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e; // ★ 기본값(전부 ON)으로 위장하지 않는다.
+        _loading = false;
+      });
+    }
   }
 
-  /// 회원 탈퇴 — 웹 열기 전에 되돌릴 수 없음 고지 + 재확인(P0-1 앱측 잔여).
-  /// '계속'을 눌러야만 기존 웹 브릿지 액션을 그대로 호출한다.
+  /// 낙관적 반영 → 저장 실패 시 원복 + 스낵바. 성공해야만 값이 확정된다.
+  Future<void> _saveWith(NotificationSettings next) async {
+    final NotificationSettings? prev = _settings;
+    if (prev == null || _saving) return;
+    setState(() {
+      _settings = next;
+      _saving = true;
+    });
+    try {
+      await widget.settingsRepository.save(next);
+      if (mounted) setState(() => _saving = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _settings = prev; // 원복 — 화면이 저장 안 된 값을 진실처럼 두지 않는다.
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('알림 설정 저장에 실패했어요. ${friendlyError(e)}')),
+      );
+    }
+  }
+
+  /// 회원 탈퇴 — 인앱 탈퇴 화면(P1-10)으로 진입한다.
+  /// 위험 고지·재확인·서버 RPC 요청·취소·웹 폴백은 전부 AccountDeleteScreen 담당.
   Future<void> _confirmAccountDelete() async {
-    final bool? proceed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('회원 탈퇴'),
-        content: const Text(
-            '탈퇴하면 계정과 데이터가 삭제되며 되돌릴 수 없어요.\n'
-            '탈퇴 절차는 웹 페이지에서 진행돼요. 계속할까요?'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AccountDeleteScreen(),
+      ),
+    );
+  }
+
+  // ── 알림 설정 영역 ──────────────────────────────────────────────
+
+  Widget _notificationArea(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '계속',
-              style: TextStyle(color: ColorTokens.danger),
+        ),
+      );
+    }
+    if (_loadError != null) {
+      // 로드 실패 — 기본값을 진실처럼 보여주지 않고 재시도만 노출.
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              '알림 설정을 불러오지 못했어요. ${friendlyError(_loadError!)}',
+              style: AppType.caption.copyWith(color: ColorTokens.danger),
             ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _load,
+                child: const Text('다시 시도'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final NotificationSettings s = _settings!;
+    final Color accent = AppAccent.of(context).accent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // OS 권한 거부 안내 — 서버 토글과 별개(끄기 상태와 혼동 금지).
+        if (_permission == PushPermissionStatus.denied)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              '기기 알림 권한이 꺼져 있어요 — 설정에서 허용해 주세요.',
+              style: AppType.caption.copyWith(color: ColorTokens.danger),
+            ),
+          ),
+        _toggleRow(
+          label: '알림 받기',
+          value: s.pushEnabled,
+          accent: accent,
+          onChanged: _saving
+              ? null
+              : (bool v) => _saveWith(s.copyWith(pushEnabled: v)),
+        ),
+        // 그룹별 토글 — 마스터가 꺼져 있으면 서버가 전부 차단하므로 잠근다.
+        for (final String key in NotificationGroups.keys)
+          _toggleRow(
+            label: NotificationGroups.labelOf(key),
+            value: s.groupEnabled(key),
+            accent: accent,
+            indent: true,
+            onChanged: (_saving || !s.pushEnabled)
+                ? null
+                : (bool v) => _saveWith(s.withGroup(key, v)),
+          ),
+      ],
+    );
+  }
+
+  Widget _toggleRow({
+    required String label,
+    required bool value,
+    required Color accent,
+    required ValueChanged<bool>? onChanged,
+    bool indent = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(left: indent ? 12 : 0),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(label, style: indent ? AppType.caption : AppType.body),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: accent,
           ),
         ],
       ),
     );
-    if (proceed == true && mounted) {
-      await openAccountDeleteWeb(context);
-    }
-  }
-
-  /// 토글 변경 → 로컬 즉시 반영 + 영속화 시도. 실패해도 로컬은 유지(앱 안 죽음).
-  Future<void> _onNotifyChanged(bool v) async {
-    setState(() {
-      _notify = v;
-      _saving = true;
-    });
-    final bool ok = await _settings.saveEnabled(v);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('알림 설정 저장은 준비 중이에요. (이 기기에서만 적용돼요)')),
-      );
-    }
   }
 
   @override
@@ -98,19 +226,7 @@ class _SettingsSectionState extends State<SettingsSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: <Widget>[
-                Expanded(child: Text('알림 받기', style: AppType.body)),
-                Switch(
-                  value: _notify,
-                  onChanged: _saving ? null : _onNotifyChanged,
-                  activeThumbColor: AppAccent.of(context).accent,
-                ),
-              ],
-            ),
-          ),
+          _notificationArea(context),
           const Divider(height: 12, color: ColorTokens.border),
           MyPageRow(
             icon: Icons.description_rounded,
@@ -122,7 +238,7 @@ class _SettingsSectionState extends State<SettingsSection> {
             label: '개인정보 처리방침',
             onTap: () => openPrivacyWeb(context),
           ),
-          MyPageRow(
+          const MyPageRow(
             icon: Icons.info_rounded,
             label: '앱 버전',
             trailingText: AppConstants.appVersion,

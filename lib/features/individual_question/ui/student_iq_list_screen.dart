@@ -51,7 +51,12 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
   Future<List<IndividualQuestion>> _load() =>
       (widget.loaderOverride ?? _repo.listForStudent)();
 
-  void _refresh() => setState(() => _future = _load());
+  // ★ 스테일 응답 방어: 새 Future 로 '교체'만 한다 — FutureBuilder 는 최신
+  //   Future 의 결과만 반영하므로 이전 로드가 늦게 끝나도 목록을 덮지 않는다.
+  void _refresh() {
+    if (!mounted) return; // 화면 복귀·당겨서 새로고침 등 await 뒤 호출 대비(P3-4).
+    setState(() => _future = _load());
+  }
 
   Future<void> _openCreate() async {
     final bool? created = await Navigator.of(context).push<bool>(
@@ -94,73 +99,71 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
 
   Widget _buildBody() {
     return FutureBuilder<List<IndividualQuestion>>(
-        future: _future,
-        builder: (BuildContext context,
-            AsyncSnapshot<List<IndividualQuestion>> snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('개별질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
-            );
-          }
-          final List<IndividualQuestion> items =
-              snap.data ?? const <IndividualQuestion>[];
-          if (items.isEmpty) {
-            return EmptyState(
-              icon: Icons.help_outline,
-              title: '아직 개별질문이 없어요',
-              message: '구독 없이 1건씩 캐시로 질문할 수 있어요.',
-              actionLabel:
-                  kIndividualQuestionCreateEnabled ? '새 개별질문' : null,
-              onAction:
-                  kIndividualQuestionCreateEnabled ? _openCreate : null,
-            );
-          }
-          final List<IndividualQuestion> filtered = items
-              .where((IndividualQuestion q) => iqMatchesTypeFilter(q, _filter))
-              .toList(growable: false);
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenH, 12, AppSpacing.screenH, 24),
-              children: <Widget>[
-                if (kIndividualQuestionCreateEnabled) ...<Widget>[
-                  PrimaryButton(
-                    label: '새 개별질문 (공개형)',
-                    icon: Icons.add,
-                    onPressed: _openCreate,
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                _typeFilterChips(),
-                const SizedBox(height: 12),
-                if (filtered.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 24),
-                    child: Text(
-                      '이 조건의 질문이 없어요.',
-                      textAlign: TextAlign.center,
-                      style: AppType.caption,
-                    ),
-                  )
-                else
-                  for (final IndividualQuestion q in filtered)
-                    IqQuestionCard(
-                      question: q,
-                      onTap: () => _openDetail(q),
-                    ),
-              ],
+      future: _future,
+      builder:
+          (BuildContext context, AsyncSnapshot<List<IndividualQuestion>> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('개별질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: ColorTokens.danger)),
             ),
           );
-        },
+        }
+        final List<IndividualQuestion> items =
+            snap.data ?? const <IndividualQuestion>[];
+        if (items.isEmpty) {
+          return EmptyState(
+            icon: Icons.help_outline,
+            title: '아직 개별질문이 없어요',
+            message: '구독 없이 1건씩 캐시로 질문할 수 있어요.',
+            actionLabel: kIndividualQuestionCreateEnabled ? '새 개별질문' : null,
+            onAction: kIndividualQuestionCreateEnabled ? _openCreate : null,
+          );
+        }
+        final List<IndividualQuestion> filtered = items
+            .where((IndividualQuestion q) => iqMatchesTypeFilter(q, _filter))
+            .toList(growable: false);
+        return RefreshIndicator(
+          onRefresh: () async => _refresh(),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+            children: <Widget>[
+              if (kIndividualQuestionCreateEnabled) ...<Widget>[
+                PrimaryButton(
+                  label: '새 개별질문 (공개형)',
+                  icon: Icons.add,
+                  onPressed: _openCreate,
+                ),
+                const SizedBox(height: 14),
+              ],
+              _typeFilterChips(),
+              const SizedBox(height: 12),
+              if (filtered.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: Text(
+                    '이 조건의 질문이 없어요.',
+                    textAlign: TextAlign.center,
+                    style: AppType.caption,
+                  ),
+                )
+              else
+                for (final IndividualQuestion q in filtered)
+                  IqQuestionCard(
+                    question: q,
+                    onTap: () => _openDetail(q),
+                  ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

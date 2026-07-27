@@ -5,13 +5,43 @@ import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import 'models/connection_note.dart';
 import 'models/question_message.dart';
-import 'models/question_thread.dart';
+import 'qna_error_mapper.dart';
 
-/// 질문방 쓰기 레포지토리 — RLS를 통과하는 동작만 노출한다.
+/// 질문 생성 RPC 결과(서버는 전체 행이 아니라 id·경로만 돌려준다).
+class CreatedQuestionThread {
+  const CreatedQuestionThread({
+    required this.threadId,
+    this.messageId,
+    required this.path,
+    required this.usedFreeQuota,
+  });
+
+  final String threadId;
+
+  /// 첫 메시지 id(본문이 비었으면 서버가 메시지를 만들지 않아 null).
+  final String? messageId;
+
+  /// 'subscription' | 'free' — 서버가 판정한 소비 경로.
+  final String path;
+  final bool usedFreeQuota;
+}
+
+/// append RPC 결과. [answeredTransition]=true 면 이번 메시지로 서버가
+/// pending→answered 전이(+question_answered 알림)를 수행했다는 뜻.
+class AppendedMessage {
+  const AppendedMessage(
+      {required this.message, required this.answeredTransition});
+
+  final QuestionMessage message;
+  final bool answeredTransition;
+}
+
+/// 질문방 쓰기 레포지토리 — v16부터 질문 워크플로 쓰기는 전부 서버 원자 RPC.
 ///
+/// ★ question_threads/question_messages 직접 INSERT/UPDATE 금지(P1-8).
+///   생성·append·확인·오답은 qna_* RPC만 사용한다 — 사용량 소비·answered 전이·
+///   question_answered 알림은 전부 서버 트랜잭션 책임이고 앱은 결과만 반영한다.
 /// ★ 방(mentor_student_rooms) 생성 메서드는 두지 않는다(앱에서 INSERT 정책 없음 = 불가).
-/// ★ 잔여(quota) 검증은 이 레이어 책임이 아니다(구독/서버). 여기선 INSERT만 시도하고,
-///   RLS/CHECK 위반 시 에러를 삼키지 않고 그대로 올린다.
 /// ★ 메시지는 append 전용 — 수정/삭제 메서드 없음.
 class QuestionRoomWriteRepository {
   const QuestionRoomWriteRepository();
@@ -33,72 +63,109 @@ class QuestionRoomWriteRepository {
     return id;
   }
 
-  /// 스레드 생성. 웹(questionRoomMutations.ts)과 동일하게 status='pending' 을 명시한다.
-  /// (status 를 생략하면 DB 기본값 'open' 으로 저장돼 주간 사용량 집계·답변 워크플로에서
-  ///  누락되므로 반드시 'pending' 으로 시작해야 한다.)
-  /// quota 검증 없음 — 호출부가 넘긴 값으로 INSERT만 시도(위반 시 예외 전파).
-  Future<QuestionThread> createThread({
+  /// 질문 생성 — 서버 원자 RPC `qna_create_question_thread` 한 번만 호출한다.
+  ///
+  /// thread + 첫 메시지 + 사용량 소비(주간/무료)가 서버 한 트랜잭션이라
+  /// 실패 시 빈 thread 가 남지 않는다. status 는 앱이 보내지 않는다(서버가
+  /// 'pending' 고정). 무료/구독 경로 분기도 서버 몫(qna_create_free_question_thread
+  /// 는 동일 함수 위임 래퍼라 별도 호출 불필요).
+  /// subject 는 정본 subjects.code 만 — catalog 밖 값은 서버가 조용히 NULL 처리한다.
+  Future<CreatedQuestionThread> createThread({
     required String roomId,
-    String? title,
+    required String title,
     String? subject,
     String? topic,
+    required String firstMessageBody,
   }) async {
-    final Map<String, dynamic> row = await _client
-        .from('question_threads')
-        .insert(<String, dynamic>{
-          'mentor_student_room_id': roomId,
-          'status': 'pending',
-          if (title != null) 'title': title,
-          if (subject != null) 'subject': subject,
-          if (topic != null) 'topic': topic,
-        })
-        .select()
-        .single();
-    return QuestionThread.fromMap(row);
+    final Object? data;
+    try {
+      data = await _client.rpc(
+        'qna_create_question_thread',
+        params: <String, dynamic>{
+          'p_room_id': roomId,
+          'p_title': title,
+          'p_subject': subject,
+          'p_topic': topic,
+          'p_first_message_body': firstMessageBody,
+        },
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
+    if (data is! Map) {
+      throw const AppError('질문 등록 결과를 확인하지 못했어요. 목록을 새로고침해 주세요.');
+    }
+    return CreatedQuestionThread(
+      threadId: data['thread_id'] as String,
+      messageId: data['message_id'] as String?,
+      path: (data['path'] as String?) ?? 'subscription',
+      usedFreeQuota: (data['used_free_quota'] as bool?) ?? false,
+    );
   }
 
-  /// 메시지 append. author_id 는 항상 현재 사용자(남의 이름으로 못 씀 — RLS도 차단).
-  Future<QuestionMessage> appendMessage({
+  /// 메시지 append — RPC `qna_append_message`.
+  ///
+  /// 첫 멘토 메시지면 서버가 answered 전이 + question_answered 알림까지 수행하고
+  /// answered_transition=true 를 돌려준다(이후 메시지는 재전이·재알림 없음).
+  /// 앱은 별도 status UPDATE 를 하지 않는다.
+  /// 반환 메시지는 서버 id + 로컬 필드로 구성한 낙관적 표현 — 실측 행은
+  /// 새로고침/Realtime 재조회로 수렴한다.
+  Future<AppendedMessage> appendMessage({
     required String threadId,
     required String body,
   }) async {
-    final Map<String, dynamic> row = await _client
-        .from('question_messages')
-        .insert(<String, dynamic>{
-          'thread_id': threadId,
-          'author_id': _uid,
-          'body': body,
-        })
-        .select()
-        .single();
-    return QuestionMessage.fromMap(row);
+    final String uid = _uid;
+    final Object? data;
+    try {
+      data = await _client.rpc(
+        'qna_append_message',
+        params: <String, dynamic>{'p_thread_id': threadId, 'p_body': body},
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
+    if (data is! Map) {
+      throw const AppError('메시지 전송 결과를 확인하지 못했어요. 새로고침해 주세요.');
+    }
+    return AppendedMessage(
+      message: QuestionMessage(
+        id: data['message_id'] as String,
+        threadId: threadId,
+        authorId: uid,
+        body: body.trim(),
+        createdAt: DateTime.now().toUtc(),
+      ),
+      answeredTransition: (data['answered_transition'] as bool?) ?? false,
+    );
   }
 
-  /// 학생이 답변을 확인 처리(status → 'confirmed'). RLS(방 참여자)로 허용된다.
-  /// 보통 answered 상태에서 호출하지만 검증은 호출부에서 한다.
-  Future<QuestionThread> confirmThread(String threadId) async {
-    final Map<String, dynamic> row = await _client
-        .from('question_threads')
-        .update(<String, dynamic>{'status': 'confirmed'})
-        .eq('id', threadId)
-        .select()
-        .single();
-    return QuestionThread.fromMap(row);
+  /// 학생 답변 확인(answered → confirmed) — RPC `qna_confirm_thread`.
+  /// 이미 confirmed 면 서버가 멱등 성공을 돌려준다. 직접 UPDATE 금지.
+  Future<void> confirmThread(String threadId) async {
+    try {
+      await _client.rpc(
+        'qna_confirm_thread',
+        params: <String, dynamic>{'p_thread_id': threadId},
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
   }
 
-  /// 멘토가 답변을 보내며 스레드를 '진행 중'으로 전이(status → 'answered').
-  /// ★ 의미: 멘토가 답변 메시지를 남기면 '답변 대기(pending)' → '진행 중(answered)'.
-  ///   학생이 확인하면 confirmThread 로 '답변 완료(confirmed)'가 된다(역할 분리).
-  ///   RLS상 멘토(방 참여자)가 question_threads.status UPDATE 가능함을 확인했다.
-  ///   보통 pending 에서 호출하지만(answered/confirmed 면 호출부가 전이를 생략) 검증은 호출부.
-  Future<QuestionThread> markThreadAnswered(String threadId) async {
-    final Map<String, dynamic> row = await _client
-        .from('question_threads')
-        .update(<String, dynamic>{'status': 'answered'})
-        .eq('id', threadId)
-        .select()
-        .single();
-    return QuestionThread.fromMap(row);
+  /// 오답 표시/해제 — RPC `qna_flag_wrong_answer`(학생 전용).
+  /// is_wrong_answer + mastery_status 갱신은 서버 책임. 직접 UPDATE 금지.
+  Future<void> flagWrongAnswer(String threadId, {bool isWrong = true}) async {
+    try {
+      await _client.rpc(
+        'qna_flag_wrong_answer',
+        params: <String, dynamic>{
+          'p_thread_id': threadId,
+          'p_is_wrong': isWrong
+        },
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
   }
 
   /// 내 연결노트 추가/수정. 본인(author_id=현재 사용자) 행만 다룬다.

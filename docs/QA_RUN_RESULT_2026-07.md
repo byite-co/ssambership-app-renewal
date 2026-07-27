@@ -61,7 +61,7 @@
 측정 명령(각 시점, 기기별 `-s <serial>`):
 
 ```bash
-adb shell dumpsys meminfo com.ssambership.app | head -40
+adb shell dumpsys meminfo com.ssambership.edu | head -40
 ```
 
 | 기기 | 시점 | TOTAL PSS (KB) | Java Heap | Native Heap | Graphics | 비고 |

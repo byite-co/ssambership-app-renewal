@@ -127,7 +127,8 @@ class UserBlocksRepository {
   }
 
   /// 콘텐츠(글/댓글/숏폼) 작성자를 차단 — id 로 author_id 를 조회해 차단한다.
-  /// [table] 예: 'community_posts' | 'community_comments' | 'shortform_posts'.
+  /// [table] 예: 'community_posts' | 'comments'(게시판 댓글 — v16 정본) |
+  /// 'community_comments'(숏폼 댓글) | 'shortform_posts'.
   Future<BlockResult> blockAuthorOf({
     required String table,
     required String contentId,

@@ -6,6 +6,7 @@ import '../../../../design/widgets/app_badge.dart';
 import '../../../../design/widgets/app_card.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../data/mentor_models.dart';
+import '../../data/mentor_subject.dart';
 import 'mentor_favorite_button.dart';
 import 'mentor_meta_item.dart';
 
@@ -31,7 +32,7 @@ class MentorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final MentorProfileInfo? profile = item.profile;
-    final List<String> subjects = item.subjects;
+    final List<MentorSubject> subjects = item.subjectViews;
     final String? school = profile?.schoolLine;
     final String? intro = profile?.introLine?.trim();
 
@@ -114,22 +115,22 @@ class MentorCard extends StatelessWidget {
   }
 }
 
-/// 과목 칩(최대 4개 + 초과분은 '+N'). 라벨은 이미 한글로 내려온 값을 그대로 쓴다.
+/// 과목 칩(최대 4개 + 초과분은 '+N'). canonical 한글 라벨만 표시(raw 코드 노출 금지).
 class _SubjectChips extends StatelessWidget {
   const _SubjectChips({required this.subjects});
 
-  final List<String> subjects;
+  final List<MentorSubject> subjects;
 
   @override
   Widget build(BuildContext context) {
     const int maxShown = 4;
-    final List<String> shown = subjects.take(maxShown).toList();
+    final List<MentorSubject> shown = subjects.take(maxShown).toList();
     final int extra = subjects.length - shown.length;
     return Wrap(
       spacing: 6,
       runSpacing: 6,
       children: <Widget>[
-        for (final String s in shown) AppBadge(label: s),
+        for (final MentorSubject s in shown) AppBadge(label: s.label),
         if (extra > 0) AppBadge(label: '+$extra'),
       ],
     );
