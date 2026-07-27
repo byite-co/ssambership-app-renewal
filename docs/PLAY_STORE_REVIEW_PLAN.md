@@ -343,3 +343,22 @@ flutter build appbundle
 - [ ] off 빌드에서 작성 진입점 3곳(학생 목록 EmptyState 액션·'새 개별질문' 버튼·멘토 상세 '개별질문 하기') 완전 숨김 확인 — `test/individual_question/iq_create_flag_test.dart` 가 플래그 연동을 상시 검증
 - [ ] Data safety 폼에 IQ 관련 수집 항목 반영(Phase D)
 - [ ] on 전환 시 예치 확인문(`iq_create_screen.dart` '…캐시가 안전 보관(예치)돼요')의 단가 노출 여부 재검토(QA_REPORT QA-01 참고)
+
+---
+
+## 🚦 릴리즈 게이트 — 숏폼 미디어 실기기 실증 (App-SF1)
+
+`shortform_media_url_resolver.dart` 로 **코드는 완료**됐으나, 아래는 코드로 증명할 수 없고 **실기기·실데이터 실행으로만 증명된다.** 전부 체크되기 전에는 숏폼을 "완료" 로 표기하지 않는다.
+
+**선행 조건(하드): 웹에서 숏폼 영상이 실제로 1건 이상 업로드·발행되어 있어야 한다.** 정본 행이 없으면 이 게이트 전체가 무의미하다.
+
+- [ ] 로그인 상태에서 웹 업로드 정본 행의 `video_url`(Storage 참조)이 signed URL 로 발급되어 **실제 재생**된다
+- [ ] **비로그인(anon)** 상태에서도 재생된다 — `sfv_public_read` 가 anon SELECT 를 허용하는 서버 정책과 일관한지 확인
+- [ ] TTL 만료 경계에서 **재발급**이 동작한다(만료 직전 초기화 실패가 없다 — `safetyMargin`)
+- [ ] 발급 실패 시 크래시 없이 **수동 재시도 UI** 로 수렴하고, 1탭 = 정확히 1회 재시도(연타 가드)
+- [ ] 참조 손상(`invalidReference`)은 재시도 버튼 **없이** 명시 폴백으로 표시된다 — '영상 없음'으로 조용히 바뀌지 않는다
+- [ ] 계정 전환 후 이전 사용자 키로 발급된 URL 이 **재사용되지 않는다**(캐시 키 = `currentUserId + storedRef`)
+- [ ] 로그·예외 문자열·크래시 리포트에 **signed URL 이나 토큰이 노출되지 않는다**
+- [ ] `thumbnail_url` 이 NULL 인 행에서 **중립 플레이스홀더 + 재생 어포던스**가 표시된다 — 이는 **정상 동작이며 결함으로 기록하지 않는다**
+
+> 출처: `docs/APP_FEATURE_STATUS.md` 인프라 항목 "숏폼 미디어 정본화" 의 **authenticated Storage 정책 실증** 이관분. 이 게이트가 닫히기 전에는 해당 항목을 문서에서 제거하지 않는다.
