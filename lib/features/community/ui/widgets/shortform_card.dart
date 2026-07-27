@@ -8,7 +8,11 @@ import '../../data/community_models.dart';
 import 'thumbnail_view.dart';
 
 /// 숏폼 카드(세로 피드 한 칸). 썸네일+재생 어포던스·제목·멘토배지·좋아요·조회수.
-/// ★ 실제 영상 재생 플러그인은 없다 — 썸네일 위 재생 아이콘(어포던스)만. 상세에서도 동일.
+///
+/// 실제 재생은 상세(video_player)가 담당하고 피드 인라인 재생은 하지 않는다 —
+/// 카드 전체 탭 = 상세 진입이므로 중앙 재생 아이콘은 '영상 열기' 어포던스다
+/// (거짓 CTA 아님). 웹이 thumbnail_url 을 null 로 저장하는 현재 계약에서는
+/// 거짓 썸네일 대신 중립 영상 플레이스홀더 + 재생 어포던스를 그린다(App-SF1).
 class ShortformCard extends StatelessWidget {
   const ShortformCard({super.key, required this.post, required this.onOpen});
 
@@ -28,7 +32,10 @@ class ShortformCard extends StatelessWidget {
           children: <Widget>[
             AspectRatio(
               aspectRatio: 16 / 10,
-              child: ThumbnailView(url: post.thumbnailUrl),
+              child: ThumbnailView(
+                url: post.thumbnailUrl,
+                showPlayAffordance: true,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -44,8 +51,7 @@ class ShortformCard extends StatelessWidget {
                     children: <Widget>[
                       if (post.authorRole == 'mentor')
                         const AppBadge(label: '멘토', tinted: true),
-                      if (post.authorRole == 'mentor')
-                        const SizedBox(width: 6),
+                      if (post.authorRole == 'mentor') const SizedBox(width: 6),
                       Text(post.authorName, style: AppType.caption),
                       const Spacer(),
                       const Icon(Icons.favorite_border,

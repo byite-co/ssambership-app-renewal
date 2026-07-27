@@ -95,7 +95,14 @@ class BoardPost {
   }
 }
 
-/// 숏폼(shortform_posts). 열람 전용 뷰모델. 실제 재생 플러그인은 없음(썸네일+재생 어포던스).
+/// 숏폼(shortform_posts). 열람 전용 뷰모델.
+///
+/// video_url 정본은 웹이 저장하는 Storage 참조
+/// (`shortform-videos/{userId}/{uuid}.{ext}`)이고 legacy 행만 http(s) 절대
+/// URL — 상세가 ShortformMediaUrlResolver 로 서명 URL 을 해석해
+/// video_player 로 재생한다(App-SF1). thumbnail_url 은 현재 웹 finalize 가
+/// null 로 저장하므로(썸네일 업로드 미배선) 피드 카드는 거짓 썸네일 대신
+/// 중립 영상 플레이스홀더 + 재생 어포던스를 그린다.
 class ShortformPost {
   const ShortformPost({
     required this.id,
