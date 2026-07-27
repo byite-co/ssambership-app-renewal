@@ -57,7 +57,7 @@
 | 리스크 | 내용 | 권장 조치 |
 |---|---|---|
 | Gradle `-Xmx8G` | `android/gradle.properties` 힙 8G+메타 4G — 표준 CI 러너(RAM 7GB)/저사양기에서 데몬 OOM/기동 실패 가능 | CI/저사양 대상이면 `-Xmx4G` 등으로 하향 또는 CI 프로파일 오버라이드 |
-| '알림 받기' 토글 무동작 | OS 푸시 미전달(POST_NOTIFICATIONS 미선언·FCM 휴면), DB 선호값만 저장. `notification_enabled` 컬럼 미보장 시 "준비 중" 스낵바가 로그인 심사관에게 노출 가능 | 운영 DB에 `users.notification_enabled`(+본인 update RLS) 실재 확인, 또는 토글 라벨을 "인앱 알림 선호"로 축소. 푸시 실도입은 백로그 |
+| ~~'알림 받기' 토글 무동작~~ | 토글은 **인앱 알림 설정**이며 정본 테이블 `notification_settings`(`push_enabled`·`groups`)에 실제로 저장·재로드된다. OS 푸시는 App-F0 에서 출시 범위 제외(FCM 제거)라 토글과 무관 | **해소(2026-07-26)**: 컬럼 추가·RLS 신설 불요 — 테이블과 `select_own`/`modify_own` 정책이 이미 실재(구 `users.notification_enabled` 는 참조 0 고아 컬럼). **토글 라벨 축소도 불요.** 저장 실패는 "준비 중" 위장 없이 원복 + 재시도 안내(`notification_settings_repository.dart:6-16`) |
 | 16KB 페이지 정렬 미검증 | Android 15+ 타깃 신규앱 요건. Flutter 엔진이 처리하나 이 환경에서 실산출 검증 불가 | 빌드 머신에서 AAB 산출 후 정렬 확인 또는 Play Console 사전출시 리포트로 확인, 오래된 네이티브 플러그인 `.so` 업데이트 |
 | 버전명 `0.1.0` | 리젝 사유는 아니나 베타/미완성 인상 | 정식 프로덕션 트랙이면 `1.0.0+1` 승격 검토. 비공개/내부 테스트면 현행 무방 |
 | '정산 관리(웹)' 외부 링크 | `web_bridge_config` baseUrl 운영 확정으로 실제 외부 이동. 멘토 **출금** 관리(소비자 결제 아님)라 방어 가능 | **해소(2026-07-16, PR #28 머지)**: payout 링크도 `kPayoutManageLinkEnabled`(dart-define, 스토어 빌드 기본 off)로 flag화 — off 시 안내 카드 대체. 무주입 빌드에서는 외부 이동 자체가 없음 |

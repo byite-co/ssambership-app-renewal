@@ -269,7 +269,7 @@
 | 디자인 토큰 통일·Pretendard·테마 seed 중립화 (2d735e3 외) | ✅ 품질 인상 개선 (P1-1 아이콘·앱명은 별개로 잔존, 로그인 브랜드 심볼을 아이콘 소스로 재사용 가능) |
 | **웹링크 8경로 배선 — baseUrl `https://ssambership-web.vercel.app` 주입** (미커밋) | ✅ 약관 `/legal/terms`·개인정보 `/legal/privacy`·고객지원·리뷰 배선 → **P0-2 해소** (남은 일: 페이지에 실제 법적 문안 게시 확인 + Play Console URL 기재) / ⚠️ **구독·충전·결제관리(`/subscriptions`) 활성화 = P0-3 위반이 '설계'에서 '실동작'으로 전환 → 푸시 전 결제성 경로만 방안 A(조회 전용화)로 되돌릴 것.** 비결제 링크는 유지 무방 |
 | IQ(개별질문) 병합 (09b62f8, 스위치 2개 ON) | 🔶 출시 전 `kIndividualQuestionCreateEnabled` OFF 시 진입점이 완전히 숨겨지는지 확인(P0-4 재발 방지) + 캐시 소비형 디지털 재화라 P0-3 검토 대상 + Data safety 수집 항목 반영 |
-| 클라우드 `users.notification_enabled` 컬럼 추가 (DB 직접 적용) | 🔶 Data safety 폼 기재 항목 추가. git으로 롤백 불가한 실DB 변경이므로 웹 레포 마이그레이션 SQL로 정본화 필요 |
+| 클라우드 `users.notification_enabled` 컬럼 추가 (DB 직접 적용) | 🔶 **미해소** — git으로 롤백 불가한 실DB 변경이므로 웹 레포 마이그레이션 SQL로 정본화 필요.<br>**[2026-07-26 추기]** 구 `public.users.notification_enabled` 컬럼은 staging에 실재하나, 앱·웹·DB 함수 참조가 모두 0인 고아 컬럼이다. 정본은 `public.notification_settings`이며, 구 컬럼의 제거 여부는 별도 DB 스키마 정리 오너 결정으로 남긴다.<br>Data safety 기재는 `notification_settings` 기준(docs/DATA_SAFETY_FORM.md §2 각주) — 이 컬럼은 더 이상 폼 항목이 아니다. 제거를 결정할 경우 ⑴ production 에서 동일 의존성 전수 스캔 1회 재수행, ⑵ 마이그레이션 번호는 **W5 종결 후** W5 마지막 파일의 다음 번호로 할당한다. 웹 `supabase/sql/` 현존 최대는 **174**(172 는 영구 결번)이고 W5 가 **175 부터** 시작하므로, 지금 175 를 예약하면 W5 와 충돌한다. 167–174 불변 원칙은 그대로 |
 | 프로필 역할분기·마이페이지 탭 배선·연결노트 버튼 (미커밋) | ✅ 죽은 UI 감소 — P0-4 부분 해소 (잔여: 회원가입 링크 스텁, 숏폼 재생·좋아요 초기상태) |
 | 전부 미푸시 | ⚠️ 원격 기준 빌드는 여전히 P0 전건 해당 — **Phase 0: 커밋·푸시 먼저** |
 
@@ -343,3 +343,22 @@ flutter build appbundle
 - [ ] off 빌드에서 작성 진입점 3곳(학생 목록 EmptyState 액션·'새 개별질문' 버튼·멘토 상세 '개별질문 하기') 완전 숨김 확인 — `test/individual_question/iq_create_flag_test.dart` 가 플래그 연동을 상시 검증
 - [ ] Data safety 폼에 IQ 관련 수집 항목 반영(Phase D)
 - [ ] on 전환 시 예치 확인문(`iq_create_screen.dart` '…캐시가 안전 보관(예치)돼요')의 단가 노출 여부 재검토(QA_REPORT QA-01 참고)
+
+---
+
+## 🚦 릴리즈 게이트 — 숏폼 미디어 실기기 실증 (App-SF1)
+
+`shortform_media_url_resolver.dart` 로 **코드는 완료**됐으나, 아래는 코드로 증명할 수 없고 **실기기·실데이터 실행으로만 증명된다.** 전부 체크되기 전에는 숏폼을 "완료" 로 표기하지 않는다.
+
+**선행 조건(하드): 웹에서 숏폼 영상이 실제로 1건 이상 업로드·발행되어 있어야 한다.** 정본 행이 없으면 이 게이트 전체가 무의미하다.
+
+- [ ] 로그인 상태에서 웹 업로드 정본 행의 `video_url`(Storage 참조)이 signed URL 로 발급되어 **실제 재생**된다
+- [ ] **비로그인(anon)** 상태에서도 재생된다 — `sfv_public_read` 가 anon SELECT 를 허용하는 서버 정책과 일관한지 확인
+- [ ] TTL 만료 경계에서 **재발급**이 동작한다(만료 직전 초기화 실패가 없다 — `safetyMargin`)
+- [ ] 발급 실패 시 크래시 없이 **수동 재시도 UI** 로 수렴하고, 1탭 = 정확히 1회 재시도(연타 가드)
+- [ ] 참조 손상(`invalidReference`)은 재시도 버튼 **없이** 명시 폴백으로 표시된다 — '영상 없음'으로 조용히 바뀌지 않는다
+- [ ] 계정 전환 후 이전 사용자 키로 발급된 URL 이 **재사용되지 않는다**(캐시 키 = `currentUserId + storedRef`)
+- [ ] 로그·예외 문자열·크래시 리포트에 **signed URL 이나 토큰이 노출되지 않는다**
+- [ ] `thumbnail_url` 이 NULL 인 행에서 **중립 플레이스홀더 + 재생 어포던스**가 표시된다 — 이는 **정상 동작이며 결함으로 기록하지 않는다**
+
+> 출처: `docs/APP_FEATURE_STATUS.md` 인프라 항목 "숏폼 미디어 정본화" 의 **authenticated Storage 정책 실증** 이관분. 이 게이트가 닫히기 전에는 해당 항목을 문서에서 제거하지 않는다.
