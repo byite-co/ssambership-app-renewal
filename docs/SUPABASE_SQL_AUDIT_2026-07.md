@@ -43,9 +43,10 @@
 
 모든 대상 테이블은 RLS 활성화 상태(운영 DB 전 테이블 `rls_enabled=true` 확인).
 
-## 2. 앱이 호출하는 RPC (26개, 전부 DB에 실존 확인)
+## 2. 앱이 호출하는 RPC (27개, 전부 DB에 실존 확인)
 
-DB 쪽 대조: 아래 26개 모두 운영 DB `public` 스키마에 존재하며, 표기한 함수 전부 **SECURITY DEFINER, owner=postgres**.
+DB 쪽 대조: 아래 27개 모두 운영 DB `public` 스키마에 존재하며, 표기한 함수 전부 **SECURITY DEFINER, owner=postgres**.
+(주의: 앱은 `.rpc<dynamic>(…)` 제네릭 호출도 사용하므로 grep 은 `\.rpc(<[^>]*>)?\(` 패턴이어야 전수가 잡힌다.)
 
 | RPC | 호출 위치 (lib/) | EXECUTE grant |
 |---|---|---|
@@ -55,6 +56,7 @@ DB 쪽 대조: 아래 26개 모두 운영 DB `public` 스키마에 존재하며,
 | `account_deletion_request_self` | `mypage/data/account_deletion_repository.dart:136` | authenticated |
 | `account_deletion_cancel_self` | `mypage/data/account_deletion_repository.dart:162` | authenticated |
 | `qna_create_question_thread` | `question_room/data/question_room_write_repository.dart:82` | authenticated |
+| `qna_create_free_question_thread` (본체 위임 래퍼) | `mentors/data/free_question_entry.dart:162` | authenticated |
 | `qna_append_message` | 〃 `:120` | authenticated |
 | `qna_confirm_thread` | 〃 `:146` | authenticated |
 | `qna_flag_wrong_answer` | 〃 `:159` | authenticated |
@@ -111,7 +113,7 @@ DB 쪽 대조: 아래 26개 모두 운영 DB `public` 스키마에 존재하며,
 - **쓰기 가드**: `question_threads/question_messages/question_attachments` 의 `*_direct_write_guard`(직접 쓰기 차단 → RPC 강제), `comments`/`community_comments` 의 `comments_write_guard`/`cc_write_guard`, `users` 의 role 승격 차단(`enforce_users_role_guard`, `enforce_users_role_insert_guard`), 계정삭제 중 쓰기 차단 `account_deletion_write_guard`(cash_ledger, cash_wallets, community_posts, payments, question_messages, shortform_posts).
 - **파생값 갱신**: `post_reactions`/`shortform_reactions` → like_count 재계산, `comments` → comment_count 재계산, `community_posts` → 해시태그 동기화, 다수 테이블 `set_updated_at`.
 - **댓글 이중화 브리지**: `comments` ↔ `community_comments` 양방향 미러(`comments_mirror_to_legacy`, `cc_sync_board_to_canonical`) — 앱의 v16 댓글 정본 전환(`comments_gateway.dart` 주석)과 대응.
-- **무료질문 한도**: `free_question_usage` INSERT 시 `check_free_question_usage_limits`(전체 15회·멘토당 3회), `question_threads` INSERT 시 `qt_direct_consume_free_usage`.
+- **무료질문 한도**: `free_question_usage` INSERT 시 `check_free_question_usage_limits`(실제 강제값: 가입 후 7일 창·전체 7회·멘토당 3회 — 테이블 comment 의 "15회"는 오기), `question_threads` INSERT 시 `qt_direct_consume_free_usage`.
 - **알림 생성**: `individual_questions`(`iq_notify_assigned`, `iq_notify_status_transition`), `individual_question_messages`(`iqm_notify_message`), `mentor_plans` 가격변경, `subscriptions` 만료, `refunds`, `subscription_billing_events` 등 → `notifications`/`notification_outbox` 로 적재되어 앱 알림함(§1 `notifications`)에 도달.
 - **구독 상한**: `subscriptions` INSERT/UPDATE 시 `enforce_mentor_cap`.
 
