@@ -94,7 +94,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 |---|---|---|---|---|
 | 1 | ~~**구독/충전/결제·정산·프로필편집/약관 버튼**~~ **✅ 해소(2026-07)** | 운영 도메인 확정 — 관리·약관·정산 버튼이 실제 웹을 연다(구매 유도 CTA 는 컴플라이언스로 별도 제거) | `web_bridge_config.dart` `baseUrl`(fromEnvironment, 기본=운영 도메인) | 완료 |
 | 2 | ~~채팅 이미지 첨부~~ **✅ 해결** | 업로드 + 뷰어 + 주석 진입점 모두 완료 | 퀵윈 `c32d53f`, 뷰어 PR #8 `b1fb61a` | 완료 |
-| 3 | **숏폼 영상 재생** | 전체 HTTP(S) URL 은 상세 플레이어에서 재생할 수 있으나, 웹 정본 영상 Storage 참조는 앱에서 signed URL 로 해석하지 못한다. 웹 finalize 는 `thumbnail_url` 도 NULL 로 저장하므로 앱에는 썸네일이 아니라 **중립 배경**만 보인다. 피드 카드는 중립 배경 + 상세 진입만 제공한다 | `shortform_video_port.dart`, `shortform_detail_screen.dart:64,70-93,114,331-352`, `community_read_repository.dart:80-93`, `community_models.dart:128-146` | **부분구현 — 앱 데이터 계층 + Storage 정책 실증** |
+| 3 | **숏폼 영상 재생** | 웹 정본 영상 Storage 참조는 `ShortformMediaUrlResolver` 가 짧은 TTL signed URL 로 해석하고, 만료 전 재발급·실패 시 수동 재시도·참조 손상 시 재시도 없는 명시 폴백으로 수렴한다(App-SF1). legacy 절대 HTTP(S) URL 은 발급 없이 통과한다. **앱 측 영상 코드 잔여 없음.** 잔여는 썸네일뿐 — 웹 finalize 가 `thumbnail_url` 을 NULL 로 저장하므로 피드·상세 모두 거짓 썸네일 대신 **중립 영상 플레이스홀더 + 재생 어포던스**를 그린다. 피드 인라인 재생은 설계상 하지 않으며 카드 탭 = 상세 진입이다 | `shortform_media_url_resolver.dart`, `shortform_video_port.dart`, `shortform_detail_screen.dart`, `shortform_card.dart`, `thumbnail_view.dart`, `community_models.dart` | **부분구현 — 썸네일(웹 측) 잔여 · Storage 정책 실증은 실기기 QA 관문** |
 | 4 | ~~**숏폼 좋아요/스크랩**~~ **✅ 해소** | 초기 상태 로드 구현됨 | `shortform_detail_screen.dart:46-63`(`_loadReactionState`) | 완료 |
 | 5 | **커뮤니티 조회수** | "조회 N" 표시되나 글 진입해도 증가 안 함 | `community_read_repository.dart`(incrementView 부재) | **인프라**(증분 RPC) |
 | 6 | **알림 딥링크** | 알림 눌러도 해당 글/스레드로 안 가고 탭만 전환 | `deep_link_service.dart:12`(TODO), `notifications_screen.dart:146-152` | 앱+인프라(푸시) |
@@ -110,8 +110,8 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 
 ### 실질 출시 판단(핵심)
 - ~~**가장 크리티컬(코어 수익 동선)**: #1 `baseUrl` 미설정~~ **✅ 해소(2026-07)** — 운영 도메인 확정으로 웹 동선 전체가 열린다. 결제 관련 잔여 판단은 스토어 정책(docs/PLAY_STORE_REVIEW_PLAN.md P0-3)이며 이 문서 범위 밖.
-- **범위 의존**: 숏폼 상세 플레이어 UI는 배선됐지만 웹 정본 영상 Storage 참조의 signed URL 해석이 앱에 없어 실데이터 재생은 아직 **부분구현**이다. 현재 웹 finalize 는 `thumbnail_url` 도 NULL 로 저장하므로 중립 배경만 표시된다. 이번 출시 범위에 포함하려면 영상 URL 해석·만료 재발급, 썸네일 생성/업로드 또는 명시적 대체 UI, 실데이터 기기 QA 를 완료해야 하며, 미완이면 빈 상태 유지 또는 진입 제한을 선택한다. (첨부는 업로드·이미지 뷰어·주석 모두 완료.)
-- **UX 저하(비차단)**: 딥링크·조회수·페이징. 숏폼 반응과 알림 토글은 완료됐고, OS 푸시는 App-F0 정책상 출시 범위에서 제외됐다. 숏폼은 `video_player` 와 상세 재생 UI가 배선됐지만 정본 영상 Storage 참조를 signed URL 로 바꾸는 데이터 계층이 없어 웹 업로드 실데이터 재생은 아직 부분구현이다. 현재 웹 finalize 는 `thumbnail_url` 을 NULL 로 저장하므로 앱에는 중립 배경만 보인다. 피드 카드의 직접 재생·재생 어포던스도 앱 UI 잔여다.
+- **범위 의존**: 숏폼 영상 재생의 **앱 측 코드 잔여는 없다** — 참조 파싱 → 짧은 TTL signed URL 발급 → 만료 재발급 → 실패 폴백이 `ShortformMediaUrlResolver` 로 배선됐다(App-SF1). 남은 것은 두 가지이며 성격이 다르다. ① **썸네일(웹 측 구현 잔여)**: 웹 finalize 가 `thumbnail_url` 을 NULL 로 저장한다 — 웹에서 생성·업로드·ref 저장을 배선하거나, 현재의 중립 플레이스홀더를 정식 대체 UI 로 확정한다. ② **Storage 정책 실증(실증 잔여 · 코드로 증명 불가)**: `sfv_public_read` 정책 하에서 실제 auth·RLS·Storage 를 거친 발급/만료 재발급/실패 폴백이 실기기·실데이터로 동작하는지는 **실행으로만 증명된다** → `docs/PLAY_STORE_REVIEW_PLAN.md` 의 숏폼 릴리즈 게이트에서 처리한다. (첨부는 업로드·이미지 뷰어·주석 모두 완료.)
+- **UX 저하(비차단)**: 딥링크·조회수·페이징. 숏폼 반응과 알림 토글은 완료됐고, OS 푸시는 App-F0 정책상 출시 범위에서 제외됐다. 숏폼 영상은 데이터 계층(`ShortformMediaUrlResolver`)까지 배선돼 앱 측 잔여가 없고, 피드 카드는 중립 플레이스홀더 위에 **재생 어포던스**를 그린다(카드 탭 = 상세 진입이므로 거짓 CTA 가 아니다). 피드 **인라인** 재생은 미구현이 아니라 **설계상 비목표**다. 실데이터 표시 품질의 잔여는 웹이 `thumbnail_url` 을 NULL 로 저장하는 것 하나뿐이다.
 
 ---
 
@@ -154,7 +154,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | 좋아요/스크랩(숏폼) | 완전작동 | `shortform_detail_screen.dart:46-63`(`_loadReactionState` initState 호출), `shortform_reactions` 조회 | 없음 | 앱 |
 | 신고 | 완전작동 | `report_sheet.dart:18-78`, `write_repository.dart:105-113`(content_reports insert) | 없음 | 앱 |
 | 숏폼 목록(feed) | 완전작동 | `shortform_feed_view.dart:28,38`(shortform_posts 실쿼리) | 없음 | 앱 |
-| 숏폼 영상 재생 | 부분구현 | `shortform_video_port.dart` 와 `shortform_detail_screen.dart:70-84,114,331-352` 로 플레이어 UI·폴백·dispose 는 완료. `community_read_repository.dart:80-93`·`community_models.dart:128-146` 에는 영상 Storage 참조→signed URL 해석이 없다. 웹 `communityShortformActions.ts` 는 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail` 호출자는 0건이다 | 웹 업로드 정본 행의 `video_url` 은 Storage 참조라 현재 앱에서 재생되지 않고, `thumbnail_url` 은 NULL 이라 중립 배경만 표시된다. 피드 내 직접 재생·재생 표시도 없고, 전체 HTTP(S) URL 인 경우에만 상세 재생이 가능하다 | 앱 데이터 계층 + Storage 정책 실증 + 앱 UI 보완 |
+| 숏폼 영상 재생 | 부분구현 | `shortform_media_url_resolver.dart` 가 Storage 참조 파싱·짧은 TTL signed URL 발급·TTL 캐시·single-flight·강제 무효화(`forceRefresh`)를 담당하고, `shortform_detail_screen.dart` 가 `absent`/`resolved`/`failed`/`invalidReference` 4상태를 분리 처리한다(실패만 수동 재시도 노출). `shortform_card.dart`·`thumbnail_view.dart` 는 중립 플레이스홀더 + 재생 어포던스를 그린다. 리졸버는 **영상 전용**이라 썸네일은 해석 대상이 아니다. 웹 `communityShortformActions.ts` 는 여전히 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail` 호출자는 0건이다 | 앱에서 정본 `video_url` 재생은 가능해졌다. `thumbnail_url` 이 NULL 이라 중립 플레이스홀더가 표시되는 것은 **거짓 썸네일 금지 원칙에 따른 정상 동작이며 결함이 아니다.** 피드 인라인 재생은 설계상 비목표 | 웹 썸네일 배선 + **실기기 Storage 정책 실증(QA 관문)** |
 | 조회수 집계 | 미완 | `community_read_repository.dart`(incrementView 부재) | 🔴 조회수 안 오름 | **인프라**(증분 RPC) |
 | 목록 페이징 | 미완 | `community_read_repository.dart:23-59`(전체 로드) | 데이터 많아지면 느림 | 앱만 |
 
@@ -199,7 +199,7 @@ Supabase 실사(스테이징 `lbeqxarxothkmzqvpudy`, 마이그레이션 2건 적
 | ~~웹 도메인 확정~~ **✅ 완료(2026-07)** | `WebBridgeConfig.baseUrl` 기본값 = 운영 도메인(오버라이드는 `--dart-define=WEB_BASE_URL`) | 구독관리·정산·약관·개인정보·지원 | `web_bridge_config.dart` 주석 |
 | ~~Storage 버킷 + image_picker~~ **✅ 완료** | 버킷 `question-room-attachments` 실존·연결(퀵윈 `c32d53f`), `DeviceImagePicker`, 뷰어 서명 URL(PR #8) | 채팅 첨부·필기·주석·뷰어 | 완료 |
 | Realtime publication | question_messages·question_threads를 `supabase_realtime`에 포함 | 실시간 채팅(미포함시 폴백) | (S6) `thread_realtime.dart:23` |
-| 숏폼 미디어 정본화 | `video_player ^2.13.0`·상세 플레이어 UI는 **완료**. 영상 잔여는 Storage ref 파싱 → 짧은 TTL signed URL 발급 → 만료 시 재발급 → 실패 폴백 및 authenticated Storage 정책 실증. 썸네일 잔여는 웹 생성/업로드·ref 저장 배선 또는 명시적 대체 UI 확정(웹 `communityShortformActions.ts` 가 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail`(`communityShortformStorage.ts`)은 호출자가 0건) | 웹 업로드 숏폼 영상·썸네일 | `shortform_video_port.dart`, `community_read_repository.dart:80-93`, `thumbnail_view.dart:20-30` |
+| 숏폼 미디어 정본화 | `video_player ^2.13.0`·상세 플레이어 UI·**Storage ref 파싱 → 짧은 TTL signed URL 발급 → 만료 재발급 → 실패 폴백 전부 완료**(App-SF1 `shortform_media_url_resolver.dart`). **코드 잔여 없음.** 남은 것은 성격이 다른 2건이다 — ⑴ **썸네일(구현 잔여, 웹 측)**: 웹 생성/업로드·ref 저장 배선 또는 중립 플레이스홀더를 정식 대체 UI 로 확정(웹 `communityShortformActions.ts` 가 `thumbnailUrl: null` 을 저장하고 `uploadShortformThumbnail`(`communityShortformStorage.ts`)은 호출자가 0건). ⑵ **authenticated Storage 정책 실증(실증 잔여 — 코드로 증명 불가, 삭제하지 말 것)**: `sfv_public_read` 정책 하 실제 발급·만료 재발급·실패 폴백을 실기기·실데이터로 확인 → **`docs/PLAY_STORE_REVIEW_PLAN.md` 숏폼 릴리즈 게이트로 이관** | 웹 업로드 숏폼 영상·썸네일 | `shortform_media_url_resolver.dart`, `thumbnail_view.dart`, 웹 `communityShortformActions.ts` |
 | 조회수 증분 RPC | `increment_*_view` RPC | 커뮤니티 조회수 | `community_*_repository` |
 | ~~푸시 인프라~~ **출시 범위 제외(App-F0)** | 활성 필요 작업 없음 — `device_tokens` 테이블은 기존재하고 앱의 FCM SDK·OS 권한·토큰 등록 경로는 제거됨. 재도입은 별도 백로그(재도입 시 Data Safety 재검토) | OS 푸시(인앱 알림은 정상 작동) | (S7) `lib/core/push/HANDOFF.md` |
 | A2 서버강제(선택) | question_threads INSERT 트리거 | 주간한도 우회 방지 | `DB_VERIFY_QUERIES.md` A2-Q3 |
