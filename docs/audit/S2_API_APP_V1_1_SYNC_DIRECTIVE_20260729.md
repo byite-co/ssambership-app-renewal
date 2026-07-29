@@ -10,7 +10,7 @@
 2. **`SUBSCRIPTION_REFUND_PENDING` 오류 코드 정합화** (웹 계약과 코드 표기 통일).
 3. **응답 envelope 가정 재기술** — 웹 계약 v1.1과 동일 구조로 고정.
 4. **주간 사용량 조회 하드닝 반영:** 레거시 `get_weekly_question_usage`는 NULL-safe **pair-party** 가드(`auth.uid() IS DISTINCT FROM p_student_id AND ... p_mentor_id` + service_role 통과, `NOT_PAIR_PARTY`/42501)로 하드닝된다. 앱 호출은 전부 로그인 학생 본인 ID이므로 **영향 없음**을 계약에 명기.
-5. **커뮤니티 hard DELETE 단계 게이트:** 앱 `lib/features/community/data/community_write_repository.dart:204-210`의 `community_posts.delete()`(생성 실패 **보상 전용** 내부 경로)가 존재하므로, DELETE 권한·`cp_delete_own` 회수는 ① 대체 RPC 제공 → ② 앱 전환 배포 → ③ 회수 순서를 지킨다. 앱 계약에는 ②단계(보상 삭제의 RPC 전환)를 앱 측 의무로 기재. **이 회수는 M8(F7·F8 멘토 RPC 마이그레이션)에 얹지 않고 별도 마이그레이션(`HD-1` 또는 새 M번호)으로 진행한다(오너 확정).**
+5. **커뮤니티 hard DELETE 단계 게이트:** 앱 `lib/features/community/data/community_write_repository.dart:204-210`의 `community_posts.delete()`(생성 실패 **보상 전용** 내부 경로)가 존재하므로, DELETE 권한·`cp_delete_own` 회수는 ① 대체 RPC 제공 → ② 앱 전환 배포 → ③ 회수 순서를 지킨다. 앱 계약에는 ②단계(보상 삭제의 RPC 전환)를 앱 측 의무로 기재. **이 회수는 M8(F7·F8 멘토 RPC 마이그레이션)에 얹지 않고 별도 마이그레이션 `HD-1`(논리 ID 고정)로 진행한다(오너 확정).** 보상 삭제 대체 RPC의 이름·시그니처·오류코드·GRANT는 v1.1 작성 세션이 확정하며, 8항의 공용 함수 대조표에 포함한다.
 6. **B-04 동결:** v1은 "금지어 검사 폐지, `POLICY_RESTRICTED`는 예약 코드이며 발생하지 않음"으로 고정. F4/F5 공용 검증부는 마스킹만 수행.
 7. **B-07 blocker 해제(실측):** 앱 프로필 수정은 `lib/features/mypage/data/profile_edit_repository.dart:30`의 `users` UPDATE 단일 호출뿐 — `mentor_profiles` 쓰기 없음.
 8. **공용 커뮤니티 내부 함수 대조표(오너 확정):** 웹·앱이 공유하는 커뮤니티 내부 함수에 대해 **이름·시그니처·오류코드·GRANT가 웹 계약 v1.1과 동일**함을 증명하는 대조표를 앱 계약 v1.1에 추가한다.
