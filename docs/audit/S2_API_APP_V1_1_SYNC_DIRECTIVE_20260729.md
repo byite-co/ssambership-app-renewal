@@ -1,6 +1,6 @@
 # S2 — `api_app_v1` 계약 v1.1 동기화 지시서
 
-- **작성일:** 2026-07-29 (rev 2 — 오너 2차 검증 보정 반영: 공용 커뮤니티 내부 함수 대조표 의무 추가, hard DELETE는 M8과 무관한 별도 마이그레이션으로 명시)
+- **작성일:** 2026-07-29 (rev 4 — 웹 정본 지시서 rev 4와 동기. rev 3: `HD-1` 논리 ID 고정·보상 삭제 RPC 대조표 연결. rev 2: 공용 커뮤니티 내부 함수 대조표 의무 추가, hard DELETE는 M8과 무관한 별도 마이그레이션으로 명시. rev 4 동결 사항: topup 정본 `idempotency_key` 단독(`ref_text` 제거), F12 관계 불일치 오류코드 4종, room 참조 정본성 — 상세는 웹 정본 지시서 A-5·A-6 참조)
 - **정본:** 웹 저장소 `docs/audit/s2_api_contract_v1_1_revision_directive_20260729.md` (같은 브랜치 `claude/schema-doc-verification-q876xf`). 전체 판정·근거·마이그레이션 정정은 정본을 따른다.
 - **판정:** 전체 S2 GO 유지 · S2-1 계약서 REVISE · S2-2 SQL 구현 임시 NO-GO 유지.
 
