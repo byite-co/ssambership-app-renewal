@@ -1,6 +1,6 @@
 # S2 — `api_app_v1` 계약 v1.1 동기화 지시서
 
-- **작성일:** 2026-07-29
+- **작성일:** 2026-07-29 (rev 2 — 오너 2차 검증 보정 반영: 공용 커뮤니티 내부 함수 대조표 의무 추가, hard DELETE는 M8과 무관한 별도 마이그레이션으로 명시)
 - **정본:** 웹 저장소 `docs/audit/s2_api_contract_v1_1_revision_directive_20260729.md` (같은 브랜치 `claude/schema-doc-verification-q876xf`). 전체 판정·근거·마이그레이션 정정은 정본을 따른다.
 - **판정:** 전체 S2 GO 유지 · S2-1 계약서 REVISE · S2-2 SQL 구현 임시 NO-GO 유지.
 
@@ -10,9 +10,10 @@
 2. **`SUBSCRIPTION_REFUND_PENDING` 오류 코드 정합화** (웹 계약과 코드 표기 통일).
 3. **응답 envelope 가정 재기술** — 웹 계약 v1.1과 동일 구조로 고정.
 4. **주간 사용량 조회 하드닝 반영:** 레거시 `get_weekly_question_usage`는 NULL-safe **pair-party** 가드(`auth.uid() IS DISTINCT FROM p_student_id AND ... p_mentor_id` + service_role 통과, `NOT_PAIR_PARTY`/42501)로 하드닝된다. 앱 호출은 전부 로그인 학생 본인 ID이므로 **영향 없음**을 계약에 명기.
-5. **커뮤니티 hard DELETE 단계 게이트:** 앱 `lib/features/community/data/community_write_repository.dart:204-210`의 `community_posts.delete()`(생성 실패 **보상 전용** 내부 경로)가 존재하므로, DELETE 권한·`cp_delete_own` 회수는 ① 대체 RPC 제공 → ② 앱 전환 배포 → ③ 회수 순서를 지킨다. 앱 계약에는 ②단계(보상 삭제의 RPC 전환)를 앱 측 의무로 기재.
+5. **커뮤니티 hard DELETE 단계 게이트:** 앱 `lib/features/community/data/community_write_repository.dart:204-210`의 `community_posts.delete()`(생성 실패 **보상 전용** 내부 경로)가 존재하므로, DELETE 권한·`cp_delete_own` 회수는 ① 대체 RPC 제공 → ② 앱 전환 배포 → ③ 회수 순서를 지킨다. 앱 계약에는 ②단계(보상 삭제의 RPC 전환)를 앱 측 의무로 기재. **이 회수는 M8(F7·F8 멘토 RPC 마이그레이션)에 얹지 않고 별도 마이그레이션(`HD-1` 또는 새 M번호)으로 진행한다(오너 확정).**
 6. **B-04 동결:** v1은 "금지어 검사 폐지, `POLICY_RESTRICTED`는 예약 코드이며 발생하지 않음"으로 고정. F4/F5 공용 검증부는 마스킹만 수행.
 7. **B-07 blocker 해제(실측):** 앱 프로필 수정은 `lib/features/mypage/data/profile_edit_repository.dart:30`의 `users` UPDATE 단일 호출뿐 — `mentor_profiles` 쓰기 없음.
+8. **공용 커뮤니티 내부 함수 대조표(오너 확정):** 웹·앱이 공유하는 커뮤니티 내부 함수에 대해 **이름·시그니처·오류코드·GRANT가 웹 계약 v1.1과 동일**함을 증명하는 대조표를 앱 계약 v1.1에 추가한다.
 
 ## 다음 세션 규칙
 
