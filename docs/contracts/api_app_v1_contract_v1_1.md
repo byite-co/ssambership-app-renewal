@@ -5,7 +5,7 @@
 - 성격: **S2 구현 전 고정 계약** — v1.0(2026-07-28 확정)의 rev 8 동기 개정본. 이 문서는 SQL·앱 코드 적용 결과가 아니라 구현·검수 기준이다.
 - Gate 판정 범위: Gate 4(`api_app_v1`)와 Gate 5(탈퇴 allowlist)
 - 원문: `docs/contracts/api_app_v1_contract_v1_0.md` (내용 무변경 보존본, 382행 / 19,814바이트 / SHA-256 `59b37c42d5b4ca81e3cc2c775a4760396fa484299d99d3b78a179facd5ae6c77`)
-- 공용 계약 정본(웹 최종 계약 v1.1): `byite-co/ssambership_web` 브랜치 `claude/api-web-v1-1-contract-20260729-v2` 최종 커밋 `4ef7332df9febdb1f1d7fae5c1676d71b29780bf`의 `docs/contracts/api_web_v1_contract_v1_1.md` (2,814행 / 289,828바이트 / SHA-256 `74a7fbf35e2e7857c82ba6dc3bef885556f1a849d4a74a3cc763af1f64aee86e`) — 공용 함수·시그니처·오류코드·GRANT·envelope·공용 테스트 기대값의 정본은 이 문서다(웹 §19.5).
+- 공용 계약 정본(웹 최종 계약 v1.1): `byite-co/ssambership_web` 브랜치 `claude/api-web-v1-1-contract-20260729-v2` 최종 커밋 `53120d026508f8f75d5eb00dfaee4bde278deb1c`의 `docs/contracts/api_web_v1_contract_v1_1.md` (2,826행 / 293,982바이트 / SHA-256 `0df3a98d2fce896df329b0f423dddedcf9d2455142a8b1b5d04fba2bb2a3511a`) — 공용 함수·시그니처·오류코드·GRANT·envelope·공용 테스트 기대값의 정본은 이 문서다(웹 §19.5). *(v1.1 재동기: 구 정본 커밋 위에 F4 replay-first 판정 우선순위·§14.4 보상 삭제 규약 정정·T-CONC-10이 추가된 최신 정본으로 교체.)*
 - 개정 지시 근거: 앱 rev 8 동기화 지시서 `docs/audit/S2_API_APP_V1_1_SYNC_DIRECTIVE_20260729.md` @ `02e1f7a5` 항목 1~10 · 웹 rev 8 정본 지시서 `docs/audit/s2_api_contract_v1_1_revision_directive_20260729.md` @ `7ec3b269`(웹 저장소) A~G.
 - 판정: v1.0 Gate 4의 "문서 게이트 PASS"는 rev 8 A-1로 **소급 무효** — 본 문서 §10에서 재게이트. **S2-2 SQL 구현은 임시 NO-GO 유지**(본 계약은 문서 계약이며 이번 세션은 SQL을 작성하지 않는다).
 
@@ -29,7 +29,7 @@
 3. 앱에서는 신규 회원가입, 신규 구독, 결제·충전, 구독 변경·해지, 신규 개별질문 결제를 제공하지 않는다.
 4. 커뮤니티 게시판은 웹·앱에서 글·댓글·반응뿐 아니라 **이미지 읽기와 쓰기까지 사용자 관점에서 동등**해야 한다.
 5. 사용자 ID는 함수 내부에서 `auth.uid()`로 도출한다. 앱이 `p_user_id`를 보내는 계약은 만들지 않는다.
-6. 모든 신규 쓰기 함수는 `SECURITY DEFINER`, 빈 `search_path`, 완전 수식 객체명, 고정 반환 형상 및 멱등 규약을 사용한다.
+6. **(v1.1 범위 정정)** 외부 호출 가능한 `api_app_v1` 쓰기 wrapper는 `SECURITY DEFINER`, 빈 `search_path`, 완전 수식 객체명, 고정 반환 형상 및 멱등 규약을 사용한다. `core_private` 공용 구현부 B-1~B-4는 **의도적으로 `SECURITY INVOKER`** 이며(SECDEF wrapper의 소유자 권한 문맥에서 실행 — §3.4), 외부 EXECUTE 0·빈 `search_path`·완전 수식 객체명을 따른다. F10(`ensure_student_mentor_room`)은 내부 `SECURITY DEFINER`이나 외부 EXECUTE 0이다.
 7. 현재 `public` 객체는 구버전 앱 종료 전 삭제·이동하지 않는다. S2는 추가형 스트랭글러로 시작한다.
 8. **(v1.1 신설, rev 8 B)** 웹·앱이 공유하는 기능(커뮤니티 글 쓰기, 질문방 확보)의 판정 로직은 `core_private` 공용 구현부 한 곳에만 둔다. 웹 wrapper와 앱 wrapper는 같은 구현부를 호출하는 얇은 껍데기이며, 검증 규칙을 각자 복제하지 않는다. `core_private`는 Data API로 도달 불가하므로 **앱이 `core_private` 함수를 직접 `.rpc()`로 호출하는 계약은 존재하지 않는다.**
 9. **(v1.1 신설, rev 8 A-10)** 커뮤니티 글 **작성 자격은 승인 멘토 전용**이다(웹·앱 동일). v1.0 원칙 4의 "사용자 관점 동등"은 유지되며, 작성 자격 규칙 자체가 웹·앱 동일하므로 동등성은 공용 구현부가 구조적으로 보장한다.
@@ -130,6 +130,13 @@ GRANT SELECT ON api_app_v1.community_posts_v1 TO authenticated;
 
 **공용 구현부 위임(rev 8 B — 웹 §7 F4·F5·F6과 동일 구조):** 앱 F4/F5/F6(`community_post_create/update/soft_delete`)과 웹 동명 함수는 **같은 `core_private` 구현부**(§3.4)를 호출하는 얇은 `SECURITY DEFINER` wrapper다. 역할·승인·계정 상태·본문 검증은 구현부에서 수행하고, wrapper는 `auth.uid()` 도출 + envelope 전달만 한다 — 판정이 wrapper마다 갈라질 수 없다. 클라이언트가 보낸 `author_id`·`author_role`·`author_label`은 받지 않는다.
 
+**F4 멱등 재생 판정 우선순위(replay-first — 웹 §7 F4와 동일, v1.1 재동기):** 재생 판정은 신규 쓰기 검증보다 **먼저**다. 웹·앱 wrapper가 동일한 B-1 구현부를 호출하므로 판정 순서도 동일하다.
+
+1. `auth.uid()` 확인 및 author binding(`p_author_id = auth.uid()` 도출) **직후**, 역할·승인·계정 write-block·본문·이미지 ref 등 **신규 쓰기 검증보다 먼저** `(author_id, create_idempotency_key)`로 **기존 커밋 행을 조회**한다.
+2. 기존 행이 있으면 — 새 쓰기와 Storage 삭제 **없이** — 기존 `post_id` + `idempotent_replay:true`를 반환한다(재생 성공은 현재 시점의 역할·승인·본문 재검증 결과에 좌우되지 않는다 — 이미 커밋된 사실의 멱등 확인이기 때문).
+3. 기존 행이 **없을 때만** 신규 쓰기 검증(작성 자격·계정 상태·본문·이미지 ref)과 INSERT를 수행한다.
+4. **단순 재호출 오류(연결 실패·timeout·예상 밖 SQL 예외 전파)는 "미커밋 확인"으로 간주하지 않는다** — 성공도 확정 실패도 아니므로 §6.3대로 객체를 보존한 채 재시도한다. "미커밋 확인"은 이 replay-first 조회가 기존 행 없음을 판정하고 신규 경로가 **확정 실패 envelope**(`ok:false` 도메인 거부) 또는 rollback으로 종결된 경우만이다. **별도 조회 RPC는 신설하지 않는다**(F4 재호출 자체가 조회를 겸한다).
+
 공통 권한:
 
 ```sql
@@ -172,7 +179,7 @@ GRANT EXECUTE ON FUNCTION api_app_v1.community_post_soft_delete(uuid) TO authent
 
 | # | 함수 (identity argument) | 반환 | 역할 |
 |---|---|---|---|
-| B-1 | `core_private.community_post_create_impl(p_author_id uuid, p_title text, p_body text, p_category text, p_image_refs text[], p_status text, p_idempotency_key uuid)` | `jsonb` | 게시글 생성 원자 구현부 |
+| B-1 | `core_private.community_post_create_impl(p_author_id uuid, p_title text, p_body text, p_category text, p_image_refs text[], p_status text, p_idempotency_key uuid)` | `jsonb` | 게시글 생성 원자 구현부 — **replay-first 판정 수행**(author binding 직후·신규 쓰기 검증보다 먼저 `(author_id, create_idempotency_key)` 기존 커밋 행 조회, §3.3 — 웹 §7 F4와 판정 순서 동일) |
 | B-2 | `core_private.community_post_update_impl(p_author_id uuid, p_post_id uuid, p_title text, p_body text, p_category text, p_image_refs text[], p_status text, p_expected_updated_at timestamptz)` | `jsonb` | 게시글 수정 원자 구현부 |
 | B-3 | `core_private.community_post_soft_delete_impl(p_author_id uuid, p_post_id uuid)` | `jsonb` | soft-delete 구현부 |
 | B-4 | `core_private.community_image_refs_validate(p_owner_id uuid, p_image_refs text[])` | `jsonb` | 공용 이미지 ref 검증기(§6.2의 검증 5종 수행, 실패 시 `{ok:false, code}`) |
@@ -299,8 +306,13 @@ END IF;
 
 - create의 `p_idempotency_key`는 필수이며 `(author_id, create_idempotency_key)` 기준으로 멱등이다(UNIQUE INDEX `community_posts_author_idem_key` 실측 — 웹 §14.4).
 - 멱등 재생 성공은 기존 `post_id`와 `idempotent_replay=true`를 반환한다.
-- 업로드 중 하나가 실패하면 그 요청에서 이미 올린 객체를 즉시 삭제한다(**Storage 신규 이미지 보상 삭제 — 유지**).
-- **(v1.1 개정 — rev 8 C, 앱 동기화 5)** DB finalize 실패·응답 불명확이면 이번 요청 신규 객체를 보상 삭제하고, **같은 멱등키로 `community_post_create`(F4)를 재호출해 성공 여부를 확정한다 — 이것이 생성 복구의 정본 경로다.** 이미 성공했으면 기존 `post_id` + `idempotent_replay:true`가 반환되고, 실패했으면 DB 트랜잭션 롤백이라 지울 행이 없다. v1.0의 "글 목록에서 idempotency key를 재조회" 방식은 이 정본 경로로 대체한다. **DB 게시글을 hard DELETE하는 보상 RPC·직접 DELETE 경로는 만들지 않는다**(보상 삭제 대체 RPC 신설도 하지 않는다 — 오너 확정).
+- **(v1.1 전면 정정 — 웹 §14.4 재호출 선행·보상 삭제 후행, 웹 §19.5 #8) 응답 불명확·응답 유실은 실패 확정이 아니다.** 보상 삭제는 다음 4분기로 고정한다. v1.0의 "글 목록에서 idempotency key를 재조회" 방식과 v1.1 구판의 "불명확 시 선삭제" 순서는 모두 이 규약으로 대체한다.
+  - **업로드 단계 실패:** 이미 업로드한 이번 요청 신규 Storage 객체를 **즉시 보상 삭제**한다(Storage 보상 삭제 — **유지**).
+  - **DB finalize의 확정 실패·rollback 확인:** 신규 Storage 객체를 보상 삭제한다(트랜잭션 롤백이므로 지울 DB 행은 없다).
+  - **DB finalize 응답 불명확·응답 유실:** Storage 객체를 **삭제하지 말고**, **동일 멱등키로 `community_post_create`(F4)를 먼저 재호출**한다 — 이것이 생성 복구의 **정본 경로**다(rev 8 C).
+    - 재호출 성공 또는 기존 `post_id` 반환(멱등 재생): 게시글이 커밋된 것이므로 **객체를 유지**한다(먼저 지우면 커밋된 글의 image ref가 깨진다).
+    - 확정 실패 및 게시물 미커밋 확인: **그때** 신규 객체를 보상 삭제한다. **"미커밋 확인"의 판정 주체는 §3.3 F4의 replay-first 판정이다** — 재호출이 `(author_id, create_idempotency_key)` 기존 행 없음을 판정하고 신규 경로에서 확정 실패 envelope(`ok:false` 도메인 거부) 또는 rollback으로 종결된 경우만 해당한다. **단순 재호출 오류(연결 실패·timeout·예상 밖 예외)는 미커밋 확인이 아니다** — 객체를 보존한 채 재시도한다. **별도 조회 RPC는 신설하지 않는다**(F4 재호출 자체가 조회를 겸한다).
+  - **DB 게시글을 hard DELETE하는 보상 RPC·직접 DELETE 경로는 계속 금지한다**(보상 삭제 대체 RPC 신설도 하지 않는다 — 오너 확정).
 - update 성공은 `removed_image_refs`를 반환한다. 앱은 commit 이후 제거된 구객체를 best-effort 삭제한다.
 - 보상 삭제 실패는 사용자 성공을 뒤집지 않고 orphan 정리 대상으로 기록한다.
 - soft delete는 게시글 행과 이미지 참조를 감사 목적으로 보존한다. 실제 객체 purge는 계정삭제·보존정책 작업이 담당한다.
@@ -344,7 +356,7 @@ END IF;
 **앱 측 의무(순서 고정 — 웹 §14.7 확대 게이트 7단계와 동일):**
 
 1. F4/F5/F6 전환 (직접 INSERT → `community_post_create`, 직접 UPDATE → `community_post_update`, 보상 DELETE → 폐기)
-2. F4 응답 불명확 시 **동일 멱등키 재시도** 구현 (§6.3 정본 복구 경로)
+2. F4 응답 불명확 시 **동일 멱등키 재시도** 구현 — **재호출 전 Storage DELETE 0회** · **replay-first 판정**(§3.3) · **성공 재생 시 기존 객체 유지** · **확정 미커밋 판정 시에만 보상 삭제**(§6.3 4분기 규약) 포함
 3. `deleteOwnPostForCompensation`(`board_author_gate.dart:183`) 제거
 4. DB 게시글 hard DELETE 코드(`community_write_repository.dart:204-210`) 제거 — **Storage 신규 이미지 보상 삭제는 유지**
 5. 직접 INSERT/UPDATE/DELETE 0건 실측
@@ -509,7 +521,7 @@ users
 - [ ] 동일 학생–멘토 동시 호출에서 방이 1개만 존재
 - [ ] 웹 이미지 글이 앱 목록·상세에 표시됨
 - [ ] 앱 이미지 작성 0장·1장·5장, MIME/크기/타인 ref 공격, DB 실패 보상 삭제(Storage 한정) 통과
-- [ ] F4 응답 불명확 시 동일 멱등키 재호출 복구 경로 동작 (§6.3)
+- [ ] **F4 응답 유실 복구(웹 T-CONC-10과 동일 — v1.1 추가):** 이미지 객체 업로드 → F4가 DB commit에 성공했으나 응답을 유실한 것으로 모사 → **재호출 전에 Storage DELETE가 0회인지 확인** → 동일 멱등키로 F4 재호출. 기대: 동일 `post_id` + `idempotent_replay:true` / 게시글 **1건** / 원래 `image_refs` **불변** / 참조 객체 **전부 존재**(서명 URL 발급 가능) / **확정 rollback·미커밋 분기(replay-first가 기존 행 없음 + 확정 실패 envelope로 종결)에서만** 신규 객체 보상 삭제 (§3.3·§6.3)
 - [ ] 커뮤니티 작성 승인 멘토 전용 판정(`ROLE_NOT_MENTOR`·`MENTOR_NOT_APPROVED`) 통과 (§6.5)
 - [ ] Realtime 미수신 시 기존 재조회 fallback 유지
 
@@ -623,11 +635,11 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 
 | 객체 (identity argument) | SECURITY | search_path | owner | 외부 EXECUTE | wrapper/구현부 경계 | 안정 오류코드 | 웹 절 | 앱 절 | 판정 |
 |---|---|---|---|---|---|---|---|---|---|
-| `core_private.community_post_create_impl(uuid,text,text,text,text[],text,uuid)` | INVOKER | `''` | migration 실행 역할 | **0** (PUBLIC·anon·authenticated·service_role 전부 미부여) | wrapper(웹 F4·앱 `community_post_create`, SECDEF)가 `auth.uid()` 도출 후 `p_author_id`로 전달. 역할·승인·상태·본문 검증은 구현부 수행 | §6.4 전체 (`ROLE_NOT_MENTOR`·`MENTOR_NOT_APPROVED`·`TITLE_REQUIRED`… `UPDATE_CONFLICT`) | 웹 §7 F4·§10.3 | §3.4 B-1·§6.4 | **PASS** |
-| `core_private.community_post_update_impl(uuid,uuid,text,text,text,text[],text,timestamptz)` | INVOKER | `''` | migration 실행 역할 | **0** | wrapper(웹 F5·앱 `community_post_update`) — 동일 구조 | 동일 + `UPDATE_CONFLICT`·`POST_NOT_FOUND_OR_NOT_OWNED` | 웹 §7 F5·§10.3 | §3.4 B-2·§6.4 | **PASS** |
-| `core_private.community_post_soft_delete_impl(uuid,uuid)` | INVOKER | `''` | migration 실행 역할 | **0** | wrapper(웹 F6·앱 `community_post_soft_delete`) — 동일 구조 | `POST_NOT_FOUND_OR_NOT_OWNED` 등 §6.4 부분집합 + `already_deleted:true` 성공 재생 | 웹 §7 F6·§10.3 | §3.4 B-3·§6.4 | **PASS** |
-| `core_private.community_image_refs_validate(uuid,text[])` | INVOKER | `''` | migration 실행 역할 | **0** | 구현부 내부에서 호출되는 공용 검증기 — 검증 5종(§6.2), 실패 시 `{ok:false, code}` | `IMAGE_COUNT_EXCEEDED`·`IMAGE_REF_INVALID`·`IMAGE_NOT_OWNED`·`IMAGE_OBJECT_NOT_FOUND`·`IMAGE_MIME_NOT_ALLOWED`·`IMAGE_SIZE_EXCEEDED` | 웹 §7 B-4·§10.3 | §3.4 B-4·§6.2·§6.4 | **PASS** |
-| `core_private.ensure_student_mentor_room(uuid,uuid,uuid,uuid,boolean)` | **DEFINER** | `''` | migration 실행 역할 | **0** | wrapper(웹 F2·앱 `ensure_free_question_room`, SECDEF)가 `auth.uid()`를 `p_student_id`로 전달. 웹 F12는 내부 호출(`p_require_entitlement=false`) | §4.3 전체 (`AUTH_REQUIRED`… `ROOM_ENSURE_FAILED`) | 웹 §7 F10·§10.3 | §3.4 F10·§4.2·§4.3 | **PASS** |
+| `core_private.community_post_create_impl(uuid,text,text,text,text[],text,uuid)` | INVOKER | `''` | migration 실행 역할 | **0** (PUBLIC·anon·authenticated·service_role 전부 미부여) | wrapper(웹 F4·앱 `community_post_create`, SECDEF)가 `auth.uid()` 도출 후 `p_author_id`로 전달. replay-first 판정(§3.3)과 역할·승인·상태·본문 검증은 구현부 수행 | `AUTH_REQUIRED`(wrapper 선행) · `ROLE_NOT_MENTOR` · `MENTOR_NOT_APPROVED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED` · `ACCOUNT_DELETION_IN_PROGRESS` · `TITLE_REQUIRED` · `BODY_TOO_SHORT` · `CATEGORY_INVALID` · B-4 위임 이미지 코드 6종. 수정·삭제 전용 코드는 발생하지 않는다. 멱등 재생은 오류가 아니라 `idempotent_replay:true` 성공 | 웹 §7 F4·§10.3 | §3.3·§3.4 B-1·§6.4 | **PASS** |
+| `core_private.community_post_update_impl(uuid,uuid,text,text,text,text[],text,timestamptz)` | INVOKER | `''` | migration 실행 역할 | **0** | wrapper(웹 F5·앱 `community_post_update`, SECDEF)가 `auth.uid()` 도출 후 `p_author_id`로 전달 | `AUTH_REQUIRED`(wrapper 선행) · `ROLE_NOT_MENTOR`(학생 작성 글 수정 거부 포함 — §6.5) · `MENTOR_NOT_APPROVED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED` · `ACCOUNT_DELETION_IN_PROGRESS` · `TITLE_REQUIRED` · `BODY_TOO_SHORT` · `CATEGORY_INVALID` · `POST_NOT_FOUND_OR_NOT_OWNED` · `UPDATE_CONFLICT` · B-4 위임 이미지 코드 6종 | 웹 §7 F5·§10.3 | §3.4 B-2·§6.4 | **PASS** |
+| `core_private.community_post_soft_delete_impl(uuid,uuid)` | INVOKER | `''` | migration 실행 역할 | **0** | wrapper(웹 F6·앱 `community_post_soft_delete`, SECDEF)가 `auth.uid()` 도출 후 `p_author_id`로 전달 | `AUTH_REQUIRED`(wrapper 선행) · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED` · `ACCOUNT_DELETION_IN_PROGRESS` · `POST_NOT_FOUND_OR_NOT_OWNED`. 제목·본문·카테고리·이미지·낙관적 충돌 등 생성·수정 전용 코드는 발생하지 않는다. 이미 삭제된 본인 글은 오류가 아니라 `ok:true` + `already_deleted:true` | 웹 §7 F6·§8.3·§10.3 | §3.3·§3.4 B-3 | **PASS** |
+| `core_private.community_image_refs_validate(uuid,text[])` | INVOKER | `''` | migration 실행 역할 | **0** | 구현부 내부에서 호출되는 공용 검증기 — 검증 5종(§6.2), 실패 시 `{ok:false, code}` | 정확히 다음 6종만: `IMAGE_COUNT_EXCEEDED` · `IMAGE_REF_INVALID` · `IMAGE_NOT_OWNED` · `IMAGE_OBJECT_NOT_FOUND` · `IMAGE_MIME_NOT_ALLOWED` · `IMAGE_SIZE_EXCEEDED` | 웹 §7 B-4·§10.3 | §3.4 B-4·§6.2·§6.4 | **PASS** |
+| `core_private.ensure_student_mentor_room(uuid,uuid,uuid,uuid,boolean)` | **DEFINER** | `''` | migration 실행 역할 | **0** | wrapper(웹 F2·앱 `ensure_free_question_room`, SECDEF)가 `auth.uid()`를 `p_student_id`로 전달. 웹 F12는 내부 호출(`p_require_entitlement=false`) | `AUTH_REQUIRED` · `ROLE_NOT_STUDENT` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED` · `ACCOUNT_DELETION_IN_PROGRESS` · `MENTOR_NOT_FOUND` · `MENTOR_NOT_APPROVED` · `BLOCKED` · `FREE_QUOTA_EXPIRED` · `FREE_QUOTA_TOTAL_EXHAUSTED` · `FREE_QUOTA_MENTOR_EXHAUSTED` · `ROOM_ENSURE_FAILED` (§4.3의 12종) | 웹 §7 F10·§10.3 | §3.4 F10·§4.2·§4.3 | **PASS** |
 
 - 커뮤니티 내부 구현부 4종(B-1~B-4)은 `SECURITY INVOKER`, `search_path=''`, 외부 EXECUTE 0으로 웹 정본과 동일하다. F10만 `SECURITY DEFINER`다(웹 §7 F10 — RLS 우회가 필요한 방 확보 원자 연산, 웹 §11.6 화이트리스트 등재).
 - `core_private`를 앱이 직접 Data API RPC로 호출하는 계약은 없다(§1 원칙 8, §3.1).
@@ -642,14 +654,14 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 | 2 | `SUBSCRIPTION_REFUND_PENDING` 정합화 | §4.3 | 반영 완료 |
 | 3 | envelope 웹 v1.1 동일 구조 재기술 | §3.3 | 반영 완료 |
 | 4 (A-8) | 주간 사용량 NULL-safe pair-party 가드·앱 영향 없음 | §4.4·§8 | 반영 완료 |
-| 5 (C) | `HD-1` 전면 잠금 게이트·보상 DELETE 폐기·멱등키 재시도·Storage 보상 유지 | §6.3·§6.6·§9 | 반영 완료 |
+| 5 (C) | `HD-1` 전면 잠금 게이트·보상 DELETE 폐기·동일 멱등키 재시도(**재호출 선행·보상 삭제 후행 — replay-first 복구 순서**)·Storage 보상 유지 | §3.3·§6.3·§6.6·§9 | 반영 완료 |
 | 6 (D, B-04) | 금지어 검사 폐지·`POLICY_RESTRICTED` 예약 코드 동결 | §6.2·§6.4 | 반영 완료 |
 | 7 (D, B-07) | 앱 `mentor_profiles` 쓰기 없음 실측·blocker 해제 | §2·§9 | 반영 완료 |
 | 8 (B) | 공용 커뮤니티 내부 함수 대조표 | §12 | 반영 완료 |
 | 9 (A-10) | 작성 승인 멘토 전용·`ROLE_NOT_MENTOR`/`MENTOR_NOT_APPROVED`·학생 글 보존·숏폼 정합화 | §6.4·§6.5 | 반영 완료 |
 | 10 (A-5) | F12 재생 계약 rev 8 동기·테스트 A~H | §11.2·§11.3 | 반영 완료 |
 
-### 13.2 웹 §19.5 동기화 기준 1~7
+### 13.2 웹 §19.5 동기화 기준 1~8
 
 | 항목 | 앱 v1.1 반영 절 | 상태 |
 |---|---|---|
@@ -660,6 +672,7 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 | 5. 주간 사용량 pair-party 가드·앱 영향 없음 명기 | §4.4 | 반영 완료 |
 | 6. 공용 커뮤니티 내부 함수 대조표 | §12 | 반영 완료 |
 | 7. `ROLE_NOT_ALLOWED` 재정의(멘토 전용 기준) | §6.4·§6.5 | 반영 완료 |
+| 8. 보상 삭제 순서 정정(재호출 선행·보상 삭제 후행)·F4 replay-first 판정 우선순위·응답 유실 복구 테스트(웹 T-CONC-10) 동기화 | §3.3·§6.3·§6.6·§10 | 반영 완료 |
 
 ### 13.3 웹 rev 8 정본 지시서 관련 절
 
@@ -676,10 +689,11 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 
 ## 14. 웹·앱 공용 계약 대조표 (v1.1 하드게이트)
 
-정본 = 웹 계약 v1.1(`4ef7332d`, SHA-256 `74a7fbf3…4aee86e`). 판정은 PASS/FAIL만 사용하며, 한 행이라도 FAIL이면 S2-1 PASS를 선언하지 않는다.
+정본 = 웹 계약 v1.1(`53120d026508f8f75d5eb00dfaee4bde278deb1c`, 2,826행 / 293,982바이트, SHA-256 `0df3a98d2fce896df329b0f423dddedcf9d2455142a8b1b5d04fba2bb2a3511a` — 원격 실측 일치 확인). 판정은 PASS/FAIL만 사용하며, 한 행이라도 FAIL이면 S2-1 PASS를 선언하지 않는다. *(v1.1 재동기: 아래 전 행을 새 정본 기준으로 재판정했다 — 특히 멱등·보상 삭제·replay-first·Gate 4 테스트 행은 새 정본의 §7 F4·§14.4·§21.3 T-CONC-10 개정을 반영해 앱 절을 함께 개정한 뒤 판정했다.)*
 
 | 분류 | 웹 정본 | 앱 v1.1 | 일치 여부 | 근거 절 (웹 / 앱) |
 |---|---|---|---|---|
+| 웹 정본 정체성 | 커밋 `53120d02…78deb1c` · 2,826행 · 293,982B · SHA-256 `0df3a98d…a3511a` | 문서 헤더·본 표 서문이 동일 정체성 참조(구 정본 참조 0건) | **PASS** | 웹 파일 실측 / 앱 헤더·§14 |
 | F4 함수명·전체 인자 순서 | `community_post_create(p_title text, p_body text, p_category text, p_idempotency_key uuid, p_image_refs text[] DEFAULT '{}', p_status text DEFAULT 'published')` | 동일 (스키마만 `api_app_v1`) | **PASS** | 웹 §7 F4 / 앱 §3.3 |
 | F5 함수명·전체 인자 순서 | `community_post_update(p_post_id uuid, p_title text, p_body text, p_category text, p_expected_updated_at timestamptz, p_image_refs text[] DEFAULT '{}', p_status text DEFAULT 'published')` | 동일 (스키마만 `api_app_v1`) | **PASS** | 웹 §7 F5 / 앱 §3.3 |
 | F6 함수명·인자 | `community_post_soft_delete(p_post_id uuid)` | 동일 | **PASS** | 웹 §7 F6 / 앱 §3.3 |
@@ -688,11 +702,12 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 | 입력 타입·DEFAULT | 필수 선행·DEFAULT 후행 (`p_image_refs text[] DEFAULT '{}'`, `p_status text DEFAULT 'published'`) · named notation 의무 | 동일 | **PASS** | 웹 §7 F4·F5 / 앱 §3.3 |
 | 응답 envelope | `{ok, contract_version:1, …}` / `{ok:false, contract_version:1, code}` · 필드 추가는 버전 유지·제거/의미 변경은 상승 · 예상 밖 예외 전파 · 멱등 재생 표시 의무 | 동일 | **PASS** | 웹 §8.1~8.3 / 앱 §3.3 |
 | 공용 내부 함수명·스키마·identity | `core_private` 5종: `community_post_create_impl(uuid,text,text,text,text[],text,uuid)` · `community_post_update_impl(uuid,uuid,text,text,text,text[],text,timestamptz)` · `community_post_soft_delete_impl(uuid,uuid)` · `community_image_refs_validate(uuid,text[])` · `ensure_student_mentor_room(uuid,uuid,uuid,uuid,boolean)` | 동일 (같은 객체를 공유 — 앱이 별도 구현부를 만들지 않음) | **PASS** | 웹 §7·§10.3 / 앱 §3.4·§12 |
-| SECURITY INVOKER/DEFINER | 구현부 4종(B-1~B-4) INVOKER · F10 DEFINER · wrapper 전부 DEFINER | 동일 | **PASS** | 웹 §7 F4~F6·F10 / 앱 §3.4·§12 |
+| SECURITY INVOKER/DEFINER 경계 | 외부 호출 wrapper = DEFINER · 구현부 4종(B-1~B-4) = 의도적 INVOKER(외부 EXECUTE 0) · F10 = 내부 DEFINER(외부 EXECUTE 0) | 동일 (§1 원칙 6을 wrapper/구현부 범위로 정정해 충돌 제거) | **PASS** | 웹 §7 F4~F6·F10·§11.1 / 앱 §1 원칙 6·§3.4·§12 |
 | owner·search_path | owner = migration 실행 역할 · `SET search_path = ''` · 완전 수식 객체명 | 동일 | **PASS** | 웹 §7·§11.1 / 앱 §3.4·§12 |
 | GRANT·REVOKE (공용 내부 함수) | `core_private` 5종 외부 EXECUTE 0 — PUBLIC·anon·authenticated·service_role 전부 미부여, 생성과 같은 마이그레이션에서 REVOKE 명시 | 동일 | **PASS** | 웹 §10.1·§10.3 / 앱 §3.1·§3.4·§12 |
 | GRANT·REVOKE (앱 wrapper) | 웹 T2 패턴: PUBLIC REVOKE·anon 미부여·authenticated EXECUTE (웹은 service_role 병행 부여 — 웹 서버 경로용) | PUBLIC·anon REVOKE + authenticated EXECUTE. `service_role`은 앱 호출자 계약에서 제외(§3.3 주석 — wrapper 객체별 호출자 계약의 의도적 차이, 공용 계약 아님) | **PASS** | 웹 §10.3 / 앱 §3.3 |
-| 커뮤니티 오류코드 | §9.4 12종 + `ROLE_NOT_MENTOR`·`MENTOR_NOT_APPROVED` (작성 자격) · `POLICY_RESTRICTED` 예약 코드(발생 안 함) · `CATEGORY_INVALID` 허용값 `study|school|career|college|free` · `BODY_TOO_SHORT` 10자 | 동일 | **PASS** | 웹 §9.2~9.4 / 앱 §6.4 |
+| 커뮤니티 오류코드 (코드 집합) | §9.4 12종 + `ROLE_NOT_MENTOR`·`MENTOR_NOT_APPROVED` (작성 자격) · `POLICY_RESTRICTED` 예약 코드(발생 안 함) · `CATEGORY_INVALID` 허용값 `study|school|career|college|free` · `BODY_TOO_SHORT` 10자 | 동일 | **PASS** | 웹 §9.2~9.4 / 앱 §6.4 |
+| 함수별 오류코드 분리 | 함수 경계별 실제 발생 가능 코드만 귀속(create ≠ update ≠ soft_delete ≠ image validator — 예: 낙관적 충돌·소유권 코드는 update/soft_delete 계열에만, image validator는 6종만) | 동일 (§12 대조표 오류코드 열을 함수별로 분리 명세) | **PASS** | 웹 §7 F4~F6·B-4·§8.3 / 앱 §12 |
 | `SUBSCRIPTION_REFUND_PENDING` | §9.3 — 정본 raise 동일명, 앱 계약 처리 의무 | §4.3에 추가 완료 | **PASS** | 웹 §9.3·§19.5-2 / 앱 §4.3 |
 | `ROLE_NOT_MENTOR` | 멘토 아님 — F4 작성 자격 위반 | 동일 정의 | **PASS** | 웹 §9.2·§7 F4 / 앱 §6.4·§6.5 |
 | `MENTOR_NOT_APPROVED` | 미승인 멘토 — `individual_question_user_is_approved_mentor(auth.uid())` 동일 헬퍼 | 동일 정의·동일 헬퍼 | **PASS** | 웹 §9.3·§7 F4 / 앱 §6.4·§6.5 |
@@ -702,17 +717,19 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 | 검증 선행·쓰기 후행 | Phase 1 검증 전용(business-state 쓰기 0) / Phase 2 room 확보·보정, 문장 명시 | 동일 (문장 동일 전사) | **PASS** | 웹 §7 F12 / 앱 §11.2 |
 | room 참조 의미론 | pair 불변 정본 · `subscription_id` NULL 보정/동일 유지/다른 값 거부 · `payment_id` = 가장 최근 성공 checkout(C 유지/NULL→C/stale→C/제3→`ROOM_REF_MISMATCH`) | 동일 (컬럼별 표 동일 전사) | **PASS** | 웹 §7 F12·§13.1 / 앱 §11.2 |
 | 늦은 과거 재생 | P≠C 조건 충족 시 무자금부작용 멱등 성공(`ok:true, idempotent:true`, anomaly 0) | 동일 | **PASS** | 웹 §7 F12 / 앱 §11.2 |
-| 멱등성·동시성 계약 | F4 멱등키 필수·`(author_id, create_idempotency_key)` · 같은 멱등키 재호출 = 정본 복구 · 방 확보 `ON CONFLICT DO NOTHING`+재조회·동시 1방(T-CONC-01) | 동일 | **PASS** | 웹 §14.4·§13.1 / 앱 §4.2·§6.3 |
+| 멱등성·동시성 계약 | F4 멱등키 필수·`(author_id, create_idempotency_key)` · 같은 멱등키 재호출 = 정본 복구 · **응답 불명확·유실은 실패 확정 아님(재호출 전 Storage 객체 보존)** · 방 확보 `ON CONFLICT DO NOTHING`+재조회·동시 1방(T-CONC-01) · F4 응답 유실 복구(T-CONC-10) | 동일 (§6.3 4분기 규약·§10 테스트로 재동기) | **PASS** | 웹 §7 F4·§14.4·§13.1·§21.3 / 앱 §3.3·§4.2·§6.3·§10 |
+| F4 공용 구현부 판정 순서(replay-first) | author binding 직후·신규 쓰기 검증보다 먼저 `(author_id, create_idempotency_key)` 기존 커밋 행 조회 → 있으면 새 쓰기·Storage 삭제 없이 기존 `post_id`+`idempotent_replay:true` → 없을 때만 신규 검증·INSERT · 단순 재호출 오류 ≠ 미커밋 확인 · 별도 조회 RPC 신설 없음 | 동일 (동일 B-1 구현부 호출 — 판정 순서 동일 전사) | **PASS** | 웹 §7 F4 / 앱 §3.3·§3.4 B-1 |
+| 커뮤니티 이미지 보상 삭제 규약 | 4분기: 업로드 실패 즉시 삭제 / 확정 실패·rollback 확인 시 삭제 / 응답 불명확·유실은 **삭제 없이 동일 멱등키 F4 선재호출**(성공·기존 `post_id` → 객체 유지, replay-first 미커밋 확인+확정 실패 종결 시에만 삭제) / DB hard DELETE 보상 계속 금지 | 동일 (§6.3 4분기 전사 — 웹 §14.5 보상 삭제 행의 "앱 v1.1 동기화 시 충족" 조건 해소) | **PASS** | 웹 §14.4·§14.5·§19.5-8 / 앱 §6.3·§6.6 |
 | 테스트 A~H | T-REP-A~H 8건 — fixture 명시 포함, 기대값 표 | 동일 (기대값 전건 전사) | **PASS** | 웹 §21.8 / 앱 §11.3 |
 | `HD-1` | `community_posts` REVOKE ALL+GRANT SELECT·쓰기 정책 6종 제거·M16 별도·확대 게이트 7단계·service_role moderation 예외·보상 RPC 폐기 | 동일 + 앱 측 의무 ①~⑦ | **PASS** | 웹 §14.7 / 앱 §6.6 |
 | Storage 정책 조건 | `sf_insert_mentor` 1건 · `sfv_mentor_insert` 1정책/2버킷 · 기존 조건 4종 보존 · 동일 승인 헬퍼 | 동일 | **PASS** | 웹 §14.8 / 앱 §6.5 |
-| 커뮤니티 이미지 계약 | ref 형식·TTL 3600·5장/5MiB/4MIME·UID 경로·보상 삭제·soft delete·레거시 URL 호환 | 동일 (웹 §14.5 동등성 표 전 행 ✅) | **PASS** | 웹 §14.1~14.5 / 앱 §5·§6 |
+| 커뮤니티 이미지 계약 | ref 형식·TTL 3600·5장/5MiB/4MIME·UID 경로·soft delete·레거시 URL 호환 (보상 삭제 행은 웹 §14.5에서 "앱 계약 v1.1 동기화 시 충족(⚠→✅)"로 표기 — 본 문서 §6.3 재동기로 조건 충족) | 동일 | **PASS** | 웹 §14.1~14.5 / 앱 §5·§6.3 |
 | V6 `current_plan_amount_cents` | 필드명 단일 확정(현재 플랜 가격) — 대체 이름 사용 금지 | 동일 확정 수용 (앱 비호출 경계 명시) | **PASS** | 웹 §6 V6·rev 8 §6.4 / 앱 §11.4 |
 | F11 3층 구조 | `record_cash_topup_impl`(INVOKER·EXECUTE 0) / 레거시 void wrapper / strict wrapper(service_role 전용) · topup 정본 `idempotency_key`·`ref_id NULL`·`ref_type='topup'` | 동일 확인 기록 (앱 비호출 경계) | **PASS** | 웹 §7 F11 / 앱 §11.1 |
 | 앱 금지 기능 경계 | F11·F12 service_role 전용 → 앱 도달 불가 · consented RPC allowlist 밖 · 결제·신규 구독·캐시 결제·개별질문 등록 앱 미노출 | 동일 (신규 앱 전용 기능 0건·금지 기능 추가 0건) | **PASS** | 웹 §19.1·§19.2 / 앱 §1·§7 |
-| Gate 4 | v1.0 문서 게이트 PASS 소급 무효 → v1.1 재게이트 | 재게이트 PASS (근거 표) | **PASS** | 웹 §19.5-1·4 / 앱 §10 |
+| Gate 4 (테스트 기대값 포함) | v1.0 문서 게이트 PASS 소급 무효 → v1.1 재게이트 · 구현 게이트에 T-CONC-10 동일 시나리오(응답 유실 모사 → 재호출 전 Storage DELETE 0회 → 동일 `post_id`·`idempotent_replay:true`·글 1건·`image_refs` 불변·참조 객체 전부 존재·확정 rollback/미커밋 분기에서만 삭제) | 재게이트 PASS (근거 표) + T-CONC-10 동일 항목 추가 | **PASS** | 웹 §19.5-1·4·§21.3 T-CONC-10 / 앱 §10 |
 
-**대조 결과: 31행 전건 PASS · FAIL 0건.**
+**대조 결과: 35행 전건 PASS · FAIL 0건.** (새 웹 정본 `53120d02…` 기준 재판정)
 
 ---
 
