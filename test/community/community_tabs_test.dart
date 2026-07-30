@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/features/community/community_screen.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 
@@ -56,12 +57,13 @@ void main() {
     expect(find.text('7'), findsOneWidget); // 댓글수
   });
 
-  testWidgets('작성 FAB: 게시판 탭에서만 노출(숏폼·내활동 없음)',
+  testWidgets('작성 FAB(멘토): 게시판 탭에서만 노출(숏폼·내활동 없음)',
       (WidgetTester tester) async {
     _bigSurface(tester);
     await tester.pumpWidget(_wrap(CommunityScreen(
       read: const FakeCommunityRead(),
       write: FakeCommunityWrite(),
+      roleOf: () => AppRole.mentor,
     )));
     await tester.pumpAndSettle();
 
@@ -77,5 +79,22 @@ void main() {
     await tester.tap(find.text('내 활동'));
     await tester.pumpAndSettle();
     expect(find.byType(FloatingActionButton), findsNothing);
+  });
+
+  testWidgets('작성 FAB: 학생·게스트에게는 게시판 탭에서도 미노출(§6.5 승인 멘토 전용)',
+      (WidgetTester tester) async {
+    _bigSurface(tester);
+    for (final AppRole role in <AppRole>[AppRole.student, AppRole.guest]) {
+      await tester.pumpWidget(_wrap(CommunityScreen(
+        read: const FakeCommunityRead(),
+        write: FakeCommunityWrite(),
+        roleOf: () => role,
+      )));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('게시판'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FloatingActionButton), findsNothing,
+          reason: '$role 은 작성 CTA 를 볼 수 없다');
+    }
   });
 }

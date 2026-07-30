@@ -15,15 +15,20 @@ class _FakePort implements FreeQuestionEntryPort {
     this.snapshot,
     this.fetchError,
     this.createError,
+    this.ensureError,
   });
 
   FreeQuestionEntrySnapshot? snapshot;
   Object? fetchError;
   CreatedFreeQuestion? createResult;
   Object? createError;
+  Object? ensureError;
+  EnsuredQuestionRoom? ensureResult;
 
   int fetchCalls = 0;
   int createCalls = 0;
+  int ensureCalls = 0;
+  String? lastEnsureMentorId;
   String? lastRoomId;
   String? lastTitle;
   Completer<CreatedFreeQuestion>? gate;
@@ -35,6 +40,16 @@ class _FakePort implements FreeQuestionEntryPort {
     return snapshot ??
         const FreeQuestionEntrySnapshot(
             roomId: 'room-1', totalUsed: 0, perMentorUsed: 0);
+  }
+
+  @override
+  Future<EnsuredQuestionRoom> ensureRoom(String mentorId) async {
+    ensureCalls++;
+    lastEnsureMentorId = mentorId;
+    if (ensureError != null) throw ensureError!;
+    return ensureResult ??
+        const EnsuredQuestionRoom(
+            roomId: 'room-1', created: false, entitlement: 'free');
   }
 
   @override
@@ -111,7 +126,7 @@ void main() {
           FreeQuestionCtaStatus.unavailable);
     });
 
-    test('방 부재 → roomMissing (앱은 방 생성 불가 — 서버 게이트)', () {
+    test('방 부재 → ready (S2-2: 질문 시점에 F2 가 방을 원자 확보)', () {
       expect(
           decideFreeQuestionCta(
               isStudent: true,
@@ -119,7 +134,7 @@ void main() {
               loading: false,
               fetchFailed: false,
               snapshot: noRoom),
-          FreeQuestionCtaStatus.roomMissing);
+          FreeQuestionCtaStatus.ready);
     });
 
     test('학생+비구독+방 존재 → ready', () {
@@ -219,7 +234,8 @@ void main() {
       expect(port.createCalls, 0); // 여전히 생성 0 — 탭 전
     });
 
-    testWidgets('방 부재 → 비활성 CTA + 안내(생성 RPC 0)', (WidgetTester tester) async {
+    testWidgets('방 부재 → CTA 활성, 탭 시 F2 확보 후 compose 진입',
+        (WidgetTester tester) async {
       final _FakePort port = _FakePort(
           snapshot: const FreeQuestionEntrySnapshot(
               roomId: null, totalUsed: 0, perMentorUsed: 0));
@@ -231,10 +247,35 @@ void main() {
         isStudentOverride: true,
       )));
       await tester.pumpAndSettle();
-      final OutlinedButton b =
-          tester.widget<OutlinedButton>(find.byType(OutlinedButton));
-      expect(b.onPressed, isNull);
-      expect(find.textContaining('연결된 질문방이 없어요'), findsOneWidget);
+      // S2-2: 방 부재는 차단 사유가 아니다 — F2 가 질문 시점에 확보한다.
+      expect(
+          tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
+          isNotNull);
+      await tester.tap(find.text('무료 질문하기'));
+      await tester.pumpAndSettle();
+      expect(port.ensureCalls, 1);
+      expect(port.lastEnsureMentorId, 'm-1');
+      expect(find.byType(FreeQuestionComposeScreen), findsOneWidget);
+      expect(port.createCalls, 0); // 확보만으로 생성·질문권 소비 없음(F3 소관).
+    });
+
+    testWidgets('F2 확보 실패(한도 소진 등) → 한글 안내 + compose 미진입',
+        (WidgetTester tester) async {
+      final _FakePort port =
+          _FakePort(ensureError: const AppError('무료 질문권을 모두 사용했어요.'));
+      await tester.pumpWidget(_wrap(FreeQuestionEntrySection(
+        mentorId: 'm-1',
+        mentorName: '멘토',
+        alreadySubscribed: false,
+        port: port,
+        isStudentOverride: true,
+      )));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('무료 질문하기'));
+      await tester.pumpAndSettle();
+      expect(port.ensureCalls, 1);
+      expect(find.byType(FreeQuestionComposeScreen), findsNothing);
+      expect(find.textContaining('무료 질문권을 모두 사용했어요'), findsOneWidget);
       expect(port.createCalls, 0);
     });
 
@@ -336,8 +377,8 @@ void main() {
 
   group('CTA 분리 계약', () {
     test('무료 질문 포트에는 개별질문(IQ)·결제 관련 API 가 없다(타입 수준 분리)', () {
-      // FreeQuestionEntryPort 는 fetch/createFreeThread 두 멤버뿐 — IQ RPC·
-      // 캐시 차감·충전·구독 이동을 표현할 수 없다. (IQ 는 IqCreateScreen +
+      // FreeQuestionEntryPort 는 fetch/ensureRoom/createFreeThread 세 멤버뿐 —
+      // IQ RPC·캐시 차감·충전·구독 이동을 표현할 수 없다. (IQ 는 IqCreateScreen +
       // create_individual_question_as_student 경로로 완전히 분리 — 소스 스캔은
       // free_question_entry.dart 에 individual_question RPC 문자열이 없음으로 보강)
       final _FakePort port = _FakePort();

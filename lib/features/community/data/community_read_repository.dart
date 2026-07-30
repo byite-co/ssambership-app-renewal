@@ -9,26 +9,45 @@ import 'user_blocks_repository.dart';
 /// 커뮤니티 열람(읽기 전용). 게시판·숏폼·댓글은 공개 열람(published/visible),
 /// 내 반응·내 활동은 RLS(본인 행)로 걸러진다. ★ 여기서 mutate 하지 않는다.
 /// ★ 차단(user_blocks): 목록·댓글에서 내가 차단한 작성자(author_id)의 콘텐츠는
-///   결과에서 숨긴다(모델엔 author_id 를 노출하지 않고 raw 행에서 필터).
+///   결과에서 숨긴다(모델엔 UI 표시용 author_id 노출 없음 — 차단·본인 글 판정 전용).
+///
+/// S2-2 M17 전환: 게시판 목록·상세·내 글 읽기는
+/// `api_app_v1.community_posts_v1`(View — SELECT 전용, DML 금지)로 읽는다.
+/// View 는 `image_refs`(영구 URL 아님 — Storage 참조)·`body`(content 수렴)를
+/// 계약 필드로 제공한다(앱 계약 §3.2·§5).
 class CommunityReadRepository {
-  const CommunityReadRepository(
-      {CommentsGateway gateway = const CommentsGateway()})
-      : _gateway = gateway;
+  const CommunityReadRepository({
+    CommentsGateway? gateway,
+    SupabaseClient? client,
+  })  : _gatewayOverride = gateway,
+        _clientOverride = client;
 
-  /// 댓글 원천 테이블 접근 통로(테스트 seam — 계약 검증용 가짜 주입 가능).
-  final CommentsGateway _gateway;
+  /// 댓글 원천 테이블 접근 통로 명시 주입(테스트 seam — 계약 검증용 가짜).
+  final CommentsGateway? _gatewayOverride;
+
+  /// 로컬 검증 하네스 주입용(운영은 SupabaseInit 전역 클라이언트).
+  final SupabaseClient? _clientOverride;
+
+  /// 명시 게이트웨이 > 클라이언트 override 게이트웨이 > 기본(전역 클라이언트).
+  CommentsGateway get _gateway =>
+      _gatewayOverride ?? CommentsGateway(client: _clientOverride);
 
   final UserBlocksRepository _blocks = const UserBlocksRepository();
 
   SupabaseClient get _client {
-    final SupabaseClient? c = SupabaseInit.clientOrNull;
+    final SupabaseClient? c = _clientOverride ?? SupabaseInit.clientOrNull;
     if (c == null) {
       throw const AppError('백엔드에 연결되어 있지 않아요.');
     }
     return c;
   }
 
-  String? get _uid => SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  /// 게시판 읽기 정본 — M17 View(`api_app_v1.community_posts_v1`).
+  SupabaseQueryBuilder get _postsView =>
+      _client.schema('api_app_v1').from('community_posts_v1');
+
+  String? get _uid =>
+      (_clientOverride ?? SupabaseInit.clientOrNull)?.auth.currentUser?.id;
 
   /// 차단 작성자 행 제거(author_id 는 화면에 노출하지 않고 여기서만 사용).
   List<Map<String, dynamic>> _dropBlocked(
@@ -60,8 +79,7 @@ class CommunityReadRepository {
   /// ★ 반환 페이지의 nextOffset/rawCount 로만 페이징을 전진할 것(items.length 금지).
   Future<CommunityPage<BoardPost>> boards(
       {String? category, int? limit, int offset = 0}) async {
-    dynamic q =
-        _client.from('community_posts').select('*').eq('status', 'published');
+    dynamic q = _postsView.select('*').eq('status', 'published');
     if (category != null && category.isNotEmpty) {
       q = q.eq('category', category);
     }
@@ -158,8 +176,7 @@ class CommunityReadRepository {
     final String? uid = _uid;
     if (uid == null) return const MyActivity();
 
-    final List<Map<String, dynamic>> mineRows = await _client
-        .from('community_posts')
+    final List<Map<String, dynamic>> mineRows = await _postsView
         .select('*')
         .eq('author_id', uid)
         .order('created_at', ascending: false);
@@ -175,8 +192,7 @@ class CommunityReadRepository {
 
   Future<List<BoardPost>> _postsByIds(Set<String> ids) async {
     if (ids.isEmpty) return <BoardPost>[];
-    final List<Map<String, dynamic>> rows = await _client
-        .from('community_posts')
+    final List<Map<String, dynamic>> rows = await _postsView
         .select('*')
         .inFilter('id', ids.toList())
         .order('created_at', ascending: false);

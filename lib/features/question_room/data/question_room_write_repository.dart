@@ -44,10 +44,14 @@ class AppendedMessage {
 /// ★ 방(mentor_student_rooms) 생성 메서드는 두지 않는다(앱에서 INSERT 정책 없음 = 불가).
 /// ★ 메시지는 append 전용 — 수정/삭제 메서드 없음.
 class QuestionRoomWriteRepository {
-  const QuestionRoomWriteRepository();
+  const QuestionRoomWriteRepository({SupabaseClient? client})
+      : _clientOverride = client;
+
+  /// 로컬 검증 하네스 주입용(운영은 SupabaseInit 전역 클라이언트).
+  final SupabaseClient? _clientOverride;
 
   SupabaseClient get _client {
-    final SupabaseClient? c = SupabaseInit.clientOrNull;
+    final SupabaseClient? c = _clientOverride ?? SupabaseInit.clientOrNull;
     if (c == null) {
       throw const AppError('백엔드에 연결되어 있지 않아요.');
     }
@@ -63,12 +67,14 @@ class QuestionRoomWriteRepository {
     return id;
   }
 
-  /// 질문 생성 — 서버 원자 RPC `qna_create_question_thread` 한 번만 호출한다.
+  /// 질문 생성 — F3 wrapper `api_app_v1.qna_create_question_thread` 한 번만
+  /// 호출한다(S2-2 M17 전환 — 기존 public RPC fallback 없음).
   ///
   /// thread + 첫 메시지 + 사용량 소비(주간/무료)가 서버 한 트랜잭션이라
   /// 실패 시 빈 thread 가 남지 않는다. status 는 앱이 보내지 않는다(서버가
-  /// 'pending' 고정). 무료/구독 경로 분기도 서버 몫(qna_create_free_question_thread
-  /// 는 동일 함수 위임 래퍼라 별도 호출 불필요).
+  /// 'pending' 고정). 무료/구독 경로 분기도 서버 몫.
+  /// wrapper 는 정본 raise 를 `{ok:false, code}` envelope 로 변환해 돌려준다
+  /// (앱 계약 §3.3·§4.3 — SUBSCRIPTION_REFUND_PENDING 포함 안정 코드 매핑).
   /// subject 는 정본 subjects.code 만 — catalog 밖 값은 서버가 조용히 NULL 처리한다.
   Future<CreatedQuestionThread> createThread({
     required String roomId,
@@ -79,7 +85,7 @@ class QuestionRoomWriteRepository {
   }) async {
     final Object? data;
     try {
-      data = await _client.rpc(
+      data = await _client.schema('api_app_v1').rpc<dynamic>(
         'qna_create_question_thread',
         params: <String, dynamic>{
           'p_room_id': roomId,
@@ -92,7 +98,14 @@ class QuestionRoomWriteRepository {
     } catch (e) {
       throw mapQnaError(e);
     }
-    if (data is! Map) {
+    if (data is! Map || data['ok'] is! bool) {
+      // `ok` 없는 응답을 성공으로 간주하지 않는다(§3.3).
+      throw const AppError('질문 등록 결과를 확인하지 못했어요. 목록을 새로고침해 주세요.');
+    }
+    if (data['ok'] != true) {
+      throw qnaEnvelopeError((data['code'] as String?) ?? '');
+    }
+    if (data['thread_id'] is! String) {
       throw const AppError('질문 등록 결과를 확인하지 못했어요. 목록을 새로고침해 주세요.');
     }
     return CreatedQuestionThread(

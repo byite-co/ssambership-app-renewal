@@ -32,9 +32,20 @@ String? qnaErrorMessage(Object e) {
     case 'ACCOUNT_BANNED':
     case 'ACCOUNT_SUSPENDED':
       return '계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.';
+    case 'ACCOUNT_DELETION_IN_PROGRESS':
+      return '탈퇴 처리 중인 계정이라 이용할 수 없어요.';
     // 멘토 자격
     case 'MENTOR_NOT_APPROVED':
       return '멘토 승인 상태가 확인되지 않아 지금은 진행할 수 없어요.';
+    case 'MENTOR_NOT_FOUND':
+      return '멘토 정보를 찾을 수 없어요. 새로고침 후 다시 시도해 주세요.';
+    // 방 확보(F2 — api_app_v1.ensure_free_question_room)
+    case 'ROLE_NOT_STUDENT':
+      return '학생 계정에서만 질문방을 만들 수 있어요.';
+    case 'FREE_QUOTA_STUDENT_NOT_FOUND':
+      return '무료 질문 자격을 확인하지 못했어요. 다시 로그인해 주세요.';
+    case 'ROOM_ENSURE_FAILED':
+      return '질문방을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.';
     // 당사자·권한
     case 'NOT_ROOM_PARTY':
     case 'STUDENT_ONLY':
@@ -80,4 +91,13 @@ bool isUniqueViolation(Object e) =>
 Object mapQnaError(Object e) {
   final String? msg = qnaErrorMessage(e);
   return msg == null ? e : AppError(msg, cause: e);
+}
+
+/// `api_app_v1` envelope(`{ok:false, code}`) 의 안정 코드 → AppError.
+/// (S2-2: F2/F3 wrapper 는 정본 raise 를 envelope 로 변환해 돌려준다 — §3.3.)
+/// 미지 코드는 일반 문구로 폴백하되 코드 원문은 노출하지 않는다.
+AppError qnaEnvelopeError(String code) {
+  final String? known = qnaErrorMessage(PostgrestException(message: code));
+  return AppError(known ?? '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      cause: 'api_app_v1:$code');
 }

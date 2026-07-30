@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/auth/auth_service.dart';
+import '../../../../core/supabase/supabase_client.dart';
 import '../../../../design/role_accent.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/shape_tokens.dart';
@@ -10,6 +12,7 @@ import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
 import '../../data/community_models.dart';
+import '../../data/community_post_images.dart';
 import '../../data/community_read_repository.dart';
 import '../../data/community_write_repository.dart';
 import '../widgets/block_author_action.dart';
@@ -17,21 +20,44 @@ import '../widgets/comment_tile.dart';
 import '../widgets/content_policy_gate.dart';
 import '../widgets/reaction_bar.dart';
 import '../widgets/report_sheet.dart';
+import 'board_edit_screen.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
-/// 게시판 상세 — 본문 + 반응(좋아요·스크랩·신고) + 댓글(읽기+작성).
-/// ★ 작성은 '댓글'만 앱에서. 글 본문 편집/작성은 없음(웹).
+/// 게시판 상세 — 본문 + 이미지(signed URL) + 반응(좋아요·스크랩·신고) +
+/// 댓글(읽기+작성) + 본인 글 관리(수정 F5·삭제 F6 — S2-2 M17 전환).
+///
+/// - 이미지: View 의 `image_refs` 를 표시 시점에 signed URL(TTL 3600)로
+///   해석(메모리 캐시만). 해석 불가 ref 는 그 이미지 하나만 숨긴다(§5).
+/// - 수정: 본인 + 멘토 역할일 때만 노출(학생 과거 글 수정은 서버도 거부).
+/// - 삭제: 본인 글이면 역할 무관 노출(기존 학생 글 본인 soft-delete 허용 — §6.5).
 class BoardDetailScreen extends StatefulWidget {
   const BoardDetailScreen({
     super.key,
     required this.post,
     required this.read,
     required this.write,
+    this.imageResolver,
+    this.currentUserIdOf = _defaultCurrentUserId,
+    this.roleOf = _defaultRoleOf,
   });
 
   final BoardPost post;
   final CommunityReadRepository read;
   final CommunityWriteRepository write;
+
+  /// 이미지 signed URL 해석기(테스트 주입용 — 기본은 전역 클라이언트 기반).
+  final CommunityPostImageUrlResolver? imageResolver;
+
+  /// 본인 글 판정용 현재 uid(테스트 주입용).
+  final String? Function() currentUserIdOf;
+
+  /// 현재 역할(수정 어포던스 판정 — 테스트 주입용).
+  final AppRole Function() roleOf;
+
+  static String? _defaultCurrentUserId() =>
+      SupabaseInit.clientOrNull?.auth.currentUser?.id;
+
+  static AppRole _defaultRoleOf() => AuthService.instance.currentRole;
 
   @override
   State<BoardDetailScreen> createState() => _BoardDetailScreenState();
@@ -40,6 +66,17 @@ class BoardDetailScreen extends StatefulWidget {
 class _BoardDetailScreenState extends State<BoardDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
+
+  CommunityPostImageUrlResolver? _resolver;
+
+  CommunityPostImageUrlResolver? get _imageResolver {
+    if (widget.imageResolver != null) return widget.imageResolver;
+    if (_resolver != null) return _resolver;
+    final c = SupabaseInit.clientOrNull;
+    if (c == null) return null;
+    return _resolver = CommunityPostImageUrlResolver(
+        backend: SupabaseCommunityPostImageBackend(c));
+  }
 
   bool _liked = false;
   bool _scrapped = false;
@@ -151,6 +188,46 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 
+  /// 본인 글 수정(F5) — 성공 시 목록 재조회 유도(pop true).
+  Future<void> _editPost() async {
+    final bool? updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => BoardEditScreen(post: widget.post, write: widget.write),
+      ),
+    );
+    if (updated == true && mounted) {
+      // 상세 스냅샷은 구본 — 목록으로 돌아가 최신 행을 다시 읽게 한다.
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  /// 본인 글 삭제(F6 soft-delete — hard delete 아님, already_deleted 도 성공).
+  Future<void> _deletePost() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('글을 삭제할까요?'),
+        content: const Text('삭제한 글은 목록에서 보이지 않게 돼요.'),
+        actions: <Widget>[
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.write.softDeletePost(widget.post.id);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      _snack('글 삭제에 실패했어요. ${friendlyError(e)}');
+    }
+  }
+
   /// 댓글 신고 → content_reports(target_type='comment' — 정본 comments 행.
   /// v16 정본 전환: 게시판 댓글의 신고 대상 테이블은 comments).
   Future<void> _reportComment(String commentId) async {
@@ -243,6 +320,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   }
 
   Widget _buildScaffold(BoardPost p) {
+    // 본인 글 판정(author_id 는 판정 전용 — 화면 노출 금지).
+    final bool mine = p.isMine(widget.currentUserIdOf());
+    final bool canEdit = mine && widget.roleOf() == AppRole.mentor;
     return Scaffold(
       appBar: AppBar(
         title: const Text('게시글'),
@@ -251,9 +331,17 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             tooltip: '더보기',
             onSelected: (String v) {
               if (v == 'block') _blockPostAuthor();
+              if (v == 'edit') _editPost();
+              if (v == 'delete') _deletePost();
             },
-            itemBuilder: (BuildContext ctx) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(value: 'block', child: Text('이 사용자 차단')),
+            itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
+              if (canEdit)
+                const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+              if (mine)
+                const PopupMenuItem<String>(value: 'delete', child: Text('삭제')),
+              if (!mine)
+                const PopupMenuItem<String>(
+                    value: 'block', child: Text('이 사용자 차단')),
             ],
           ),
         ],
@@ -294,6 +382,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       : '(내용 없음)',
                   style: AppType.body,
                 ),
+                if (p.imageRefs.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: AppSpacing.s16),
+                  for (final String ref in p.imageRefs)
+                    _PostImage(imageRef: ref, resolver: _imageResolver),
+                ],
                 const SizedBox(height: AppSpacing.s24),
                 ReactionBar(
                   liked: _liked,
@@ -398,6 +491,80 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 게시글 이미지 1장 — ref 를 signed URL 로 해석해 표시(§5).
+/// 해석 불가 ref·해석기 부재는 그 이미지만 숨긴다(본문 표시는 계속).
+/// 로드 실패 시 그 이미지만 재서명·재시도할 수 있다.
+class _PostImage extends StatefulWidget {
+  const _PostImage({required this.imageRef, required this.resolver});
+
+  final String imageRef;
+  final CommunityPostImageUrlResolver? resolver;
+
+  @override
+  State<_PostImage> createState() => _PostImageState();
+}
+
+class _PostImageState extends State<_PostImage> {
+  late Future<String?> _url = _resolve();
+
+  Future<String?> _resolve() async {
+    final CommunityPostImageUrlResolver? r = widget.resolver;
+    if (r == null) return null;
+    try {
+      return await r.resolve(widget.imageRef);
+    } catch (_) {
+      return null; // 서명 실패 — 이 이미지 하나만 숨김(재시도 버튼 제공).
+    }
+  }
+
+  void _retry() {
+    widget.resolver?.invalidate(widget.imageRef);
+    setState(() => _url = _resolve());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _url,
+      builder: (BuildContext context, AsyncSnapshot<String?> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+                height: 120,
+                child: Center(child: CircularProgressIndicator())),
+          );
+        }
+        final String? url = snap.data;
+        if (url == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              url,
+              fit: BoxFit.fitWidth,
+              errorBuilder: (BuildContext ctx, Object e, StackTrace? st) {
+                // 만료·전송 오류 — 이 이미지 한정 재시도(글 본문 영향 없음).
+                return InkWell(
+                  onTap: _retry,
+                  child: Container(
+                    height: 96,
+                    color: ColorTokens.elevated,
+                    child: const Center(
+                        child: Icon(Icons.refresh_rounded,
+                            color: ColorTokens.muted)),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

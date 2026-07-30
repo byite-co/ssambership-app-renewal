@@ -4,16 +4,18 @@ import '../../../../core/auth/auth_service.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../../../design/widgets/secondary_button.dart';
+import '../../../../shared/errors/friendly_error.dart';
 import '../../data/free_question_entry.dart';
 import '../free_question_compose_screen.dart';
 
-/// 멘토 상세의 무료 질문 진입 섹션(세션1 §3).
+/// 멘토 상세의 무료 질문 진입 섹션(세션1 §3 · S2-2 M17 전환).
 ///
 /// - 학생에게만 노출(멘토·게스트·관리자 hidden), 구독자는 기존 질문방 진입 유지.
-/// - 자격 '조회' 성공 + 방 존재일 때만 CTA 활성(fail-closed) — 수량·기간 판정은
-///   생성 RPC(서버)가 하고, 오류 코드는 한글로 안내한다.
+/// - 자격 '조회' 성공 시 CTA 활성 — 수량·기간 판정은 서버(F2/F3)가 하고,
+///   오류 코드는 한글로 안내한다.
 /// - 조회 실패: 재시도 제공, 재시도 성공 전 생성 RPC 0회.
-/// - 방 부재: 앱은 방을 만들 수 없다(서버 게이트) → 비활성 안내.
+/// - 방 확보: 질문 시작 시 F2(`api_app_v1.ensure_free_question_room`)가 원자
+///   확보(기존 방 재사용 포함) — 무료질문권은 소비하지 않는다(F3 소관).
 /// - 캐시 차감형 개별질문 CTA(개별질문 하기)와 handler·RPC·상태 공유 금지.
 class FreeQuestionEntrySection extends StatefulWidget {
   const FreeQuestionEntrySection({
@@ -102,15 +104,28 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
   }
 
   Future<void> _open() async {
-    final String? roomId = _snapshot?.roomId;
-    if (roomId == null || _creating) return;
+    if (_creating) return;
     setState(() => _creating = true);
     try {
+      // F2 — 방 원자 확보(없으면 생성·있으면 재사용, created 플래그는 서버
+      // 정본). 실패 코드는 한글 매핑으로 안내하고 compose 로 진입하지 않는다.
+      final EnsuredQuestionRoom room;
+      try {
+        room = await widget.port.ensureRoom(widget.mentorId);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(friendlyError(e))),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
       final CreatedFreeQuestion? created =
           await Navigator.of(context).push<CreatedFreeQuestion>(
         MaterialPageRoute<CreatedFreeQuestion>(
           builder: (_) => FreeQuestionComposeScreen(
-            roomId: roomId,
+            roomId: room.roomId,
             mentorName: widget.mentorName,
             port: widget.port,
           ),
@@ -164,24 +179,6 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
                 icon: Icons.refresh_rounded,
                 onPressed: _fetch,
               ),
-            ],
-          ),
-        );
-      case FreeQuestionCtaStatus.roomMissing:
-        return Padding(
-          padding: const EdgeInsets.only(top: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const SecondaryButton(
-                label: '무료 질문하기',
-                icon: Icons.chat_bubble_outline_rounded,
-                onPressed: null, // 방 부재 — 앱에서 개설 불가(서버 게이트).
-              ),
-              const SizedBox(height: 6),
-              Text('아직 이 멘토와 연결된 질문방이 없어요. 질문방이 생기면 무료 질문을 보낼 수 있어요.',
-                  style:
-                      AppType.caption.copyWith(color: ColorTokens.secondary)),
             ],
           ),
         );

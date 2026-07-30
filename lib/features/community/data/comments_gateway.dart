@@ -11,10 +11,13 @@ import '../../../shared/errors/app_error.dart';
 /// 지나가므로, 테스트는 손수 만든 기록형 가짜로 계약(테이블명·페이로드)을 검증한다
 /// (규약: mocktail 등 목 프레임워크 금지 — test/community/fakes.dart 참고).
 class CommentsGateway {
-  const CommentsGateway();
+  const CommentsGateway({SupabaseClient? client}) : _clientOverride = client;
+
+  /// 로컬 검증 하네스 주입용(운영은 SupabaseInit 전역 클라이언트).
+  final SupabaseClient? _clientOverride;
 
   SupabaseClient get _client {
-    final SupabaseClient? c = SupabaseInit.clientOrNull;
+    final SupabaseClient? c = _clientOverride ?? SupabaseInit.clientOrNull;
     if (c == null) {
       throw const AppError('백엔드에 연결되어 있지 않아요.');
     }
@@ -22,7 +25,8 @@ class CommentsGateway {
   }
 
   /// 현재 로그인 사용자 id(비로그인/미연결이면 null) — 댓글 작성 author_id 용.
-  String? get currentUserId => SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  String? get currentUserId =>
+      (_clientOverride ?? SupabaseInit.clientOrNull)?.auth.currentUser?.id;
 
   /// [table] 에서 [filters](모두 eq 조건)로 조회, created_at 오름차순(대화순).
   /// [limit] 지정 시 [offset]부터 그만큼만(페이징).

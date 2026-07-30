@@ -1,5 +1,7 @@
 import 'package:ssambership_app/features/community/data/comments_gateway.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
+import 'package:ssambership_app/features/community/data/community_post_actions.dart';
+import 'package:ssambership_app/features/community/data/community_post_images.dart';
 import 'package:ssambership_app/features/community/data/community_read_repository.dart';
 import 'package:ssambership_app/features/community/data/community_write_repository.dart';
 
@@ -76,6 +78,8 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   int commentCalls = 0;
   int reportCalls = 0;
   int postCalls = 0;
+  int updateCalls = 0;
+  int softDeleteCalls = 0;
   String? lastReportReason;
   String? lastReportTargetType;
   String? lastReportTargetId;
@@ -84,6 +88,11 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   String? lastPostTitle;
   String? lastPostBody;
   String? lastPostCategory;
+  String? lastPostIdempotencyKey;
+  int? lastPostImageCount;
+  String? lastUpdatePostId;
+  String? lastExpectedUpdatedAt;
+  String? lastSoftDeletePostId;
 
   /// true 면 반응 토글이 호출 기록 후 throw(낙관적 상태 롤백 경로 테스트).
   bool failReactions = false;
@@ -133,27 +142,44 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   }
 
   @override
-  Future<BoardPost> createPost({
+  Future<CreatedBoardPostV1> createPost({
     required String title,
     required String body,
     required String category,
+    required String idempotencyKey,
+    List<ValidatedPostImage> images = const <ValidatedPostImage>[],
   }) async {
     postCalls++;
     lastPostTitle = title;
     lastPostBody = body;
     lastPostCategory = category;
-    return BoardPost(
-      id: 'fake-post',
-      title: title,
-      body: body,
-      category: category,
-      authorLabel: '나',
-      authorRole: 'student',
-      likeCount: 0,
-      commentCount: 0,
-      viewCount: 0,
-      createdAt: DateTime(2026, 7, 1),
-    );
+    lastPostIdempotencyKey = idempotencyKey;
+    lastPostImageCount = images.length;
+    return const CreatedBoardPostV1(
+        postId: 'fake-post', idempotentReplay: false);
+  }
+
+  @override
+  Future<UpdatedBoardPostV1> updatePost({
+    required String postId,
+    required String title,
+    required String body,
+    required String category,
+    required String? expectedUpdatedAt,
+    required List<String> imageRefs,
+  }) async {
+    updateCalls++;
+    lastUpdatePostId = postId;
+    lastExpectedUpdatedAt = expectedUpdatedAt;
+    return UpdatedBoardPostV1(
+        postId: postId, updatedAt: null, removedImageRefs: const <String>[]);
+  }
+
+  @override
+  Future<SoftDeletedBoardPostV1> softDeletePost(String postId) async {
+    softDeleteCalls++;
+    lastSoftDeletePostId = postId;
+    return SoftDeletedBoardPostV1(postId: postId, alreadyDeleted: false);
   }
 
   @override

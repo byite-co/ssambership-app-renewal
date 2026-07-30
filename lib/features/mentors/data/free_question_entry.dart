@@ -4,20 +4,18 @@ import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import '../../question_room/data/qna_error_mapper.dart';
 
-/// 무료 질문 진입(세션1 §3) — 자격 '조회'와 생성 RPC 만 담당한다.
+/// 무료 질문 진입(세션1 §3) — 자격 '조회'·방 확보(F2)·생성(F3)만 담당한다.
 ///
-/// 서버 정본 계약(staging 실측 2026-07-24):
-/// - 생성: `qna_create_free_question_thread(p_room_id, p_title, p_subject,
-///   p_topic, p_first_message_body)` (authenticated 전용·SECURITY DEFINER·
-///   search_path 고정·auth.uid 본인성·원자/멱등 — 본체 qna_create_question_thread
-///   위임). 성공 payload {ok, thread_id, message_id, path, used_free_quota}.
-/// - 자격(entitlement) scope = **가입 후 7일 창 + 사용자 전역 총량 + 멘토쌍 한도**
-///   의 이중 스코프이며, 수량·기간 '판정'은 전부 서버가 한다(FREE_QUOTA_EXPIRED /
-///   FREE_QUOTA_TOTAL_EXHAUSTED / FREE_QUOTA_MENTOR_EXHAUSTED).
-///   앱은 질문권 수량·기간을 하드코딩하지 않고, 조회 가능한 사실값
-///   (본인 free_question_usage 행 — RLS fqu_select_own)과 방 존재 여부만 읽는다.
-/// - 방(mentor_student_rooms) 은 SELECT 정책만 있고 앱이 만들 수 없다(생성은
-///   웹 서버 전용) → 방 부재 학생의 무료 질문 생성은 WAITING_SERVER_GATE.
+/// S2-2 M17 전환(앱 계약 v1.1 §3.3·§4):
+/// - 방 확보: `api_app_v1.ensure_free_question_room(p_mentor_id)` (F2) —
+///   학생 ID 는 보내지 않는다(서버가 auth.uid 도출). 방 직접 INSERT·23505
+///   재조회 수렴은 앱에 존재하지 않는다(공용 구현부 F10 이 원자 확보).
+/// - 생성: `api_app_v1.qna_create_question_thread(...)` (F3) — envelope
+///   `{ok, contract_version, ...}` 를 반환하며 도메인 거부는 `{ok:false, code}`.
+///   무료질문권 소비는 F3 소관 — F2 성공 시점에 로컬 차감하지 않는다.
+/// - 기존 public RPC(qna_create_free_question_thread) fallback 은 두지 않는다.
+/// - 자격 scope(가입 7일 창·전역 총량·멘토쌍 한도) '판정'은 전부 서버 —
+///   앱은 수량·기간을 하드코딩하지 않고 사실값(본인 free_question_usage 행)만 읽는다.
 /// - 캐시 차감형 개별질문(IQ)과는 완전히 분리 — handler·RPC·상태 재사용 금지.
 
 /// 자격 조회 스냅샷(사실값만 — 한도 판정 없음).
@@ -28,7 +26,7 @@ class FreeQuestionEntrySnapshot {
     required this.perMentorUsed,
   });
 
-  /// 현재 학생↔이 멘토의 질문방 id. null = 방 없음(앱에서 생성 불가 — 서버 게이트).
+  /// 현재 학생↔이 멘토의 질문방 id. null = 방 없음(질문 시점에 F2 로 확보).
   final String? roomId;
 
   /// 내 무료 질문 사용 행 수(전역 — 표시용 사실값).
@@ -36,6 +34,23 @@ class FreeQuestionEntrySnapshot {
 
   /// 이 멘토와의 무료 질문 사용 행 수(표시용 사실값).
   final int perMentorUsed;
+}
+
+/// F2 성공 결과(서버 반환 정본 — §4.1).
+class EnsuredQuestionRoom {
+  const EnsuredQuestionRoom({
+    required this.roomId,
+    required this.created,
+    required this.entitlement,
+  });
+
+  final String roomId;
+
+  /// true = 이번 호출이 방을 만들었다(동일 pair 재호출은 false — 기존 방 재사용).
+  final bool created;
+
+  /// 'free' | 'subscription'.
+  final String entitlement;
 }
 
 /// 생성 성공 결과(서버 반환 정본만).
@@ -66,14 +81,14 @@ enum FreeQuestionCtaStatus {
   /// 조회 실패 — 재시도 제공, 활성 CTA 0, 생성 RPC 0.
   unavailable,
 
-  /// 방 없음 — 앱은 방을 만들 수 없다(서버 게이트). 활성 CTA 0.
-  roomMissing,
-
-  /// 조회 성공 + 방 존재 → CTA 활성(최종 자격 판정은 생성 RPC 가 한다).
+  /// 조회 성공 → CTA 활성. 방이 없으면 질문 시점에 F2 가 확보한다
+  /// (최종 자격 판정은 F2/F3 서버가 한다).
   ready,
 }
 
 /// CTA 노출·활성 판정(순수 — 한도 수치 계산 없음).
+/// S2-2: 방 부재는 더 이상 차단 사유가 아니다 — F2(ensure_free_question_room)가
+/// 질문 시점에 방을 원자 확보한다.
 FreeQuestionCtaStatus decideFreeQuestionCta({
   required bool isStudent,
   required bool? alreadySubscribed,
@@ -89,13 +104,15 @@ FreeQuestionCtaStatus decideFreeQuestionCta({
     return FreeQuestionCtaStatus.loading;
   }
   if (fetchFailed || snapshot == null) return FreeQuestionCtaStatus.unavailable;
-  if (snapshot.roomId == null) return FreeQuestionCtaStatus.roomMissing;
   return FreeQuestionCtaStatus.ready;
 }
 
 /// 테스트 주입용 포트.
 abstract class FreeQuestionEntryPort {
   Future<FreeQuestionEntrySnapshot> fetch(String mentorId);
+
+  /// F2 — 방 원자 확보(없으면 생성, 있으면 재사용). 실패는 AppError(한글).
+  Future<EnsuredQuestionRoom> ensureRoom(String mentorId);
 
   Future<CreatedFreeQuestion> createFreeThread({
     required String roomId,
@@ -105,12 +122,15 @@ abstract class FreeQuestionEntryPort {
   });
 }
 
-/// 운영 구현 — 조회는 본인 행 SELECT(RLS), 생성은 무료 전용 RPC 1회.
+/// 운영 구현 — 조회는 본인 행 SELECT(RLS), 확보·생성은 `api_app_v1` wrapper.
 class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
-  const SupabaseFreeQuestionEntryRepository();
+  const SupabaseFreeQuestionEntryRepository({SupabaseClient? client})
+      : _clientOverride = client;
+
+  final SupabaseClient? _clientOverride;
 
   SupabaseClient get _client {
-    final SupabaseClient? c = SupabaseInit.clientOrNull;
+    final SupabaseClient? c = _clientOverride ?? SupabaseInit.clientOrNull;
     if (c == null) throw const AppError('백엔드에 연결되어 있지 않아요.');
     return c;
   }
@@ -149,6 +169,36 @@ class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
   }
 
   @override
+  Future<EnsuredQuestionRoom> ensureRoom(String mentorId) async {
+    final Object? data;
+    try {
+      // F2 — 학생 ID 미전송(서버 auth.uid 도출). 방 확보는 무료질문권을
+      // 소비하지 않는다(소비는 F3 트랜잭션 몫 — §4.2).
+      data = await _client.schema('api_app_v1').rpc<dynamic>(
+        'ensure_free_question_room',
+        params: <String, dynamic>{'p_mentor_id': mentorId},
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
+    if (data is! Map || data['ok'] is! bool) {
+      throw const AppError('질문방 확인 결과를 알 수 없어요. 잠시 후 다시 시도해 주세요.');
+    }
+    if (data['ok'] != true) {
+      throw qnaEnvelopeError((data['code'] as String?) ?? '');
+    }
+    final Object? roomId = data['room_id'];
+    if (roomId is! String || roomId.isEmpty) {
+      throw const AppError('질문방 확인 결과를 알 수 없어요. 잠시 후 다시 시도해 주세요.');
+    }
+    return EnsuredQuestionRoom(
+      roomId: roomId,
+      created: data['created'] == true,
+      entitlement: (data['entitlement'] as String?) ?? 'free',
+    );
+  }
+
+  @override
   Future<CreatedFreeQuestion> createFreeThread({
     required String roomId,
     required String title,
@@ -157,10 +207,10 @@ class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
   }) async {
     final Object? data;
     try {
-      // 무료 전용 진입점 RPC — 개별질문(IQ)·구독 작성 화면의 handler 와 공유하지
-      // 않는다. 원자성·멱등·한도 판정은 서버 트랜잭션 몫.
-      data = await _client.rpc<dynamic>(
-        'qna_create_free_question_thread',
+      // F3 — envelope 반환 wrapper. IQ·구독 작성 화면 handler 와 공유하지
+      // 않는다. 원자성·멱등·한도 판정(무료질문권 소비 포함)은 서버 트랜잭션 몫.
+      data = await _client.schema('api_app_v1').rpc<dynamic>(
+        'qna_create_question_thread',
         params: <String, dynamic>{
           'p_room_id': roomId,
           'p_title': title,
@@ -171,8 +221,14 @@ class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
     } catch (e) {
       throw mapQnaError(e);
     }
-    if (data is! Map || data['ok'] != true || data['thread_id'] is! String) {
+    if (data is! Map || data['ok'] is! bool) {
       // 로컬 가짜 성공을 만들지 않는다 — 구조 불명이면 실패로 처리.
+      throw const AppError('무료 질문 등록 결과를 확인하지 못했어요. 질문방에서 확인해 주세요.');
+    }
+    if (data['ok'] != true) {
+      throw qnaEnvelopeError((data['code'] as String?) ?? '');
+    }
+    if (data['thread_id'] is! String) {
       throw const AppError('무료 질문 등록 결과를 확인하지 못했어요. 질문방에서 확인해 주세요.');
     }
     return CreatedFreeQuestion(

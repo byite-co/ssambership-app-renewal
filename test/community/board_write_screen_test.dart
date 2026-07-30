@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ssambership_app/features/community/data/community_post_actions.dart';
+import 'package:ssambership_app/features/community/data/community_post_envelope.dart';
+import 'package:ssambership_app/features/community/data/community_post_images.dart';
 import 'package:ssambership_app/features/community/ui/board/board_write_screen.dart';
 import 'package:ssambership_app/features/community/ui/widgets/content_policy_gate.dart';
 
@@ -64,6 +67,68 @@ void main() {
     expect(fake.lastPostTitle, '오답노트 공유');
     expect(fake.lastPostBody, '이렇게 정리했어요.');
     expect(fake.lastPostCategory, 'study'); // 기본 선택 = 첫 옵션(학습법)
+    expect(fake.lastPostIdempotencyKey, isNotNull); // 시도당 1회 생성(UUID).
     expect(popResult, isTrue);
   });
+
+  testWidgets('멱등키 규약: 응답 불명확 후 재등록은 같은 키, 확정 거부 후엔 새 키(§6.3)',
+      (WidgetTester tester) async {
+    ContentPolicyGate.agreedThisSession = true;
+    final _ScriptedWrite fake = _ScriptedWrite();
+    await tester.pumpWidget(MaterialApp(home: BoardWriteScreen(write: fake)));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), '제목');
+    await tester.enterText(find.byType(TextField).at(1), '내용입니다');
+
+    // 1차: 응답 불명확 → 키 유지.
+    fake.nextError = const CommunityCreateUnclear();
+    await tester.tap(find.text('등록'));
+    await tester.pumpAndSettle();
+    final String? k1 = fake.lastPostIdempotencyKey;
+    expect(k1, isNotNull);
+
+    // 2차: 여전히 불명확 — 같은 키 재사용(새 키 금지).
+    await tester.tap(find.text('등록'));
+    await tester.pumpAndSettle();
+    expect(fake.lastPostIdempotencyKey, k1);
+
+    // 3차: 확정 거부(도메인 실패) — 이번 시도 종결.
+    fake.nextError = CommunityWriteRejected('BODY_TOO_SHORT');
+    await tester.tap(find.text('등록'));
+    await tester.pumpAndSettle();
+    expect(fake.lastPostIdempotencyKey, k1); // 이 호출 자체는 같은 키였고,
+
+    // 4차: 다음 등록은 '새 작성 시도' — 새 키.
+    fake.nextError = null;
+    await tester.tap(find.text('등록'));
+    await tester.pumpAndSettle();
+    expect(fake.lastPostIdempotencyKey, isNotNull);
+    expect(fake.lastPostIdempotencyKey, isNot(k1));
+    expect(fake.postCalls, 4);
+  });
+}
+
+/// 다음 호출의 결과를 스크립트할 수 있는 쓰기 가짜(멱등키 규약 검증용).
+class _ScriptedWrite extends FakeCommunityWrite {
+  Object? nextError;
+
+  @override
+  Future<CreatedBoardPostV1> createPost({
+    required String title,
+    required String body,
+    required String category,
+    required String idempotencyKey,
+    List<ValidatedPostImage> images = const <ValidatedPostImage>[],
+  }) async {
+    final Future<CreatedBoardPostV1> base = super.createPost(
+      title: title,
+      body: body,
+      category: category,
+      idempotencyKey: idempotencyKey,
+      images: images,
+    );
+    final Object? e = nextError;
+    if (e != null) throw e;
+    return base;
+  }
 }

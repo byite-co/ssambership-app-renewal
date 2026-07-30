@@ -138,8 +138,11 @@ class UserBlocksRepository {
     if (c == null || uid == null) return BlockResult.notLoggedIn;
     String? authorId;
     try {
-      final Map<String, dynamic>? row = await c
-          .from(table)
+      // S2-2 M17: 게시판 글의 author_id 판정 읽기는 View 경유(직접 테이블
+      // 읽기 축소 — author_id 는 차단 판정 전용, UI 비노출).
+      final Map<String, dynamic>? row = await (table == 'community_posts'
+              ? c.schema('api_app_v1').from('community_posts_v1')
+              : c.from(table))
           .select('author_id')
           .eq('id', contentId)
           .maybeSingle();

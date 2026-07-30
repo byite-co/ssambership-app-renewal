@@ -48,15 +48,19 @@ class CommunityPage<T> {
   final bool hasMore;
 }
 
-/// 게시판 글(community_posts). 열람 전용 뷰모델.
+/// 게시판 글 — M17 View(`api_app_v1.community_posts_v1`) 행의 열람 전용 뷰모델.
 class BoardPost {
   const BoardPost({
     required this.id,
     required this.title,
     this.body,
     this.category,
+    this.authorId,
     this.authorLabel,
     this.authorRole,
+    this.imageRefs = const <String>[],
+    this.status,
+    this.updatedAtRaw,
     required this.likeCount,
     required this.commentCount,
     required this.viewCount,
@@ -67,8 +71,22 @@ class BoardPost {
   final String title;
   final String? body;
   final String? category;
+
+  /// ★ 차단·본인 글 판정 전용(앱 계약 §3.2) — UI 에 직접 노출 금지.
+  final String? authorId;
+
   final String? authorLabel;
   final String? authorRole;
+
+  /// Storage 참조(`community-post-images/{uid}/{object}` — 영구 URL 아님).
+  /// 표시 시점에 signed URL(TTL 3600)로 해석한다(§5).
+  final List<String> imageRefs;
+
+  final String? status;
+
+  /// F5 `p_expected_updated_at` 용 서버 원문(정밀도 보존 — 재직렬화 금지).
+  final String? updatedAtRaw;
+
   final int likeCount;
   final int commentCount;
   final int viewCount;
@@ -76,17 +94,28 @@ class BoardPost {
 
   String get authorName => communityAuthorName(authorLabel, authorRole);
 
+  /// 본인 글 여부(uid 비교 — F5/F6 어포던스 판정 전용).
+  bool isMine(String? uid) => uid != null && authorId != null && authorId == uid;
+
   factory BoardPost.fromMap(Map<String, dynamic> m) {
     return BoardPost(
       id: m['id'] as String,
       title: (m['title'] as String?)?.trim().isNotEmpty == true
           ? (m['title'] as String).trim()
           : '(제목 없음)',
-      // 스키마상 body/content 둘 다 존재 — 게시판은 legacy content 우선(기존 계약 유지).
+      // View 는 body 로 수렴(content 우선 coalesce — 서버 §3.2). 과도기 fixture
+      // 행(content 만 존재)도 관대하게 읽는다.
       body: _pickText(m, const <String>['content', 'body']),
       category: m['category'] as String?,
+      authorId: m['author_id'] as String?,
       authorLabel: m['author_label'] as String?,
       authorRole: m['author_role'] as String?,
+      imageRefs: <String>[
+        for (final Object? r in (m['image_refs'] as List?) ?? const <Object?>[])
+          if (r is String && r.trim().isNotEmpty) r,
+      ],
+      status: m['status'] as String?,
+      updatedAtRaw: m['updated_at'] as String?,
       likeCount: parseInt(m['like_count']),
       commentCount: parseInt(m['comment_count']),
       viewCount: parseInt(m['view_count']),

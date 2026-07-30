@@ -2,27 +2,43 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
-import 'board_author_gate.dart';
 import 'comments_gateway.dart';
 import 'community_models.dart';
+import 'community_post_actions.dart';
+import 'community_post_images.dart';
 
-/// 커뮤니티 쓰기(반응·댓글·신고·게시판 글 작성). ★ 숏폼 '작성'은 이 레포에 없다 —
+/// 커뮤니티 쓰기(반응·댓글·신고·게시판 글). ★ 숏폼 '작성'은 이 레포에 없다 —
 /// 실제 write 는 웹 작성기(인앱 WebView, ShortformComposeScreen)가 담당한다.
-/// 본인(author_id/user_id/reporter_id = 현재 사용자) 행만 다룬다(RLS도 강제).
+///
+/// S2-2 M17 전환: 게시판 글 생성/수정/삭제는 `api_app_v1` wrapper
+/// (`community_post_create/update/soft_delete`)만 사용한다 — `community_posts`
+/// 직접 INSERT/UPDATE/DELETE/UPSERT 0건. author_id/author_role/author_label 은
+/// 서버가 `auth.uid()` 로 도출하므로 앱이 보내지 않는다(앱 계약 §3.3·§6.2).
+/// DB 게시글 hard DELETE 보상(구 deleteOwnPostForCompensation)은 폐기됐고,
+/// Storage 신규 이미지 보상 삭제만 §6.3 4분기 규약으로 유지한다.
 class CommunityWriteRepository {
-  const CommunityWriteRepository(
-      {CommentsGateway gateway = const CommentsGateway()})
-      : _gateway = gateway;
+  const CommunityWriteRepository({
+    CommentsGateway? gateway,
+    SupabaseClient? client,
+  })  : _gatewayOverride = gateway,
+        _clientOverride = client;
 
-  /// 댓글 원천 테이블 접근 통로(테스트 seam — 계약 검증용 가짜 주입 가능).
-  final CommentsGateway _gateway;
+  /// 댓글 원천 테이블 접근 통로 명시 주입(테스트 seam — 계약 검증용 가짜).
+  final CommentsGateway? _gatewayOverride;
+
+  /// 로컬 검증 하네스 주입용(운영은 SupabaseInit 전역 클라이언트).
+  final SupabaseClient? _clientOverride;
+
+  /// 명시 게이트웨이 > 클라이언트 override 게이트웨이 > 기본(전역 클라이언트).
+  CommentsGateway get _gateway =>
+      _gatewayOverride ?? CommentsGateway(client: _clientOverride);
 
   /// 반응 종류(자유 텍스트 컬럼 — 앱 내부 규약).
   static const String reactionLike = 'like';
   static const String reactionScrap = 'scrap';
 
   SupabaseClient get _client {
-    final SupabaseClient? c = SupabaseInit.clientOrNull;
+    final SupabaseClient? c = _clientOverride ?? SupabaseInit.clientOrNull;
     if (c == null) {
       throw const AppError('백엔드에 연결되어 있지 않아요.');
     }
@@ -107,6 +123,8 @@ class CommunityWriteRepository {
   /// v16 정본 전환 — 게시판: 정본 `comments` 에 {post_id, author_id, content}만
   /// INSERT(보호·모더레이션 필드 전송 금지 — 서버 트리거가 그 외 컬럼 변경을 거부).
   /// 숏폼: 기존 `community_comments`(post_type='shortform', status='visible') 유지.
+  /// M13: author_label/author_role 은 서버 BEFORE INSERT 트리거가 users.nickname
+  /// 기준으로 도출·강제한다 — 앱은 라벨을 권위값으로 전송하지 않는다(§3.5).
   /// [parentId] 는 게시판 답글(최대 2-depth)용 — 현재 UI는 평면이라 미사용(null=미전송).
   Future<CommunityComment> addComment({
     required CommunityPostType postType,
@@ -171,44 +189,70 @@ class CommunityWriteRepository {
     return null;
   }
 
-  /// 게시판 글 작성(본인). ★ 검수 없이 즉시 공개(status='published' — 동업자 확정).
-  /// author_role 정본 = 본인 users 행 role SELECT(BoardAuthorGate) — DB
-  /// DEFAULT('mentor') 의존 금지, 모든 실패 fail-closed(INSERT 0회), 저장 후
-  /// 반환 행 author_id/author_role 재검증까지 통과해야 성공 처리한다.
-  Future<BoardPost> createPost({
+  /// `api_app_v1` wrapper 호출(named arguments — 계약 §3.3 호출 규약).
+  Future<Object?> _appV1Rpc(String fn, Map<String, dynamic> params) {
+    return _client.schema('api_app_v1').rpc<dynamic>(fn, params: params);
+  }
+
+  /// 게시판 글 생성(F4 — `api_app_v1.community_post_create`).
+  ///
+  /// - 작성 자격(승인 멘토 전용)·본문 검증·author 도출은 전부 서버 공용
+  ///   구현부 몫 — 앱은 author_id/role/label 을 보내지 않는다.
+  /// - [idempotencyKey] 는 작성 시도당 1회 생성(UUID). 응답 불명확
+  ///   ([CommunityCreateUnclear]) 후 재시도에는 **같은 키를 다시 넘겨야 한다**.
+  /// - 이미지 업로드·보상 삭제(§6.3 4분기)·replay-first 재호출은
+  ///   [createBoardPostV1] 이 수행한다.
+  Future<CreatedBoardPostV1> createPost({
     required String title,
     required String body,
     required String category,
+    required String idempotencyKey,
+    List<ValidatedPostImage> images = const <ValidatedPostImage>[],
   }) {
-    final SupabaseClient client = _client;
-    return createBoardPostGated(
-      authUserId: client.auth.currentUser?.id,
-      fetchOwnUserRows: (String userId) async {
-        final List<dynamic> rows =
-            await client.from('users').select('id, role').eq('id', userId);
-        return rows.cast<Map<String, dynamic>>();
-      },
-      insert: (Map<String, dynamic> payload) =>
-          client.from('community_posts').insert(payload).select().single(),
+    return createBoardPostV1(
+      uid: _uid,
       title: title,
       body: body,
       category: category,
-      // 보정2: 반환 정본 불일치 '보상 전용' 내부 삭제 — 공개 API·UI·라우트로
-      // 노출하지 않는다. id+본인 author_id 로 클라이언트 범위를 좁히고,
-      // 실제 권한 판정은 RLS cp_delete_own(author 본인 또는 admin)에 맡긴다.
-      deleteOwnPostForCompensation: (String postId) async {
-        final String? uid = client.auth.currentUser?.id;
-        if (uid == null) throw const AppError('로그인이 필요해요.');
-        // v19 보정2: representation 을 요청해 실제 삭제 행을 확인한다 —
-        // 0행(조건 불일치·RLS 비가시성·기삭제)은 성공이 아니다.
-        final List<dynamic> deleted = await client
-            .from('community_posts')
-            .delete()
-            .eq('id', postId)
-            .eq('author_id', uid)
-            .select('id');
-        verifyCompensationDeleteReturn(deleted, postId);
-      },
+      idempotencyKey: idempotencyKey,
+      images: images,
+      storage: SupabaseCommunityPostImageBackend(_client),
+      callCreate: (Map<String, dynamic> params) =>
+          _appV1Rpc('community_post_create', params),
+    );
+  }
+
+  /// 게시판 글 수정(F5 — `api_app_v1.community_post_update`).
+  /// [expectedUpdatedAt] 은 실제 조회한 행의 updated_at 원문(NULL 포함)이어야
+  /// 하며, `UPDATE_CONFLICT` 는 자동 덮어쓰기 없이 그대로 사용자에게 안내한다.
+  Future<UpdatedBoardPostV1> updatePost({
+    required String postId,
+    required String title,
+    required String body,
+    required String category,
+    required String? expectedUpdatedAt,
+    required List<String> imageRefs,
+  }) {
+    return updateBoardPostV1(
+      postId: postId,
+      title: title,
+      body: body,
+      category: category,
+      expectedUpdatedAt: expectedUpdatedAt,
+      imageRefs: imageRefs,
+      storage: SupabaseCommunityPostImageBackend(_client),
+      callUpdate: (Map<String, dynamic> params) =>
+          _appV1Rpc('community_post_update', params),
+    );
+  }
+
+  /// 게시판 글 삭제(F6 — `api_app_v1.community_post_soft_delete`).
+  /// hard delete 아님 — 행·이미지 참조는 감사 목적으로 보존된다.
+  Future<SoftDeletedBoardPostV1> softDeletePost(String postId) {
+    return softDeleteBoardPostV1(
+      postId: postId,
+      callSoftDelete: (Map<String, dynamic> params) =>
+          _appV1Rpc('community_post_soft_delete', params),
     );
   }
 
