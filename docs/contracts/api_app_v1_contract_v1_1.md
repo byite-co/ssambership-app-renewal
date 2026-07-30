@@ -1,13 +1,13 @@
 # Ssambership `api_app_v1` 접합부 계약 v1.1
 
-- 확정일: 2026-07-29
+- 확정일: 2026-07-29 · M13 재동기(3차): 2026-07-30
 - 대상 DB: Supabase project ref `lbeqxarxothkmzqvpudy`
 - 성격: **S2 구현 전 고정 계약** — v1.0(2026-07-28 확정)의 rev 8 동기 개정본. 이 문서는 SQL·앱 코드 적용 결과가 아니라 구현·검수 기준이다.
 - Gate 판정 범위: Gate 4(`api_app_v1`)와 Gate 5(탈퇴 allowlist)
 - 원문: `docs/contracts/api_app_v1_contract_v1_0.md` (내용 무변경 보존본, 382행 / 19,814바이트 / SHA-256 `59b37c42d5b4ca81e3cc2c775a4760396fa484299d99d3b78a179facd5ae6c77`)
-- 공용 계약 정본(웹 최종 계약 v1.1): `byite-co/ssambership_web` 브랜치 `claude/api-web-v1-1-contract-20260729-v2` 최종 커밋 `48e64eea7fe363aed1ee4e6c47c1882c780875f9`의 `docs/contracts/api_web_v1_contract_v1_1.md` (2,951행 / 317,396바이트 / SHA-256 `0c444434bf9ca4e275a21f656a9f98dae2808b6c1c7fbc832a01de59b6d5ae94`) — 공용 함수·시그니처·오류코드·GRANT·envelope·공용 테스트 기대값의 정본은 이 문서다(웹 §19.5). *(v1.1 재동기 2차: F4 replay-first·보상 삭제 규약에 더해 **M17 신설(`api_app_v1` 표면 소유 migration — 웹 §20.2)·D-API-A 플랫폼 단계(웹 §20.6)·테스트 소유권(웹 §21.11)** canon 보정을 반영한 최신 정본으로 교체. `WEB_HANDOFF_HASH_MATCH`.)*
+- 공용 계약 정본(웹 최종 계약 v1.1): `byite-co/ssambership_web` 브랜치 `claude/s2-2-m13-contract-correction-20260730-0tjasi` 최종 커밋 `9dc1b835c611d60c1ab6412a4dd7de16aa450c05`의 `docs/contracts/api_web_v1_contract_v1_1.md` (2,994행 / 329,690바이트 / SHA-256 `bd9fc0dd2802c8358bb09f2938e0de7248d8b60703794895708e300f8ef32fa6`) — 공용 함수·시그니처·오류코드·GRANT·envelope·공용 테스트 기대값의 정본은 이 문서다(웹 §19.5). *(v1.1 재동기 3차: 2차의 M17·D-API-A·테스트 소유권 canon 보정에 더해 **M13 baseline 정합 보정(오너 승인 2026-07-30 — 선재 `comments.author_label` 재사용·M13 신규 컬럼 `author_role` 1개·board 댓글 서버 라벨 권위·forward-only 백필: 웹 §6 V2·§7 F0·§10.4·§20.2 M13·§20.3·§21.7 T-M13-01~16·§22 #8·부록 A·부록 C-2)** 를 반영한 최신 정본으로 교체. `WEB_HANDOFF_HASH_MATCH`.)*
 - 개정 지시 근거: 앱 rev 8 동기화 지시서 `docs/audit/S2_API_APP_V1_1_SYNC_DIRECTIVE_20260729.md` @ `02e1f7a5` 항목 1~10 · 웹 rev 8 정본 지시서 `docs/audit/s2_api_contract_v1_1_revision_directive_20260729.md` @ `7ec3b269`(웹 저장소) A~G.
-- 판정: v1.0 Gate 4의 "문서 게이트 PASS"는 rev 8 A-1로 **소급 무효** — 본 문서 §10에서 재게이트. **S2-2는 BLOCKED**(`SAFE_TEST_ENV_UNAVAILABLE` 유지 · Data API 현재 Exposed schemas 목록 확인 대기 — 웹 §24.2와 동기. 본 계약은 문서 계약이며 이번 세션은 SQL을 작성하지 않는다).
+- 판정: v1.0 Gate 4의 "문서 게이트 PASS"는 rev 8 A-1로 **소급 무효** — 본 문서 §10에서 재게이트. **S2-2 Batch B는 본 재동기화(3차) 완료로 READY_TO_RESUME**(웹 부록 C-2의 "앱 계약 재동기화 완료 전까지 Batch B BLOCKED 유지" 해제 조건 충족 — 재개 실행은 웹 저장소 Batch B 절차 소관, Batch A M0·M15 `LOCAL_PASS` 실적 불변 — 물리 정책 §9.1·§9.2. 본 계약은 문서 계약이며 이번 세션은 SQL을 작성하지 않는다. **M13 SQL·앱 코드 전환·앱 Gate 4 구현은 미착수** — §10 판정 구분).
 
 **v1.0 → v1.1 개정 요약** (각 항목의 rev 8 절 번호 역기입):
 
@@ -21,6 +21,7 @@
 8. 공용 커뮤니티 내부 함수 대조표 추가 (B, 앱 동기화 8) → §12
 9. 커뮤니티 작성 승인 멘토 전용·기존 학생 글 보존·숏폼 정책 정합화 (A-10, 앱 동기화 9) → §6.4·§6.5
 10. F12 재생 계약 rev 8 동기 — 오류코드·room 의미론·테스트 A~H (A-5, 앱 동기화 10) → §11
+11. **(v1.1 재동기 3차, 2026-07-30)** M13 baseline 정합 보정 수용 — 선재 `comments.author_label` 재사용·M13 신규 컬럼 `author_role` 1개·board 댓글 서버 라벨 권위·canonical/legacy 양쪽 적용·shortform 무영향·forward-only 백필 (웹 부록 C-2) → §3.5·§10·§13.5·§14
 
 ## 1. 확정 원칙
 
@@ -87,7 +88,7 @@ api_app_v1 DB 표면의 SQL 정본:
 
 - 본 절과 §3.2·§3.3이 요구하는 `api_app_v1` DB 표면(스키마·뷰·wrapper 5종)은 **웹 저장소의 M17이 생성**한다. M17 소유 객체는 **정확히 7개**다: schema 1(`api_app_v1`) · view 1(`api_app_v1.community_posts_v1`) · wrapper function 5(§3.3 표). GRANT·REVOKE·default privilege 방어는 M17이 함께 수행하되 **객체 수에 포함하지 않는다**(웹 §20.2 M17).
 - 앱 저장소의 기존 `supabase/migrations` 스냅샷 체계(IQ 첨부 기록용)를 S2 공용 DB migration 정본으로 사용하지 않는다.
-- **M17 의존조건: `M17 : M5 + M7`**(웹 §20.2.1) — M5 = F10(`core_private.ensure_student_mentor_room`), M7 = B-1~B-4(공용 커뮤니티 구현부). M1(스키마 기반)은 M5·M7의 선행이라 간접 충족된다. **M13 의존은 없다** — M13은 `public.comments` 라벨 비정규화이며 앱 `community_posts_v1`과 무관하다.
+- **M17 의존조건: `M17 : M5 + M7`**(웹 §20.2.1) — M5 = F10(`core_private.ensure_student_mentor_room`), M7 = B-1~B-4(공용 커뮤니티 구현부). M1(스키마 기반)은 M5·M7의 선행이라 간접 충족된다. **M13 의존은 없다** — M13은 `public.comments` 라벨 비정규화이며 앱 `community_posts_v1`과 무관하다. **M13 baseline 정합 보정(2026-07-30 — §3.5) 후에도 이 의존 그래프는 불변이다** — M13 correction은 기존 `public` 댓글 표면의 서버 라벨 정규화이고 M17 객체 생성의 선행조건이 아니므로, M13을 M17의 신규 직접 선행조건으로 추가하지 않는다(웹 §20.2.1·§22 #2 — 역의존도 없음).
 - `core_private`의 B-1~B-4·F10은 **M7·M5가 만든 기존 공용 객체를 공유**하며, M17이나 앱 저장소에서 복제하지 않는다.
 
 **Data API 노출 — D-API-A 플랫폼 단계(웹 §20.6):** `api_app_v1`의 Exposed schemas 추가는 **SQL migration이 아니라 Supabase 플랫폼 설정**이다(논리 ID `D-API-A`). 적용·전환 순서는 다음으로 고정한다.
@@ -110,7 +111,7 @@ api_web_v1   : Exposed schemas 포함
 core_private : Exposed schemas 미포함 (절대 노출 금지)
 ```
 
-플랫폼 검증(웹 §20.6.2 — SQL assertion으로 대체 불가): ① 대시보드/Management API의 **실제 Exposed schemas 목록** 확인 ② `api_app_v1` PostgREST 요청 성공 ③ `core_private` 요청은 schema 비노출 오류로 거부 ④ 정상 앱 schema 요청에서 `PGRST106`·`PGRST002` 없음. **현재 Data API Exposed schemas 목록은 아직 확인되지 않았다 — D-API-A는 미구현·미검증 상태이며 본 문서는 이를 구현 완료로 표시하지 않는다**(S2-2 BLOCKED 사유의 하나).
+플랫폼 검증(웹 §20.6.2 — SQL assertion으로 대체 불가): ① 대시보드/Management API의 **실제 Exposed schemas 목록** 확인 ② `api_app_v1` PostgREST 요청 성공 ③ `core_private` 요청은 schema 비노출 오류로 거부 ④ 정상 앱 schema 요청에서 `PGRST106`·`PGRST002` 없음. **현재 Data API Exposed schemas 목록은 아직 확인되지 않았다 — D-API-A는 미구현·미검증 상태이며 본 문서는 이를 구현 완료로 표시하지 않는다**(웹 §24.2가 기록한 확인 대기 항목 — 운영 D-API-A 적용 전 필수 확인이며, 웹 저장소 Batch B SQL 작성 재개 여부와는 무관하다 — §13.5).
 
 **(v1.1 추가, rev 8 A-2·B)** `core_private` 스키마는 Data API에 노출하지 않으며 `anon`·`authenticated`·`service_role` 어느 역할에도 USAGE를 부여하지 않는다(웹 §10.1과 동일). 앱은 `core_private` 객체에 도달할 수 없고, 도달하는 계약을 만들지 않는다.
 
@@ -171,7 +172,7 @@ GRANT SELECT ON api_app_v1.community_posts_v1 TO authenticated;
 
 **공용 구현부 위임(rev 8 B — 웹 §7 F4·F5·F6과 동일 구조):** 앱 F4/F5/F6(`community_post_create/update/soft_delete`)과 웹 동명 함수는 **같은 `core_private` 구현부**(§3.4)를 호출하는 얇은 `SECURITY DEFINER` wrapper다. 역할·승인·계정 상태·본문 검증은 구현부에서 수행하고, wrapper는 `auth.uid()` 도출 + envelope 전달만 한다 — 판정이 wrapper마다 갈라질 수 없다. 클라이언트가 보낸 `author_id`·`author_role`·`author_label`은 받지 않는다.
 
-**F4 멱등 재생 판정 우선순위(replay-first — 웹 §7 F4와 동일, v1.1 재동기):** 재생 판정은 신규 쓰기 검증보다 **먼저**다. 웹·앱 wrapper가 동일한 B-1 구현부를 호출하므로 판정 순서도 동일하다.
+**F4 멱등 재생 판정 우선순위(replay-first — 웹 §7 F4·§14.4와 동일, v1.1 재동기. 4항의 "별도 조회 RPC 신설 없음" 문장의 원출처는 웹 §14.4):** 재생 판정은 신규 쓰기 검증보다 **먼저**다. 웹·앱 wrapper가 동일한 B-1 구현부를 호출하므로 판정 순서도 동일하다.
 
 1. `auth.uid()` 확인 및 author binding(`p_author_id = auth.uid()` 도출) **직후**, 역할·승인·계정 write-block·본문·이미지 ref 등 **신규 쓰기 검증보다 먼저** `(author_id, create_idempotency_key)`로 **기존 커밋 행을 조회**한다.
 2. 기존 행이 있으면 — 새 쓰기와 Storage 삭제 **없이** — 기존 `post_id` + `idempotent_replay:true`를 반환한다(재생 성공은 현재 시점의 역할·승인·본문 재검증 결과에 좌우되지 않는다 — 이미 커밋된 사실의 멱등 확인이기 때문).
@@ -232,6 +233,97 @@ GRANT EXECUTE ON FUNCTION api_app_v1.community_post_soft_delete(uuid) TO authent
 - F10: **`SECURITY DEFINER`**, `SET search_path = ''`, 완전 수식 객체명, owner = migration 실행 역할. **EXECUTE: `PUBLIC`·`anon`·`authenticated`·`service_role` 전부 미부여** — 호출자는 SECDEF wrapper(웹 F2·웹 F12·앱 wrapper)의 소유자 권한 문맥뿐이다.
 - F10이 `p_student_id`를 인자로 받는 이유(웹 §7 F10): 구독 확정(웹 F12 내부)은 학생 세션이 아닌 서버 컨텍스트에서 실행되므로 `auth.uid()`를 쓸 수 없다. 앱 경로에서는 **앱 wrapper가 `auth.uid()`를 넣어 호출**하며, 외부 역할 EXECUTE가 0이므로 클라이언트가 임의 `p_student_id`를 넣을 경로가 없다.
 - `p_require_entitlement=true`(앱 wrapper·웹 F2 경로): 무료질문 자격 또는 활성 구독을 검사한다. `false`는 웹 F12 구독 확정 경로 전용이다.
+
+### 3.5 공용 board 댓글 라벨 표면 — M13 baseline 정합 보정 수용 (v1.1 재동기 3차 — 웹 §6 V2·§7 F0·§10.4·§20.2 M13·§20.3·§21.7·§22 #8·부록 C-2)
+
+M13(`..._comments_author_label_denormalize.sql`)은 웹·앱이 공유하는 **기존 `public` 댓글 표면의 서버 라벨 정규화** migration이다. 앱 board 댓글은 정본 `comments`에, 숏폼 댓글은 레거시 `community_comments(post_type='shortform')`에 기록되고 board 행은 163/164 브리지로 양방향 동기화되므로(실측 — `lib/features/community/data/comments_gateway.dart`·`community_models.dart`; 두 테이블은 테이블명을 동적으로 결정하는 댓글 게이트웨이 경유라 §9의 리터럴 24종 목록에는 나타나지 않는 앱 직접 사용 표면이다 — §9 M13 주석), M13 correction은 앱 community board 댓글의 공용 DB 동작에 그대로 적용된다. **M13 SQL의 소유 저장소는 웹**(물리 정책 §9 Batch B — `M13 : M0`)이며, **앱 저장소는 M13 SQL을 생성하지 않는다**(§3.1의 M17 소유 원칙과 동일 — 앱 저장소 S2 공용 DB migration 0건).
+
+**선재·신규 객체 구분(정합 보정의 핵심 — 웹 §10.4·부록 C-2):**
+
+```text
+public.comments.author_label:
+  037 기원 선재 컬럼 — text NOT NULL
+  M13 신규 컬럼 아님 (M13에서 재사용)
+  default '쌤버십 회원' → '쌤버십 사용자' 정정만 수행
+  rollback에서 DROP 금지 (컬럼 보존)
+
+public.comments.author_role:
+  M13 신규 컬럼 — text NULL
+  M13 신규 column은 정확히 1개 (이것뿐)
+```
+
+구해석 폐기: `author_label`을 M13이 새로 추가하는 nullable 컬럼으로 기술하던 해석, M13 rollback이 이 선재 컬럼을 제거한다는 해석, M13 신규 column을 2개로 집계하던 해석은 **전부 폐기**한다(웹 부록 C-2 — 실측: `comments.author_label`(037)·`community_comments.author_label`(016)은 선재 컬럼이며, 컬럼 제거 시 레거시 데이터가 파괴된다).
+
+**라벨 최종 권위(단일 사슬):**
+
+```text
+DB BEFORE INSERT trigger
+  > 163/164 bridge 입력
+  > 웹·앱 클라이언트 입력
+  > 컬럼 default
+```
+
+**라벨 도출 규칙(트리거 함수 2종이 승계 — 웹 §7 F0 승계 라벨 규칙):**
+
+```text
+author_label:
+  public.users.nickname만 사용
+  NULL·trim 공백·사용자 조회 실패 → 정확히 '쌤버십 사용자'
+
+author_role:
+  student·mentor만 기록 (canonical comments에만)
+  admin·기타 role·사용자 없음 → NULL (관리자 신원 비노출)
+
+금지 정보(라벨 도출·반환에 절대 사용 금지):
+  full_name · email · birth_date · grade_level
+```
+
+**앱 경계(클라이언트 라벨 불신):** 앱이 보내는 `author_label`·`author_role`은 **DB 정본이 아니다.** 현행 앱 board 댓글 INSERT는 `comments`에 `{post_id, author_id, content(, parent_id)}`만 전송해 라벨을 보내지 않지만(실측 — `lib/features/community/data/community_write_repository.dart:105-128`), **구버전 앱·웹이 payload에 라벨 값을 포함하더라도 M13 trigger가 서버 기준으로 무조건 덮어쓴다.** 앱 계약에서 클라이언트 제공 댓글 라벨을 신뢰하거나 정본으로 표현하는 문구는 존재하지 않으며, 앞으로도 만들지 않는다(게시글 쪽 F4/F5가 클라이언트 `author_*`를 받지 않는 §3.3·§6.2 원칙의 댓글 표면 확장).
+
+**canonical·legacy 양쪽 적용(트리거 함수 2종·트리거 4종 — 웹 §10.4):**
+
+```text
+public.comments (canonical — 앱 board 댓글 기록 대상):
+  INSERT: 서버 라벨 덮어쓰기 (comments_set_author_label BEFORE INSERT)
+  author_label·author_role snapshot UPDATE: 명시적 오류로 거부
+
+public.community_comments (legacy):
+  post_type='board' INSERT: 서버 라벨 덮어쓰기
+    (community_comments_set_author_label BEFORE INSERT — board 한정)
+  board 행 author_label snapshot UPDATE: 명시적 오류로 거부
+
+public.community_comments shortform (앱 숏폼 댓글 경로):
+  M13 영향 없음 — 데이터·규약 불변 (트리거 미발화)
+```
+
+- **163/164 브리지 본문은 변경하지 않는다.** 각 테이블의 BEFORE INSERT trigger가 독립적으로 동일한 서버 라벨을 도출하므로 board canonical/legacy 양쪽의 표시 라벨은 동일 값으로 수렴한다(웹 T-M13-07·08).
+- snapshot 보호는 라벨 컬럼 한정이다 — 163/164의 `body`·`content`·`status`·`is_deleted`·매핑 포인터(`canonical_comment_id`·`legacy_comment_id`) 동기화는 계속 허용된다(웹 T-M13-11).
+- 트리거 함수 2종은 SECDEF·`SET search_path = ''`·PUBLIC EXECUTE 회수(같은 트랜잭션 — 웹 §10.4·T-M13-14).
+
+**backfill·rollback(forward-only — 웹 §22 #8):**
+
+```text
+backfill (1회 — 보안 데이터 교정):
+  comments 전행: author_label·author_role 정규화
+  community_comments post_type='board' 행: author_label 정규화
+  shortform 행: 변경 0 (바이트 단위 불변)
+  양 테이블 행 수·비대상 컬럼 불변
+
+rollback (여기까지만 — 웹 §22 #8 순서 5단계, = trigger 4종·function 2종 제거):
+  ① snapshot 보호 트리거 제거
+  ② INSERT 트리거 2종 제거   (①+② = trigger 4종 제거)
+  ③ trigger function 2종 제거
+  ④ comments.author_role 제거
+  ⑤ comments.author_label default를 '쌤버십 회원'으로 복원
+  comments.author_label 컬럼은 보존 (제거 금지)
+  정규화된 기존 라벨값은 유지 — 과거 클라이언트 제공 라벨 복원 금지
+```
+
+기존 클라이언트 제공 라벨은 신뢰 불가 값으로서 **보안 정규화 대상**이며 rollback 때 복원하지 않는다(웹 §22 #8 원문: **"모든 데이터 원복" 요구에서 M13 라벨 backfill만 명시적 예외**다 — 행 수·비대상 컬럼은 반드시 동일). 댓글 행·본문·작성자·상태·시간·매핑 포인터는 삭제하거나 복원 대상으로 삼지 않는다.
+
+**M17 의존관계 불변(정합 보정 후에도):** `M17 : M5 + M7` 그대로다(§3.1). M17은 `api_app_v1` 스키마·게시글 View·wrapper 5종을 소유하고, M13은 기존 `public` 댓글 표면의 서버 라벨 정규화이므로 **M13 correction은 M17 객체 생성의 선행조건이 아니다.** M13을 M17의 신규 직접 선행조건으로 추가하지 않으며, `api_app_v1` 표면 소유권과 의존 그래프는 불변이다.
+
+**테스트 소유:** M13 검증 **T-M13-01~16(웹 §21.7)의 canonical 소유는 웹 Batch B 검증기**다. 앱 Gate 4는 앱 호출 경로를 통한 대표 시나리오만 재검증한다(§10 — M7/M17 이중 확인 구조와 동일한 원칙).
 
 ## 4. 무료질문 방 확보 계약
 
@@ -536,6 +628,7 @@ users
 - **M11·M12(`mentor_profiles`·`mentor_plans` 테이블 단위 `REVOKE ALL` + `GRANT SELECT` 재부여):** 앱 접근은 2곳 모두 SELECT(`mentor_directory_repository.dart:175`, `question_room_read_repository.dart:67`)이므로 **앱을 깨뜨리지 않는다**(B-02 해소 — 웹 §19.4-B). 컬럼 단위 REVOKE는 무효라는 rev 8 A-3 확정에 따라 테이블 단위 전면 회수로 확정됐다.
 - **M16(`HD-1` — `community_posts` `REVOKE ALL` + `GRANT SELECT`):** §6.6 게이트 7단계 완료 후에만 적용된다. 적용 후 앱 쓰기는 F4/F5/F6만 통과한다(SELECT·View 읽기는 유지).
 - **B-07 해제(rev 8 D, 앱 동기화 7):** 앱 프로필 수정은 `lib/features/mypage/data/profile_edit_repository.dart:30`의 `users` UPDATE 단일 호출뿐 — **`mentor_profiles` 쓰기 없음**(실측). 웹 F7/F13 및 M11 회수는 앱 프로필 수정 경로와 충돌하지 않는다.
+- **M13 재동기(3차) 주석 — 댓글 테이블 보완(§3.5):** 위 24종은 웹 §19.4-B의 **리터럴 `.from()` 전수 스윕** 실측 전사이며 원문 기록으로 불변 유지한다. 앱 댓글 경로는 테이블명을 동적으로 결정하는 단일 게이트웨이(`lib/features/community/data/comments_gateway.dart` — board는 정본 `comments`, 숏폼은 `community_comments`)를 지나므로 이 리터럴 목록에 잡히지 않지만, **`comments`·`community_comments`도 앱이 직접 사용하는 `public` 테이블 표면이다**(SELECT·INSERT — 실측 `community_models.dart:204`). 두 테이블은 S2 회수 대상이 아니며(웹 §10.5 — M11·M12·M16 대상 아님), M13은 이 직접 경로의 존속을 전제로 BEFORE INSERT trigger가 **라벨만** 서버 강제한다(§3.5 — 댓글 본문·행 자체의 쓰기 규약은 불변).
 
 ## 10. 구현·검수 완료 조건
 
@@ -553,7 +646,26 @@ users
 | 공용 내부 함수 대조표 전건 일치 | **PASS** | §12 |
 | 웹·앱 공용 계약 대조표 전건 일치 | **PASS** | §14 |
 
-**v1.1 문서 게이트: PASS.** 아래 체크박스는 문서 게이트가 아니라 **S2-2 구현·검수 게이트**이며, SQL 구현(S2-2 BLOCKED — 별도 승인 필요) 이후에만 체크할 수 있다. **문서 계약 동기화 PASS와 실제 구현 Gate 4 PASS는 별개다** — 본 절의 문서 게이트 PASS는 아래 구현 체크박스를 하나도 충족하지 않는다.
+**v1.1 문서 게이트: PASS.** 아래 체크박스는 문서 게이트가 아니라 **S2-2 구현·검수 게이트**이며, SQL 구현(웹 저장소 Batch B 이후 — 별도 승인 필요) 이후에만 체크할 수 있다. **문서 계약 동기화 PASS와 실제 구현 Gate 4 PASS는 별개다** — 본 절의 문서 게이트 PASS는 아래 구현 체크박스를 하나도 충족하지 않는다.
+
+**M13 재동기(3차) 판정 구분(문서 ≠ 구현 — §3.5·§13.5):**
+
+```text
+M13 계약 문서 동기화:
+  PASS (본 문서 — 새 웹 정본 9dc1b835… 기준 재동기화 완료)
+
+M13 SQL 구현(웹 저장소 Batch B):
+  미착수
+
+앱 코드 전환:
+  미착수
+
+앱 Gate 4 구현:
+  기존 미완료 상태 유지 (아래 체크박스 전건 미충족)
+
+S2-2 Batch B:
+  앱 문서 재동기화 완료 후 웹 저장소에서 재개 가능
+```
 
 **구현 선행조건·소유권(v1.1 canon 보정 — 웹 §20.2 M17·§20.3·§20.6·§21.11):**
 
@@ -563,6 +675,7 @@ users
 - **canonical `T-CONC-10`(응답 유실 복구)의 소유자는 M7**(공용 구현부 B-1~B-4)이다. **M17은 앱 표면에서 동일한 응답 유실 시나리오를 재검증**한다(동일 멱등키 F4 재호출 → 동일 `post_id`+`idempotent_replay:true`, 재호출 전 Storage DELETE 0회, `image_refs` 불변) — M7의 canonical 판정을 대체하지 않는 이중 확인이다. **M9는 T-CONC-10을 소유하지 않는다**(웹 §21.11).
 - 앱 hard DELETE 보상 제거(§6.6 3~4단계)와 **직접 INSERT 0건 확인**은 앱 Gate 4의 일부다.
 - **앱 Gate 4 완료(및 직접 쓰기 0건 확인) 전에는 M16(HD-1)을 적용하지 않는다** — M17 적용 직후 M16 실행 금지(웹 §20.3 M16 게이트).
+- **M13 board 댓글 라벨 규약(§3.5 — 앱 구현 시 확인, v1.1 재동기 3차):** ① 앱은 댓글 라벨(`author_label`·`author_role`)을 권위값으로 전송하지 않는다 ② 구버전 payload에 라벨 값이 남아도 DB BEFORE INSERT trigger가 서버 기준으로 덮어쓴다 ③ canonical(`comments`)/legacy(`community_comments` board) 양쪽 board 댓글의 표시 라벨은 동일해야 한다 ④ shortform 댓글은 M13 영향이 없다 ⑤ label spoof UPDATE는 실패해야 한다(성공 no-op 위장 금지) ⑥ **T-M13-01~16의 canonical 소유는 웹 Batch B 검증기**(웹 §21.7)이며, 앱 Gate 4에서는 앱 호출 경로를 통한 대표 시나리오를 재검증한다 ⑦ **앱 저장소에 M13 SQL을 중복 생성하지 않는다.**
 
 - [ ] 위 스키마·view·5개 함수가 timestamp migration으로 생성됨 (v1.1 재배열 시그니처 기준)
 - [ ] 함수 시그니처·JSON envelope·오류코드 contract test 통과 (시그니처·오류코드·GRANT contract test는 v1.1 기준으로 재수행 — 웹 §19.5-4)
@@ -573,6 +686,7 @@ users
 - [ ] 앱 이미지 작성 0장·1장·5장, MIME/크기/타인 ref 공격, DB 실패 보상 삭제(Storage 한정) 통과
 - [ ] **F4 응답 유실 복구(웹 T-CONC-10과 동일 — v1.1 추가):** 이미지 객체 업로드 → F4가 DB commit에 성공했으나 응답을 유실한 것으로 모사 → **재호출 전에 Storage DELETE가 0회인지 확인** → 동일 멱등키로 F4 재호출. 기대: 동일 `post_id` + `idempotent_replay:true` / 게시글 **1건** / 원래 `image_refs` **불변** / 참조 객체 **전부 존재**(서명 URL 발급 가능) / **확정 rollback·미커밋 분기(replay-first가 기존 행 없음 + 확정 실패 envelope로 종결)에서만** 신규 객체 보상 삭제 (§3.3·§6.3)
 - [ ] 커뮤니티 작성 승인 멘토 전용 판정(`ROLE_NOT_MENTOR`·`MENTOR_NOT_APPROVED`) 통과 (§6.5)
+- [ ] **M13 board 댓글 라벨 대표 시나리오 재검증(앱 호출 경로 — v1.1 재동기 3차 추가, canonical 검증은 웹 T-M13-01~16 소유):** 앱 경로 board 댓글 INSERT에서 서버 라벨 도출(라벨 payload 미전송이 기본, spoof 시 서버 덮어쓰기), canonical/legacy board 표시 라벨 동일, shortform 무영향, `author_label`/`author_role` spoof UPDATE 명시 실패 (§3.5)
 - [ ] Realtime 미수신 시 기존 재조회 fallback 유지
 
 ### Gate 5
@@ -645,7 +759,7 @@ C = 잠근 subscription.last_payment_id가 가리키는 최신 성공 payment
 
 detail은 내부 감사 정보이며 클라이언트 분기용 안정 코드는 `SUBSCRIPTION_REF_INVALID` 하나로 고정한다. **C 당사자 불일치:** C가 가리키는 payment가 존재하고 succeeded지만 학생·멘토가 현재 subscription pair와 다르면 `SUBSCRIPTION_REF_INVALID`가 아니라 8단계의 `PARTY_BINDING_MISMATCH`를 사용한다.
 
-**room 참조 규칙 — 컬럼별 정본 의미(rev 8 동결, 웹 §7 F12 표와 동일):**
+**room 참조 규칙 — 컬럼별 정본 의미(rev 8 동결, 웹 §7 F12 표와 동일 — 멱등 재생 열은 웹 표가 상호참조하는 「위 Phase 1 판정」 원문을 의미 동일하게 병합 기재):**
 
 | 컬럼 | 정본 의미 | 신규 결제 | 멱등 재생 |
 |---|---|---|---|
@@ -723,7 +837,7 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
 | 6. 공용 커뮤니티 내부 함수 대조표 | §12 | 반영 완료 |
 | 7. `ROLE_NOT_ALLOWED` 재정의(멘토 전용 기준) | §6.4·§6.5 | 반영 완료 |
 | 8. 보상 삭제 순서 정정(재호출 선행·보상 삭제 후행)·F4 replay-first 판정 우선순위·응답 유실 복구 테스트(웹 T-CONC-10) 동기화 | §3.3·§6.3·§6.6·§10 | 반영 완료 |
-| 9. `api_app_v1` DB 표면 소유 migration 확정 — **M17이 표면 소유**·SQL 정본은 웹 저장소(`supabase/sql/<VERSION>_api_app_v1_surface.sql`)·**앱 저장소 중복 migration 금지**·**M17+D-API-A 이후에만 앱 전환**·**앱 Gate 4·직접 쓰기 0건 전 M16 금지**·`M17 : M5 + M7`(M13 의존 없음)·새 웹 정본 commit `48e64eea7fe363aed1ee4e6c47c1882c780875f9`/SHA-256 `0c444434…d5ae94` 반영 | §3.1·§3.2·§3.3·§10·§14 | 반영 완료 |
+| 9. `api_app_v1` DB 표면 소유 migration 확정 — **M17이 표면 소유**·SQL 정본은 웹 저장소(`supabase/sql/<VERSION>_api_app_v1_surface.sql`)·**앱 저장소 중복 migration 금지**·**M17+D-API-A 이후에만 앱 전환**·**앱 Gate 4·직접 쓰기 0건 전 M16 금지**·`M17 : M5 + M7`(M13 의존 없음)·새 웹 정본 commit `9dc1b835c611d60c1ab6412a4dd7de16aa450c05`/SHA-256 `bd9fc0dd…f32fa6` 반영(재동기 3차에서 M13 정합 보정 정본으로 재갱신 — §13.5) | §3.1·§3.2·§3.3·§10·§14 | 반영 완료 |
 
 ### 13.3 웹 rev 8 정본 지시서 관련 절
 
@@ -751,24 +865,62 @@ P1→P2 시나리오는 라이브에 실제 다중 succeeded pair가 존재한�
   M17 (api_app_v1 표면 소유 migration — 객체 7개, M17 : M5 + M7, M13 의존 없음)
   + D-API-A (api_app_v1 Exposed schemas 추가 — SQL이 아닌 플랫폼 단계)
 
-웹 정본:
-  48e64eea7fe363aed1ee4e6c47c1882c780875f9
-  0c444434bf9ca4e275a21f656a9f98dae2808b6c1c7fbc832a01de59b6d5ae94
+웹 정본 (재동기 3차에서 M13 정합 보정 정본으로 교체 — §13.5):
+  9dc1b835c611d60c1ab6412a4dd7de16aa450c05
+  bd9fc0dd2802c8358bb09f2938e0de7248d8b60703794895708e300f8ef32fa6
 
-S2-2 상태:
-  BLOCKED
-  (SAFE_TEST_ENV_UNAVAILABLE 유지 · Data API 현재 Exposed schemas 목록 확인 대기)
+S2-2 상태 (재동기 3차 갱신 — §13.5):
+  Batch A(M0·M15) LOCAL_PASS 실적 불변
+  Batch B READY_TO_RESUME (본 재동기화 완료 — 웹 저장소에서 재개)
 ```
 
 앱 v1.1 반영 절: §3.1(소유·의존·D-API-A 순서) · §3.2(뷰 소유) · §3.3(wrapper 5종 소유) · §10(구현 선행조건·테스트 소유권) · §14(대조 4행 추가).
 
+### 13.5 M13 baseline 정합 보정 추적 (v1.1 재동기 3차 — 웹 부록 C-2·물리 정책 §9.2 동기)
+
+```text
+결함:
+  BATCH_B_BASELINE_OBJECT_MISMATCH
+  (웹 Batch B 사전 게이트 실측 — public.comments.author_label이
+   037 기원 선재 컬럼(text NOT NULL)으로 확인됨.
+   community_comments.author_label(016 기원)도 동일 속성 선재.
+   신규 nullable 라벨 컬럼 2개 추가·rollback에서 선재 라벨 컬럼 제거라는
+   구해석은 실측과 불일치 — 컬럼 제거 시 레거시 데이터 파괴)
+
+해소 (오너 승인 2026-07-30 — RESOLVED_IN_CONTRACT):
+  선재 author_label 재사용 (DROP 금지·NOT NULL 유지·default '쌤버십 사용자' 정정)
+  M13 신규 컬럼 = comments.author_role text NULL 정확히 1개
+  트리거 함수 2종·트리거 4종 (canonical + legacy board INSERT 서버 덮어쓰기
+   + snapshot UPDATE 보호 — shortform 무영향, 163/164 본문 불변)
+  백필 forward-only (rollback은 과거 클라이언트 라벨을 복원하지 않음)
+
+새 웹 정본 (실측 일치 — WEB_HANDOFF_HASH_MATCH):
+  branch claude/s2-2-m13-contract-correction-20260730-0tjasi
+  commit 9dc1b835c611d60c1ab6412a4dd7de16aa450c05
+  docs/contracts/api_web_v1_contract_v1_1.md
+  2,994행 / 329,690바이트
+  SHA-256 bd9fc0dd2802c8358bb09f2938e0de7248d8b60703794895708e300f8ef32fa6
+
+보조 정본 (실측 일치):
+  docs/audit/s2_2_migration_physical_policy_20260730.md
+  278행 / 22,963바이트
+  SHA-256 7205e4088f75d65fc77979190da5f3b8fc3d9b46746bec746341170fd42669ad
+
+S2-2 상태:
+  Batch A(M0·M15) LOCAL_PASS 실적·파일 SHA-256 불변 (물리 정책 §9.1)
+  Batch B: 본 재동기화 완료로 웹 저장소에서 재개 가능 (READY_TO_RESUME)
+  M13 SQL·앱 코드 전환·앱 Gate 4 구현: 미착수 (§10 판정 구분)
+```
+
+앱 v1.1 반영 절: 문서 헤더(정본 정체성 교체·개정 요약 #11) · §3.1(M17 의존 그래프 불변 확인) · **§3.5 신설**(선재·신규 구분, 라벨 권위·도출 규칙, canonical/legacy 양쪽 적용, backfill·rollback, 앱 경계) · §10(판정 구분·앱 확인 규약·대표 시나리오 재검증 체크박스) · §13.2 #9·§13.4(정본 교체) · **§14**(정체성 행 갱신·M17 행 재판정·M13 정합 보정 행 신설 — 40행 전건 재판정) · 문서 말미 판정 블록.
+
 ## 14. 웹·앱 공용 계약 대조표 (v1.1 하드게이트)
 
-정본 = 웹 계약 v1.1(`48e64eea7fe363aed1ee4e6c47c1882c780875f9`, 2,951행 / 317,396바이트, SHA-256 `0c444434bf9ca4e275a21f656a9f98dae2808b6c1c7fbc832a01de59b6d5ae94` — 원격 실측 일치 확인, `WEB_HANDOFF_HASH_MATCH`). 판정은 PASS/FAIL만 사용하며, 한 행이라도 FAIL이면 S2-1 PASS를 선언하지 않는다. *(v1.1 재동기 2차: 아래 전 행을 새 정본 기준으로 재판정했다 — replay-first·보상 삭제·T-CONC-10 행에 더해 M17 소유권·의존조건·D-API-A 플랫폼 단계·테스트 소유권 4행을 신설했다. 이 표는 **문서 계약 교차대조** 결과이며 SQL·앱 구현의 완료를 뜻하지 않는다.)*
+정본 = 웹 계약 v1.1(`9dc1b835c611d60c1ab6412a4dd7de16aa450c05`, 2,994행 / 329,690바이트, SHA-256 `bd9fc0dd2802c8358bb09f2938e0de7248d8b60703794895708e300f8ef32fa6` — 원격 실측 일치 확인, `WEB_HANDOFF_HASH_MATCH`). 판정은 PASS/FAIL만 사용하며, 한 행이라도 FAIL이면 S2-1 PASS를 선언하지 않는다. *(v1.1 재동기 3차: 아래 전 행을 M13 baseline 정합 보정 정본 기준으로 재판정했다 — 2차의 39행에 **M13 baseline 정합 보정 행 1행을 신설해 데이터 행은 40**이다. 이 표는 **문서 계약 교차대조** 결과이며 SQL·앱 구현의 완료를 뜻하지 않는다.)*
 
 | 분류 | 웹 정본 | 앱 v1.1 | 일치 여부 | 근거 절 (웹 / 앱) |
 |---|---|---|---|---|
-| 웹 정본 정체성 | 커밋 `48e64eea7fe363aed1ee4e6c47c1882c780875f9` · 2,951행 · 317,396바이트 · SHA-256 `0c444434…d5ae94` | 문서 헤더·본 표 서문·§13.4가 동일 정체성 참조(구 정본 참조 0건) | **PASS** | 웹 파일 실측 / 앱 헤더·§13.4·§14 |
+| 웹 정본 정체성 | 커밋 `9dc1b835c611d60c1ab6412a4dd7de16aa450c05` · 2,994행 · 329,690바이트 · SHA-256 `bd9fc0dd…f32fa6` | 문서 헤더·본 표 서문·§13.4·§13.5가 동일 정체성 참조(구 정본 참조 0건) | **PASS** | 웹 파일 실측 / 앱 헤더·§13.4·§13.5·§14 |
 | F4 함수명·전체 인자 순서 | `community_post_create(p_title text, p_body text, p_category text, p_idempotency_key uuid, p_image_refs text[] DEFAULT '{}', p_status text DEFAULT 'published')` | 동일 (스키마만 `api_app_v1`) | **PASS** | 웹 §7 F4 / 앱 §3.3 |
 | F5 함수명·전체 인자 순서 | `community_post_update(p_post_id uuid, p_title text, p_body text, p_category text, p_expected_updated_at timestamptz, p_image_refs text[] DEFAULT '{}', p_status text DEFAULT 'published')` | 동일 (스키마만 `api_app_v1`) | **PASS** | 웹 §7 F5 / 앱 §3.3 |
 | F6 함수명·인자 | `community_post_soft_delete(p_post_id uuid)` | 동일 | **PASS** | 웹 §7 F6 / 앱 §3.3 |
@@ -790,10 +942,10 @@ S2-2 상태:
 | C 당사자 불일치 | 8단계 `PARTY_BINDING_MISMATCH` (`SUBSCRIPTION_REF_INVALID` 아님) | 동일 | **PASS** | 웹 §7 F12 / 앱 §11.2 |
 | 9단계 오류 우선순위 | 1 `SUCCEEDED_NO_SUBSCRIPTION` … 9 `ROOM_REF_MISMATCH` (7단계 목록 부재·병존 없음, `ROOM_ENSURE_FAILED` 별도 운영 오류) | 동일 (목록 전문 전사) | **PASS** | 웹 §7 F12 / 앱 §11.2 |
 | 검증 선행·쓰기 후행 | Phase 1 검증 전용(business-state 쓰기 0) / Phase 2 room 확보·보정, 문장 명시 | 동일 (문장 동일 전사) | **PASS** | 웹 §7 F12 / 앱 §11.2 |
-| room 참조 의미론 | pair 불변 정본 · `subscription_id` NULL 보정/동일 유지/다른 값 거부 · `payment_id` = 가장 최근 성공 checkout(C 유지/NULL→C/stale→C/제3→`ROOM_REF_MISMATCH`) | 동일 (컬럼별 표 동일 전사) | **PASS** | 웹 §7 F12·§13.1 / 앱 §11.2 |
+| room 참조 의미론 | pair 불변 정본 · `subscription_id` NULL 보정/동일 유지/다른 값 거부 · `payment_id` = 가장 최근 성공 checkout(C 유지/NULL→C/stale→C/제3→`ROOM_REF_MISMATCH`) | 동일 (컬럼별 표 전사 — 웹 표의 「위 Phase 1 판정」 상호참조를 의미 동일하게 병합 기재) | **PASS** | 웹 §7 F12·§13.1 / 앱 §11.2 |
 | 늦은 과거 재생 | P≠C 조건 충족 시 무자금부작용 멱등 성공(`ok:true, idempotent:true`, anomaly 0) | 동일 | **PASS** | 웹 §7 F12 / 앱 §11.2 |
 | 멱등성·동시성 계약 | F4 멱등키 필수·`(author_id, create_idempotency_key)` · 같은 멱등키 재호출 = 정본 복구 · **응답 불명확·유실은 실패 확정 아님(재호출 전 Storage 객체 보존)** · 방 확보 `ON CONFLICT DO NOTHING`+재조회·동시 1방(T-CONC-01) · F4 응답 유실 복구(T-CONC-10) | 동일 (§6.3 4분기 규약·§10 테스트로 재동기) | **PASS** | 웹 §7 F4·§14.4·§13.1·§21.3 / 앱 §3.3·§4.2·§6.3·§10 |
-| F4 공용 구현부 판정 순서(replay-first) | author binding 직후·신규 쓰기 검증보다 먼저 `(author_id, create_idempotency_key)` 기존 커밋 행 조회 → 있으면 새 쓰기·Storage 삭제 없이 기존 `post_id`+`idempotent_replay:true` → 없을 때만 신규 검증·INSERT · 단순 재호출 오류 ≠ 미커밋 확인 · 별도 조회 RPC 신설 없음 | 동일 (동일 B-1 구현부 호출 — 판정 순서 동일 전사) | **PASS** | 웹 §7 F4 / 앱 §3.3·§3.4 B-1 |
+| F4 공용 구현부 판정 순서(replay-first) | author binding 직후·신규 쓰기 검증보다 먼저 `(author_id, create_idempotency_key)` 기존 커밋 행 조회 → 있으면 새 쓰기·Storage 삭제 없이 기존 `post_id`+`idempotent_replay:true` → 없을 때만 신규 검증·INSERT · 단순 재호출 오류 ≠ 미커밋 확인 · 별도 조회 RPC 신설 없음(원출처 웹 §14.4) | 동일 (동일 B-1 구현부 호출 — 판정 순서 동일 전사) | **PASS** | 웹 §7 F4·§14.4 / 앱 §3.3·§3.4 B-1 |
 | 커뮤니티 이미지 보상 삭제 규약 | 4분기: 업로드 실패 즉시 삭제 / 확정 실패·rollback 확인 시 삭제 / 응답 불명확·유실은 **삭제 없이 동일 멱등키 F4 선재호출**(성공·기존 `post_id` → 객체 유지, replay-first 미커밋 확인+확정 실패 종결 시에만 삭제) / DB hard DELETE 보상 계속 금지 | 동일 (§6.3 4분기 전사 — 웹 §14.5 보상 삭제 행의 "앱 v1.1 동기화 시 충족" 조건 해소) | **PASS** | 웹 §14.4·§14.5·§19.5-8 / 앱 §6.3·§6.6 |
 | 테스트 A~H | T-REP-A~H 8건 — fixture 명시 포함, 기대값 표 | 동일 (기대값 전건 전사) | **PASS** | 웹 §21.8 / 앱 §11.3 |
 | `HD-1` | `community_posts` REVOKE ALL+GRANT SELECT·쓰기 정책 6종 제거·M16 별도·확대 게이트 7단계·service_role moderation 예외·보상 RPC 폐기 | 동일 + 앱 측 의무 ①~⑦ | **PASS** | 웹 §14.7 / 앱 §6.6 |
@@ -804,36 +956,41 @@ S2-2 상태:
 | 앱 금지 기능 경계 | F11·F12 service_role 전용 → 앱 도달 불가 · consented RPC allowlist 밖 · 결제·신규 구독·캐시 결제·개별질문 등록 앱 미노출 | 동일 (신규 앱 전용 기능 0건·금지 기능 추가 0건) | **PASS** | 웹 §19.1·§19.2 / 앱 §1·§7 |
 | Gate 4 (테스트 기대값 포함) | v1.0 문서 게이트 PASS 소급 무효 → v1.1 재게이트 · 구현 게이트에 T-CONC-10 동일 시나리오(응답 유실 모사 → 재호출 전 Storage DELETE 0회 → 동일 `post_id`·`idempotent_replay:true`·글 1건·`image_refs` 불변·참조 객체 전부 존재·확정 rollback/미커밋 분기에서만 삭제) | 재게이트 PASS (근거 표) + T-CONC-10 동일 항목 추가 | **PASS** | 웹 §19.5-1·4·§21.3 T-CONC-10 / 앱 §10 |
 | `api_app_v1` SQL 정본 소유 | `api_app_v1` 표면(스키마·뷰·wrapper 5종)은 웹 저장소 M17(`supabase/sql/<VERSION>_api_app_v1_surface.sql`)이 생성 · 앱 저장소는 S2 공용 DB migration SQL을 만들지 않음 | 동일 명기 — 앱 저장소 SQL 0 (§3.1·§3.3) | **PASS** | 웹 §19.5 #9·§20.2 M17 / 앱 §3.1·§3.2·§3.3 |
-| M17 객체·선행조건 | 소유 객체 정확히 7개(schema 1 + view 1 + function 5, GRANT·REVOKE·default privilege는 수량 제외) · `M17 : M5 + M7` · M13 의존 없음 | 동일 (7객체 목록·의존 그래프 전사) | **PASS** | 웹 §20.2 M17·§20.2.1·§20.3 / 앱 §3.1·§3.3 |
+| M17 객체·선행조건 | 소유 객체 정확히 7개(schema 1 + view 1 + function 5, GRANT·REVOKE·default privilege는 수량 제외) · `M17 : M5 + M7` · M13 의존 없음(**M13 baseline 정합 보정 후에도 불변** — M13을 M17의 신규 직접 선행조건으로 추가하지 않음, 웹 §20.2.1·§22 #2 역의존 없음) | 동일 (7객체 목록·의존 그래프 전사 — §3.5에서 보정 후 불변 재확인) | **PASS** | 웹 §20.2 M17·§20.2.1·§20.3·부록 C-1 / 앱 §3.1·§3.3·§3.5 |
 | Data API 플랫폼 단계 | D-API-A = `api_app_v1` Exposed schemas 추가(SQL migration 아님) · 목표: `api_app_v1` exposed·`api_web_v1` exposed·`core_private` never exposed · M17 적용 후·앱 Gate 4 전환 이전 · 플랫폼 검증 4종(`PGRST106`/`PGRST002` 없음 포함) · 현재 노출 목록 미확인 → 구현 완료로 표시 금지 | 동일 (§3.1 순서 체인·검증 4종·미구현 상태 명기) | **PASS** | 웹 §20.6·§20.6.2 / 앱 §3.1·§10 |
-| M16·Gate 4·테스트 소유권 | M16은 M17+D-API-A+웹·앱 F4/F5/F6 전환+앱 Gate 4+직접 쓰기 0건 이후에만 · T-CONC-10 canonical 소유 = M7 · 앱 표면 재검증 = M17(캐노니컬 대체 아닌 이중 확인) · M9는 T-CONC-10 미소유 | 동일 (§10 선행조건 블록·§6.6 게이트) | **PASS** | 웹 §20.2.1·§20.3·§21.11 / 앱 §6.6·§10 |
+| M16·Gate 4·테스트 소유권 | M16은 M7+M17+D-API-A+웹·앱 F4/F5/F6 전환(C5 포함)+앱 Gate 4+앱 보상 DELETE 제거+직접 쓰기 0건 실측+§14.7 확대 게이트 7단계 이후에만 · T-CONC-10 canonical 소유 = M7 · 앱 표면 재검증 = M17(캐노니컬 대체 아닌 이중 확인) · M9는 T-CONC-10 미소유 | 동일 (§10 선행조건 블록·§6.6 게이트 ①~⑦) | **PASS** | 웹 §20.2.1·§20.3·§21.11 / 앱 §6.6·§10 |
+| M13 baseline 정합 보정 (board 댓글 라벨) | 선재 `comments.author_label`(037) 재사용 — `text NOT NULL` 유지·default `'쌤버십 회원'`→`'쌤버십 사용자'` 정정·rollback에서 컬럼 보존 · **M13 신규 컬럼 = `comments.author_role` 정확히 1개** · 트리거 함수 2종·트리거 4종 — canonical `comments`·legacy `community_comments`(`post_type='board'`) **양쪽 INSERT 서버 라벨 덮어쓰기**(권위: DB BEFORE INSERT trigger > 163/164 bridge > 웹·앱 클라이언트 > 컬럼 default · 163/164 본문 불변) + **snapshot UPDATE 명시 거부** · shortform 무영향 · 라벨 도출 `users.nickname`만(비었으면 `'쌤버십 사용자'` · `author_role`은 student/mentor만, admin 등은 NULL · `full_name`·`email`·`birth_date`·`grade_level` 금지) · 백필 forward-only(rollback은 과거 클라이언트 라벨 미복원 — 웹 §22 #8 예외) · T-M13-01~16 canonical 소유 = 웹 Batch B | 동일 수용(§3.5 신설) — 앱은 댓글 라벨을 권위값으로 전송하지 않음·구버전 payload는 서버가 덮어씀·앱 저장소 M13 SQL 0건·앱 Gate 4는 대표 시나리오 재검증(§10) | **PASS** | 웹 §6 V2·§7 F0·§10.4·§20.2 M13·§20.3·§21.7·§22 #8·부록 A·부록 C-2 / 앱 §3.5·§10·§13.5 |
 
-**대조 결과: 39행 전건 PASS · FAIL 0건.** (새 웹 정본 `48e64eea…` 기준 재판정 — 문서 계약 교차대조 결과이며 SQL·앱 구현 완료를 뜻하지 않는다)
+**대조 결과: 데이터 행 40 · PASS 40 · FAIL 0건.** (새 웹 정본 `9dc1b835…` 기준 전 행 재판정 — M13 baseline 정합 보정 행 1행 신설. 문서 계약 교차대조 결과이며 SQL·앱 구현 완료를 뜻하지 않는다)
 
 ---
 
-**최종 판정(웹 rev 8 G·§24.2 동기):**
+**최종 판정(웹 §24.2·부록 C-2·물리 정책 §9.2 동기 — v1.1 재동기 3차):**
 
 ```text
 웹 계약 v1.1:
   정본 고정
-  48e64eea7fe363aed1ee4e6c47c1882c780875f9
-  WEB_HANDOFF_HASH_MATCH
+  9dc1b835c611d60c1ab6412a4dd7de16aa450c05
+  WEB_HANDOFF_HASH_MATCH: PASS
 
 앱 계약 v1.1:
-  새 웹 정본 재동기화 완료
+  새 웹 정본(M13 baseline 정합 보정) 재동기화 완료
+  M13_APP_CONTRACT_RESYNC: PASS
+  APP_V1_1_DOC_CANON: PASS
 
 웹·앱 문서 교차대조:
-  PASS 39
+  데이터 행 40
+  PASS 40
   FAIL 0
+  S2_1_CROSS_CONTRACT_M13: PASS
 
 S2-1:
   PASS 재심사 가능
 
 S2-2:
-  BLOCKED
-  SAFE_TEST_ENV_UNAVAILABLE 유지
-  Data API 현재 Exposed schemas 목록 확인 대기
+  Batch A(M0·M15): LOCAL_PASS 실적 불변
+  S2_2_BATCH_B: READY_TO_RESUME (웹 저장소에서 재개)
+  READY_FOR_S2_2_BATCH_B_RESUME: YES
 ```
 
-본 계약의 어떤 절도 이번 세션에서 SQL·마이그레이션·제품 코드 작성이나 Data API 설정 변경을 승인하지 않는다.
+이 판정은 M13 SQL 또는 앱 구현 완료를 의미하지 않는다 — 앱 계약 문서가 새 웹 정본과 다시 일치하여 웹 저장소에서 S2-2 Batch B를 재개할 수 있다는 의미다(§10 판정 구분). 본 계약의 어떤 절도 이번 세션에서 SQL·마이그레이션·제품 코드 작성이나 Data API 설정 변경을 승인하지 않는다.
