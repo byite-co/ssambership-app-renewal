@@ -1,7 +1,7 @@
 name: ssambership_app
 description: "쌤버십 모바일 앱 — 기존 웹(Next.js)의 컴패니언. 읽기 중심·Commerce-Zero(앱 내 결제 없음)."
 publish_to: "none"
-version: 0.1.0+4
+version: 0.1.0+9
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
