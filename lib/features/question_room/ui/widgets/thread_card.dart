@@ -10,7 +10,7 @@ import 'thread_status_pill.dart';
 
 /// 질문 스레드 카드(공통). 학생 질문목록(S4)·멘토 질문목록(S5)이 함께 쓴다.
 ///
-/// 제목 + 상태칩 / 과목·오답 배지 + 활동시각 / (선택)하단 액션.
+/// 제목 + 상태칩 / 과목 배지 + 활동시각 / (선택)하단 액션.
 /// 역할별 차이는 [bottomAction] 으로만 주입한다(학생=답변 확인, 멘토=없음 등).
 class ThreadCard extends StatelessWidget {
   const ThreadCard({
@@ -53,10 +53,6 @@ class ThreadCard extends StatelessWidget {
           Row(
             children: <Widget>[
               AppBadge(label: subjectLabel(thread.subject)),
-              if (thread.isWrongAnswer) ...<Widget>[
-                const SizedBox(width: 6),
-                const AppBadge(label: '오답노트'),
-              ],
               const Spacer(),
               Text(
                 Formatters.relativeKorean(thread.updatedAt),

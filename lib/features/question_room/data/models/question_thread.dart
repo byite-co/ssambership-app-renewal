@@ -71,7 +71,6 @@ class QuestionThread {
     required this.status,
     this.topic,
     this.subject,
-    required this.isWrongAnswer,
     required this.masteryStatus,
     this.firstAnsweredAt,
     this.confirmedAt,
@@ -89,7 +88,6 @@ class QuestionThread {
 
   /// subjects.code (영문 코드). 화면 표시 시 한글 라벨로 변환할 것.
   final String? subject;
-  final bool isWrongAnswer;
   final MasteryStatus masteryStatus;
   final DateTime? firstAnsweredAt;
   final DateTime? confirmedAt;
@@ -104,7 +102,6 @@ class QuestionThread {
       status: ThreadStatus.fromCode(map['status'] as String?),
       topic: map['topic'] as String?,
       subject: map['subject'] as String?,
-      isWrongAnswer: (map['is_wrong_answer'] as bool?) ?? false,
       masteryStatus: MasteryStatus.fromCode(map['mastery_status'] as String?),
       firstAnsweredAt: parseTimeOrNull(map['first_answered_at']),
       confirmedAt: parseTimeOrNull(map['confirmed_at']),
@@ -120,7 +117,6 @@ class QuestionThread {
         'status': status.code,
         'topic': topic,
         'subject': subject,
-        'is_wrong_answer': isWrongAnswer,
         'mastery_status': masteryStatus.code,
         'first_answered_at': firstAnsweredAt?.toIso8601String(),
         'confirmed_at': confirmedAt?.toIso8601String(),

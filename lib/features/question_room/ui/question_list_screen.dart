@@ -21,7 +21,7 @@ import 'widgets/thread_card.dart';
 import '../../../shared/errors/friendly_error.dart';
 
 /// 질문 영역(3뎁스, 학생 전용 화면). 스레드 카드 목록(최신순) + 새 질문 + 연결노트.
-/// 멘토는 mentor_question_list_screen 을 쓴다 — 오답 표시 액션은 이 화면에만 있다.
+/// 멘토는 mentor_question_list_screen 을 쓴다.
 class QuestionListScreen extends StatefulWidget {
   const QuestionListScreen({
     super.key,
@@ -229,52 +229,13 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
     }
   }
 
-  /// 카드 하단 액션 묶음(학생 전용): 답변 확인 + 오답 표시 토글.
-  /// 오답 토글은 답변이 달린 뒤(answered/confirmed)에만 노출한다.
+  /// 카드 하단 액션(학생 전용): 답변 확인 버튼 하나.
   Widget? _threadActions(QuestionThread t) {
-    final bool answeredOnce =
-        t.status == ThreadStatus.answered || t.status == ThreadStatus.confirmed;
-    final List<Widget> actions = <Widget>[
-      if (t.status == ThreadStatus.answered)
-        SecondaryButton(
-          label: '답변 확인 완료',
-          onPressed: () => _confirm(t),
-        ),
-      if (answeredOnce)
-        TextButton(
-          onPressed: _busy ? null : () => _toggleWrongAnswer(t),
-          child: Text(t.isWrongAnswer ? '오답 표시 해제' : '오답으로 표시'),
-        ),
-    ];
-    if (actions.isEmpty) return null;
-    if (actions.length == 1) return actions.single;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        actions.first,
-        const SizedBox(height: 4),
-        actions.last,
-      ],
+    if (t.status != ThreadStatus.answered) return null;
+    return SecondaryButton(
+      label: '답변 확인 완료',
+      onPressed: () => _confirm(t),
     );
-  }
-
-  /// 오답 표시/해제 — 서버 RPC(qna_flag_wrong_answer)만 호출(P2-13 후속).
-  /// 성공 시 목록 재조회로 수렴, 실패 시 로컬 상태를 바꾸지 않고 재시도 안내.
-  Future<void> _toggleWrongAnswer(QuestionThread t) async {
-    setState(() => _busy = true);
-    try {
-      await _write.flagWrongAnswer(t.id, isWrong: !t.isWrongAnswer);
-      if (mounted) _refresh();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오답 표시에 실패했어요. ${friendlyError(e)}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 }
 

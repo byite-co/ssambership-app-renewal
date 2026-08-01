@@ -165,6 +165,78 @@ bool iqCanMentorAnswer(IndividualQuestionStatus s) =>
     s == IndividualQuestionStatus.claimed ||
     s == IndividualQuestionStatus.assigned;
 
+/// 스레드 메시지 작성자 방향. 확정할 수 없으면 [unknown] — 추측하지 않는다.
+enum IqMessageAuthor { student, mentor, unknown }
+
+/// `author_id` 를 질문 당사자 id 와 대조해 작성자 방향을 판정한다.
+///
+/// 서버 정본(`answer_individual_question`)은 `auth.uid()` 를 멘토 신원과 대조한 뒤
+/// 같은 `auth.uid()` 를 `individual_question_messages.author_id` 에 저장한다.
+/// 따라서 질문 행의 `student_id`·`claimed_mentor_id`(둘 다 auth uid)와 직접
+/// 비교할 수 있고, 서버·DB 변경 없이 클라이언트에서 판정이 끝난다.
+///
+/// ★ 빈 문자열은 절대 매칭하지 않는다 — [IqMessage.authorId] 와
+///   [IndividualQuestion.studentId] 는 둘 다 null 을 `''` 로 접기 때문에,
+///   순진하게 비교하면 미기록 행이 전부 한쪽으로 오분류된다.
+IqMessageAuthor iqMessageAuthorOf({
+  required String authorId,
+  required String studentId,
+  required String? mentorId,
+}) {
+  final String a = authorId.trim();
+  if (a.isEmpty) return IqMessageAuthor.unknown;
+  final String s = studentId.trim();
+  if (s.isNotEmpty && a == s) return IqMessageAuthor.student;
+  final String m = (mentorId ?? '').trim();
+  if (m.isNotEmpty && a == m) return IqMessageAuthor.mentor;
+  return IqMessageAuthor.unknown;
+}
+
+/// 작성자 방향 한글 라벨(내부 id·영문 코드 노출 금지).
+String iqMessageAuthorLabel(IqMessageAuthor a) {
+  switch (a) {
+    case IqMessageAuthor.student:
+      return '학생';
+    case IqMessageAuthor.mentor:
+      return '멘토';
+    case IqMessageAuthor.unknown:
+      return '작성자 미확인';
+  }
+}
+
+/// 뷰어 본인이 쓴 메시지인지. 판정 불가(뷰어 id 없음·작성자 미기록)면 **null**.
+/// `false` 는 "상대가 썼다"는 단정이라, 모를 때 쓰면 거짓말이 된다.
+bool? iqMessageIsMine({
+  required String authorId,
+  required String? viewerId,
+}) {
+  final String a = authorId.trim();
+  final String v = (viewerId ?? '').trim();
+  if (a.isEmpty || v.isEmpty) return null;
+  return a == v;
+}
+
+/// 종결 상태의 읽기전용 안내 문구. 진행 중이면 null.
+/// 액션이 하나도 없는 상태에서 화면이 비어 보이지 않게 한다.
+String? iqReadOnlyNotice(IndividualQuestionStatus s) {
+  switch (s) {
+    case IndividualQuestionStatus.refunded:
+      return '환불된 질문이에요. 안전 보관 중이던 캐시가 돌려보내졌어요.';
+    case IndividualQuestionStatus.expired:
+      return '답변 기한이 지나 만료된 질문이에요.';
+    case IndividualQuestionStatus.canceled:
+      return '취소된 질문이에요.';
+    case IndividualQuestionStatus.escrowed:
+    case IndividualQuestionStatus.assigned:
+    case IndividualQuestionStatus.open:
+    case IndividualQuestionStatus.claimed:
+    case IndividualQuestionStatus.answered:
+    case IndividualQuestionStatus.released:
+    case IndividualQuestionStatus.unknown:
+      return null;
+  }
+}
+
 /// cents 정수 → "5,000캐시" (웹 `formatIndividualQuestionPrice` 미러: ÷100).
 String formatIqCash(int amountCents) {
   final int cash = amountCents.abs() ~/ 100;

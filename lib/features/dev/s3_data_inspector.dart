@@ -295,7 +295,6 @@ class _ThreadList extends StatelessWidget {
                       runSpacing: 8,
                       children: <Widget>[
                         AppBadge(label: subjectLabel(t.subject), tinted: true),
-                        if (t.isWrongAnswer) const AppBadge(label: '오답노트'),
                         AppBadge(
                           label: '숙련: '
                               '${QuestionRoomLabels.masteryStatus(t.masteryStatus)}',

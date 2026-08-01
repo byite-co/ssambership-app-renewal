@@ -14,7 +14,6 @@ QuestionThread _thread() {
     roomId: 'r1',
     title: '미분 질문',
     status: ThreadStatus.pending,
-    isWrongAnswer: false,
     masteryStatus: MasteryStatus.unknown,
     createdAt: now,
     updatedAt: now,
