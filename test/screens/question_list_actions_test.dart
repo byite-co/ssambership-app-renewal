@@ -58,7 +58,6 @@ QuestionThread _thread({required ThreadStatus status}) {
     roomId: 'r1',
     title: '미분 질문',
     status: status,
-    isWrongAnswer: false,
     masteryStatus: MasteryStatus.unknown,
     createdAt: now,
     updatedAt: now,
@@ -96,6 +95,13 @@ Future<void> _pump(
   ));
   await tester.pumpAndSettle();
 }
+
+/// 제거된 오답 어포던스 문구 — 어떤 상태에서도 다시 나타나면 안 된다.
+const List<String> _removedWrongAnswerLabels = <String>[
+  '오답으로 표시',
+  '오답 표시 해제',
+  '오답노트',
+];
 
 void main() {
   testWidgets('answered 스레드: "답변 확인 완료" 버튼 노출', (WidgetTester tester) async {
@@ -156,6 +162,23 @@ void main() {
 
     expect(find.textContaining('확인 처리에 실패했어요'), findsOneWidget);
     expect(find.text('답변 확인 완료'), findsOneWidget); // 원상 유지
+  });
+
+  testWidgets('오답 어포던스 전멸: pending/answered/confirmed 어디에도 없음',
+      (WidgetTester tester) async {
+    for (final ThreadStatus s in <ThreadStatus>[
+      ThreadStatus.pending,
+      ThreadStatus.answered,
+      ThreadStatus.confirmed,
+    ]) {
+      final _FakeRead read = _FakeRead(<QuestionThread>[_thread(status: s)]);
+      await _pump(tester, read: read, write: _FakeWrite());
+
+      for (final String label in _removedWrongAnswerLabels) {
+        expect(find.text(label), findsNothing,
+            reason: '$s 상태에서 "$label" 이 노출되면 안 된다');
+      }
+    }
   });
 
   testWidgets('질문 0개 → 빈 상태 렌더', (WidgetTester tester) async {

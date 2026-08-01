@@ -78,7 +78,7 @@
 
 | 계약 | 고정 테스트 |
 |---|---|
-| 질문 생성·append·confirm·오답·첨부 = qna RPC만, 직접 write 0 | new_question_submit / chat_attachment_send / wrong_answer_toggle / qna_error_mapper |
+| 질문 생성·append·confirm·첨부 = qna RPC만, 직접 write 0 | new_question_submit / chat_attachment_send / question_list_actions / qna_error_mapper |
 | 첨부 23505 의미 검증·미등록만 보상 삭제 | attachment_upload_rpc (11) |
 | usage fail-closed | new_question_submit |
 | 숏폼 player/scrap/body fallback | shortform_detail (9) + community_models |

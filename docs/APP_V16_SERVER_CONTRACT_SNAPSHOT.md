@@ -60,6 +60,9 @@
 - 학생 전용. `is_wrong_answer` + `mastery_status`(`wrong`/`unknown`) 갱신. 상태 제한 없음.
 - 반환: `{"ok":true, "thread_id":uuid, "is_wrong_answer":bool}`
 - 오류: `AUTH_REQUIRED`, `THREAD_NOT_FOUND`, `STUDENT_ONLY`.
+- ★ **앱은 이 RPC를 호출하지 않는다**(오답 표시 기능을 앱에서 제거). 서버 RPC·`is_wrong_answer` 컬럼·
+  `mastery_status` 트리거는 그대로 배포 유지되며 웹 전용 경로로 남는다. 앱은 `mastery_status` 를
+  계속 **읽기만** 한다(`MasteryStatus` 유지).
 
 ### 1.6 `qna_register_attachment(p_thread_id uuid, p_storage_path text, p_file_name text = null, p_mime_type text = null, p_message_id uuid = null)`
 

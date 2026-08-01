@@ -39,7 +39,7 @@ class AppendedMessage {
 /// 질문방 쓰기 레포지토리 — v16부터 질문 워크플로 쓰기는 전부 서버 원자 RPC.
 ///
 /// ★ question_threads/question_messages 직접 INSERT/UPDATE 금지(P1-8).
-///   생성·append·확인·오답은 qna_* RPC만 사용한다 — 사용량 소비·answered 전이·
+///   생성·append·확인은 qna_* RPC만 사용한다 — 사용량 소비·answered 전이·
 ///   question_answered 알림은 전부 서버 트랜잭션 책임이고 앱은 결과만 반영한다.
 /// ★ 방(mentor_student_rooms) 생성 메서드는 두지 않는다(앱에서 INSERT 정책 없음 = 불가).
 /// ★ 메시지는 append 전용 — 수정/삭제 메서드 없음.
@@ -146,22 +146,6 @@ class QuestionRoomWriteRepository {
       await _client.rpc(
         'qna_confirm_thread',
         params: <String, dynamic>{'p_thread_id': threadId},
-      );
-    } catch (e) {
-      throw mapQnaError(e);
-    }
-  }
-
-  /// 오답 표시/해제 — RPC `qna_flag_wrong_answer`(학생 전용).
-  /// is_wrong_answer + mastery_status 갱신은 서버 책임. 직접 UPDATE 금지.
-  Future<void> flagWrongAnswer(String threadId, {bool isWrong = true}) async {
-    try {
-      await _client.rpc(
-        'qna_flag_wrong_answer',
-        params: <String, dynamic>{
-          'p_thread_id': threadId,
-          'p_is_wrong': isWrong
-        },
       );
     } catch (e) {
       throw mapQnaError(e);

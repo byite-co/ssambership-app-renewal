@@ -7,7 +7,6 @@ QuestionThread _thread({
   String? title = '미분 질문',
   String? subject = 'math_calculus',
   ThreadStatus status = ThreadStatus.pending,
-  bool wrong = false,
 }) {
   final DateTime now = DateTime(2026, 7, 1);
   return QuestionThread(
@@ -16,7 +15,6 @@ QuestionThread _thread({
     title: title,
     subject: subject,
     status: status,
-    isWrongAnswer: wrong,
     masteryStatus: MasteryStatus.unknown,
     createdAt: now,
     updatedAt: now,
@@ -47,11 +45,11 @@ void main() {
     expect(find.text('(제목 없음)'), findsOneWidget);
   });
 
-  testWidgets('오답노트 배지 렌더', (WidgetTester tester) async {
+  testWidgets('오답노트 배지 미노출(기능 제거 회귀 가드)', (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(
-      ThreadCard(thread: _thread(wrong: true), onOpen: () {}),
+      ThreadCard(thread: _thread(), onOpen: () {}),
     ));
-    expect(find.text('오답노트'), findsOneWidget);
+    expect(find.text('오답노트'), findsNothing);
   });
 
   testWidgets('bottomAction 주입 시 렌더(예: 학생 답변 확인 버튼)',

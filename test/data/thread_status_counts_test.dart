@@ -9,7 +9,6 @@ QuestionThread _thread(ThreadStatus status) {
     id: 'id-${status.name}',
     roomId: 'room-1',
     status: status,
-    isWrongAnswer: false,
     masteryStatus: MasteryStatus.unknown,
     createdAt: now,
     updatedAt: now,
