@@ -70,6 +70,9 @@ void main() {
     )));
     await tester.pumpAndSettle();
 
+    // 두 쪽을 다 고정한다. 오류 문구 부재만 단언하면 빈 상태 위젯을 통째로
+    // 지워도(빈 화면) 테스트가 통과한다 — 제목이 주장하는 회귀를 못 잡는다.
+    expect(find.text('아직 글이 없어요'), findsOneWidget);
     expect(find.textContaining('불러오지 못했'), findsNothing);
   });
 

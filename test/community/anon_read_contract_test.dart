@@ -179,8 +179,15 @@ void main() {
 
   group('author_id 계약 — 내부 식별자는 뷰모델에 새지 않는다', () {
     const String uuid = '3f2b1c9e-0000-4aaa-bbbb-cccccccccccc';
+    const String modelsPath = 'lib/features/community/data/community_models.dart';
 
-    test('BoardPost 는 author_id 를 표면에 두지 않는다', () {
+    // ★ toString() 으로 검사하지 않는다. 두 모델 모두 toString 을 override 하지
+    //   않아 Object.toString() = "Instance of 'BoardPost'" 가 나오고, 그러면
+    //   모델에 authorId 를 추가해도 단언이 통과하는 공허한 가드가 된다.
+    //   대신 (1) 공개 문자열 필드를 하나씩 대조하고 (2) 소스에 필드 선언이
+    //   생기지 않는지 잠근다.
+
+    test('BoardPost 의 어떤 공개 문자열 필드에도 author_id 가 실리지 않는다', () {
       final BoardPost p = BoardPost.fromMap(<String, dynamic>{
         'id': 'p1',
         'title': '제목',
@@ -189,8 +196,18 @@ void main() {
         'author_role': 'student',
         'created_at': '2026-07-01T00:00:00Z',
       });
-      expect(p.toString().contains(uuid), isFalse);
-      expect(p.authorName, isNot(contains(uuid)));
+      final List<String?> surface = <String?>[
+        p.id,
+        p.title,
+        p.body,
+        p.category,
+        p.authorLabel,
+        p.authorRole,
+        p.authorName,
+      ];
+      for (final String? v in surface) {
+        expect(v, isNot(contains(uuid)));
+      }
     });
 
     test('ShortformPost 도 마찬가지', () {
@@ -198,9 +215,44 @@ void main() {
         'id': 's1',
         'title': '숏폼',
         'author_id': uuid,
+        'author_role': 'mentor',
         'created_at': '2026-07-01T00:00:00Z',
       });
-      expect(s.toString().contains(uuid), isFalse);
+      final List<String?> surface = <String?>[
+        s.id,
+        s.title,
+        s.description,
+        s.category,
+        s.authorLabel,
+        s.authorRole,
+        s.thumbnailUrl,
+        s.videoUrl,
+        s.authorName,
+      ];
+      for (final String? v in surface) {
+        expect(v, isNot(contains(uuid)));
+      }
+    });
+
+    test('모델이 author_id 를 필드로 승격하지 않는다(소스 잠금)', () {
+      // author_id 는 raw 행에서 차단 필터가 쓰는 값일 뿐이다
+      // (community_read_repository 의 _dropBlocked). 뷰모델로 올라오면
+      // 어떤 위젯이든 UUID 를 렌더할 수 있게 된다.
+      final String src = File(modelsPath).readAsStringSync();
+      expect(RegExp(r'\bfinal\s+String\??\s+authorId\b').hasMatch(src), isFalse,
+          reason: '뷰모델에 authorId 필드가 생겼다');
+      expect(src.contains("m['author_id']"), isFalse,
+          reason: '모델이 author_id 를 파싱하기 시작했다');
+    });
+
+    test('가드 자기-검증 — 위 대조가 실제로 UUID 를 잡아낸다', () {
+      // 필드 하나라도 uuid 를 담으면 같은 방식으로 탐지된다는 증명.
+      final BoardPost leaky = BoardPost.fromMap(<String, dynamic>{
+        'id': 'p1',
+        'title': uuid, // 유출을 흉내낸 값
+        'created_at': '2026-07-01T00:00:00Z',
+      });
+      expect(leaky.title, contains(uuid));
     });
 
     test('작성자 표기는 한글 라벨로만 수렴한다', () {
