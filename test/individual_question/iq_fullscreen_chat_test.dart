@@ -161,8 +161,7 @@ void main() {
       expect(find.text('답변 등록'), findsOneWidget);
       expect(find.descendant(of: _timeline, matching: find.text('답변 등록')),
           findsNothing);
-      expect(
-          find.descendant(of: _timeline, matching: find.byType(TextField)),
+      expect(find.descendant(of: _timeline, matching: find.byType(TextField)),
           findsNothing,
           reason: '답변 입력은 하단 고정 영역 소속이어야 한다');
     });
@@ -197,8 +196,7 @@ void main() {
           role: AppRole.mentor, status: IndividualQuestionStatus.released);
       expect(find.text('정산이 완료된 질문이에요.'), findsOneWidget);
       expect(
-          find.descendant(
-              of: _timeline, matching: find.text('정산이 완료된 질문이에요.')),
+          find.descendant(of: _timeline, matching: find.text('정산이 완료된 질문이에요.')),
           findsNothing);
     });
   });
@@ -253,8 +251,7 @@ void main() {
         attachments: const <IqAttachment>[_image],
       );
 
-      expect(
-          find.descendant(of: _bubble(kBody), matching: find.text('첨삭하기')),
+      expect(find.descendant(of: _bubble(kBody), matching: find.text('첨삭하기')),
           findsOneWidget);
     });
 
@@ -333,7 +330,8 @@ void main() {
       Size(411, 891),
       Size(844, 390), // 가로 모드
     ]) {
-      testWidgets('(${size.width.toInt()}×${size.height.toInt()}) '
+      testWidgets(
+          '(${size.width.toInt()}×${size.height.toInt()}) '
           '학생 answered: 오버플로 0 · 하단 액션 즉시 도달 · 처음/끝 도달',
           (WidgetTester tester) async {
         _setView(tester, size);
@@ -363,8 +361,7 @@ void main() {
       });
     }
 
-    testWidgets('초기 위치: 메시지가 있으면 최신 대화 근처에서 시작한다',
-        (WidgetTester tester) async {
+    testWidgets('초기 위치: 메시지가 있으면 최신 대화 근처에서 시작한다', (WidgetTester tester) async {
       _setView(tester, const Size(390, 844));
       final List<IqMessage> twenty = <IqMessage>[
         for (int i = 1; i <= 20; i++)

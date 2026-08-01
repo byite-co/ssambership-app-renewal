@@ -108,7 +108,8 @@ void main() {
       await _pump(tester, IndividualQuestionStatus.unknown,
           role: AppRole.student);
 
-      expect(find.text('수열 질문이에요'), findsOneWidget);
+      // 제목은 컴팩트 헤더(한 줄)와 첫 질문 말풍선(전문) 두 곳에서 보인다.
+      expect(find.text('수열 질문이에요'), findsNWidgets(2));
       expect(find.text(kRelease), findsNothing);
       expect(find.text(kRefund), findsNothing);
     });
@@ -151,8 +152,7 @@ void main() {
       IndividualQuestionStatus.claimed,
     ]) {
       testWidgets('멘토 · $s: 첨삭하기 표시', (WidgetTester tester) async {
-        await _pump(tester, s,
-            role: AppRole.mentor, attachments: _oneImage);
+        await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
 
         expect(find.text('첨삭하기'), findsOneWidget);
       });
@@ -171,8 +171,7 @@ void main() {
     ]) {
       testWidgets('멘토 · $s: 첨삭하기 미표시(첨부 조회·저장은 유지)',
           (WidgetTester tester) async {
-        await _pump(tester, s,
-            role: AppRole.mentor, attachments: _oneImage);
+        await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
 
         expect(find.text('첨삭하기'), findsNothing);
         // 게이트가 첨부 카드 자체를 죽이면 안 된다 — 저장(다운로드)은 유지된다.
@@ -182,8 +181,7 @@ void main() {
 
     for (final IndividualQuestionStatus s in IndividualQuestionStatus.values) {
       testWidgets('학생 · $s: 첨삭하기 미표시', (WidgetTester tester) async {
-        await _pump(tester, s,
-            role: AppRole.student, attachments: _oneImage);
+        await _pump(tester, s, role: AppRole.student, attachments: _oneImage);
 
         expect(find.text('첨삭하기'), findsNothing);
       });

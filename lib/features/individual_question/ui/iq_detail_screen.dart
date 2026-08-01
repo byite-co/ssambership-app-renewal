@@ -11,7 +11,6 @@ import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/tokens/typography.dart';
 import '../../../design/widgets/app_badge.dart';
-import '../../../design/widgets/app_card.dart';
 import '../../../design/widgets/primary_button.dart';
 import '../../../design/widgets/secondary_button.dart';
 import '../../../shared/format/formatters.dart';
@@ -49,7 +48,14 @@ class IqDetailData {
   final String? mentorName;
 }
 
-/// 개별질문 상세 — 학생·멘토 공용. 역할·상태에 따라 액션이 달라진다.
+/// 개별질문 상세 — 학생·멘토 공용. **화면 전체가 대화방이다**(vc11 정본 UX).
+///
+/// 구조: [컴팩트 헤더] → [Expanded 대화 타임라인] → [하단 고정 액션/작성 영역].
+/// 최초 질문(제목·본문·첨부)이 타임라인의 첫 학생 항목으로 들어가고, 이후
+/// IqMessage 가 작성순으로 이어진다. 카드 스택(질문 카드·첨부 카드·작은 대화
+/// 카드)은 쓰지 않는다 — 계약은 test/individual_question/iq_fullscreen_chat_test.dart.
+///
+/// 역할·상태별 액션은 하단 영역에 고정된다:
 /// - 학생: 답변 도착 → [해결 완료(정산)] / 답변 전 → [질문 취소(환불)]
 /// - 멘토: 답변중(수락·지정) → 답변 작성
 /// 변경이 있었으면 pop(true) 로 알린다(호출부 새로고침).
@@ -142,6 +148,14 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   final MentorLookupRepository _mentorLookup = const MentorLookupRepository();
   final TextEditingController _answerController = TextEditingController();
 
+  /// 대화 타임라인 스크롤(수명은 이 State 가 소유·정리한다).
+  final ScrollController _timelineScroll = ScrollController();
+
+  /// 최신 대화로 내려보낼 필요가 있을 때만 참 — 최초 진입, 그리고 내가 방금
+  /// 답변을 등록한 직후. 그 외 새로고침(첨삭·환불·정산)은 사용자가 보고 있던
+  /// 스크롤 위치를 지키느라 건드리지 않는다(§7 예측 가능성).
+  bool _scrollToLatestOnData = true;
+
   /// §6: 멘토 답변 첨부 대기열(업로드 실패분 재시도용 상태 포함).
   final List<_PendingIqUpload> _pendingUploads = <_PendingIqUpload>[];
 
@@ -163,6 +177,7 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   @override
   void dispose() {
     _answerController.dispose();
+    _timelineScroll.dispose();
     super.dispose();
   }
 
@@ -196,8 +211,9 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   // ★ 스테일 응답 방어: 새 Future 로 '교체'만 한다 — FutureBuilder 는 최신
   //   Future 의 결과만 반영하므로 이전 로드가 늦게 끝나도 화면을 덮지 않는다
   //   (수동 세대 토큰 불필요).
-  void _refresh() {
+  void _refresh({bool scrollToLatest = false}) {
     if (!mounted) return; // await 뒤 호출 경로 대비(P3-4).
+    if (scrollToLatest) _scrollToLatestOnData = true;
     final Future<IqDetailData> next = _load();
     setState(() {
       _future = next;
@@ -230,14 +246,17 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
     return ok == true;
   }
 
-  Future<void> _runAction(Future<void> Function() action) async {
+  Future<void> _runAction(
+    Future<void> Function() action, {
+    bool scrollToLatest = false,
+  }) async {
     // P3-4: 확인 다이얼로그(await) 뒤에 진입한다 — dispose 후 setState 금지.
     if (_busy || !mounted) return;
     setState(() => _busy = true);
     try {
       await action();
       _changed = true;
-      _refresh(); // 내부에서 mounted 를 확인한다.
+      _refresh(scrollToLatest: scrollToLatest); // 내부에서 mounted 를 확인한다.
     } catch (e) {
       _snack(iqFailureMessage(e));
     } finally {
@@ -374,7 +393,8 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
       '답변 등록',
     );
     if (!ok || !mounted) return;
-    await _runAction(() async {
+    // 방금 등록한 내 답변은 타임라인 끝에 붙는다 — 이때만 끝으로 내려보낸다.
+    await _runAction(scrollToLatest: true, () async {
       await _repo.answer(widget.questionId, body);
       _answerController.clear();
       _snack('답변을 등록했어요.');
@@ -407,7 +427,9 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
                 ),
               );
             }
-            return _body(snap.data!);
+            final IqDetailData data = snap.data!;
+            _scheduleScrollToLatest(data);
+            return _body(data);
           },
         ),
       ),
@@ -420,110 +442,162 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   String? get _viewerId =>
       widget.currentUserId ?? SupabaseInit.clientOrNull?.auth.currentUser?.id;
 
+  /// §7 초기 위치: 메시지가 있으면 최신 대화 근처에서 시작한다. 질문만 있으면
+  /// 맨 위(질문)가 자연스러운 시작점이라 건드리지 않는다. build 중에는 플래그만
+  /// 내리고 실제 점프는 프레임 뒤로 미룬다.
+  void _scheduleScrollToLatest(IqDetailData data) {
+    if (!_scrollToLatestOnData || data.messages.isEmpty) return;
+    _scrollToLatestOnData = false;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _jumpTimelineToEnd(retriesLeft: 4));
+  }
+
+  /// 끝으로 점프. ListView 의 children 지연 레이아웃 때문에 maxScrollExtent 가
+  /// 추정치일 수 있어, 실제 끝에 닿을 때까지 몇 프레임 재시도한다(상한 고정 —
+  /// 초기 진입 직후에만 도는 짧은 수렴 루프).
+  void _jumpTimelineToEnd({required int retriesLeft}) {
+    if (!mounted || !_timelineScroll.hasClients) return;
+    final ScrollPosition p = _timelineScroll.position;
+    if (p.pixels >= p.maxScrollExtent) return;
+    _timelineScroll.jumpTo(p.maxScrollExtent);
+    if (retriesLeft > 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _jumpTimelineToEnd(retriesLeft: retriesLeft - 1));
+    }
+  }
+
+  /// 화면 전체 = 대화방: [컴팩트 헤더] → [Expanded 타임라인] → [하단 고정 영역].
   Widget _body(IqDetailData data) {
     final IndividualQuestion q = data.question;
     final bool isStudent = _role == AppRole.student;
     final bool isMentor = _role == AppRole.mentor;
-    final String? remaining = formatIqExpiryRemaining(q.expiresAt, q.status);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+    // 하단 고정 영역 내용(상태 안내 + 액션/컴포저). 역할·상태 게이트는 기존
+    // 의미 그대로 — 내용이 없으면 영역 자체를 렌더하지 않는다(빈 띠 금지).
+    final List<Widget> bottom = <Widget>[
+      if (isStudent) ..._studentActions(q),
+      if (isMentor) ..._mentorActions(q),
+    ];
+
+    return Column(
       children: <Widget>[
-        // 헤더: 유형·상태·가격·마감.
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        _conversationHeader(data),
+        Expanded(
+          child: ListView(
+            controller: _timelineScroll,
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenH, 12, AppSpacing.screenH, 12),
             children: <Widget>[
-              // 컴플라이언스: 헤더에서 금액 표시 제거(유형·상태만).
-              Row(
-                children: <Widget>[
-                  AppBadge(label: iqTypeLabel(q.type), tinted: true),
-                  const SizedBox(width: 6),
-                  IqStatusPill(status: q.status),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(q.title.isEmpty ? '(제목 없음)' : q.title,
-                  style: AppTypography.title),
-              const SizedBox(height: 6),
-              Row(
-                children: <Widget>[
-                  if (isStudent)
-                    Text(data.mentorName ?? '멘토', style: AppTypography.caption),
-                  if (q.createdAt != null) ...<Widget>[
-                    if (isStudent) const SizedBox(width: 8),
-                    Text(Formatters.relativeKorean(q.createdAt!),
-                        style: AppTypography.caption),
-                  ],
-                  if (remaining != null) ...<Widget>[
-                    const SizedBox(width: 8),
-                    Text(remaining, style: AppTypography.caption),
-                  ],
-                ],
-              ),
+              _questionBubble(data),
+              for (final IqMessage m in data.messages) _iqMessageBubble(q, m),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        // 질문 본문.
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // 본문 작성자는 정의상 학생이다(question.student_id).
-              // 아래 '대화' 카드의 멘토 답변과 같은 종류의 블록으로 보이지 않게
-              // 여기서도 작성자를 밝힌다.
-              Row(
-                children: <Widget>[
-                  const Text('질문', style: AppTypography.caption),
-                  const SizedBox(width: 6),
-                  const AppBadge(label: '학생', tinted: true),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(q.body, style: AppTypography.body),
-            ],
-          ),
-        ),
-        if (data.attachments.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 12),
-          _AttachmentsCard(
-            attachments: data.attachments,
-            urlResolver: _urlResolver,
-            // 첨삭 진입은 멘토만(§3). 학생의 전송 전 필기는 작성 화면 쪽.
-            // ★ 상태 게이트: 답변을 쓸 수 있는 구간(assigned/claimed)에서만 첨삭한다.
-            //   종결(released·refunded·expired·canceled)과 답변 완료(answered),
-            //   답변자 미정(escrowed·open), 미지(unknown)는 읽기 전용이다.
-            //   첨부 조회·저장은 상태와 무관하게 유지한다.
-            onAnnotate: isMentor && !_busy && iqCanMentorAnswer(q.status)
-                ? _annotateAttachment
-                : null,
-            // §6: 당사자 저장(다운로드) — RLS 가 당사자 외 접근을 차단한다.
-            onSave: _saveAttachment,
-          ),
-        ],
-        if (data.messages.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // '답변' 이 아니라 '대화' — 작성자 미확인 행이 섞일 수 있고,
-                // 모든 행이 멘토 답변이라는 단정은 데이터가 뒷받침하지 않는다.
-                const Text('대화', style: AppTypography.caption),
-                const SizedBox(height: 8),
-                for (final IqMessage m in data.messages)
-                  _iqMessageBubble(q, m),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        // 상태 안내 + 액션.
-        if (isStudent) ..._studentActions(q),
-        if (isMentor) ..._mentorActions(q),
+        if (bottom.isNotEmpty) _bottomArea(bottom),
       ],
+    );
+  }
+
+  /// 컴팩트 대화방 헤더 — 유형·상태·마감, 제목 한 줄, 멘토명·작성시각.
+  /// 카드가 아니라 얇은 띠다(대화 영역을 잠식하지 않는다). 제목이 길면 여기서는
+  /// 말줄임하고, 전문은 타임라인 첫 질문 말풍선에서 항상 읽을 수 있다.
+  Widget _conversationHeader(IqDetailData data) {
+    final IndividualQuestion q = data.question;
+    final bool isStudent = _role == AppRole.student;
+    final String? remaining = formatIqExpiryRemaining(q.expiresAt, q.status);
+    final List<String> meta = <String>[
+      if (isStudent) data.mentorName ?? '멘토',
+      if (q.createdAt != null) Formatters.relativeKorean(q.createdAt!),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenH, 10, AppSpacing.screenH, 10),
+      decoration: const BoxDecoration(
+        color: ColorTokens.page,
+        border: Border(bottom: BorderSide(color: ColorTokens.border)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              // 컴플라이언스: 헤더에 금액 비표시(유형·상태만) — 카드 시절과 동일.
+              AppBadge(label: iqTypeLabel(q.type), tinted: true),
+              const SizedBox(width: 6),
+              IqStatusPill(status: q.status),
+              if (remaining != null) ...<Widget>[
+                const Spacer(),
+                Text(remaining, style: AppTypography.caption),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            q.title.isEmpty ? '(제목 없음)' : q.title,
+            style: AppTypography.cardTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (meta.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(meta.join(' · '), style: AppTypography.caption),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 원본 질문 = 타임라인의 첫 대화 항목. 제목·본문·작성시각·첨부가 한 말풍선
+  /// 그룹이다(별도 질문 카드·첨부 섹션 금지).
+  ///
+  /// 작성자는 질문 행의 student_id 로 판정한다 — 빈 값은 절대 매칭하지 않고
+  /// '작성자 미확인' 중립으로 남긴다(메시지와 같은 규칙). 좌우 거울상·강조는
+  /// 뷰어 uid 가 있을 때만.
+  ///
+  /// 첨부는 원본과 이후 첨삭본을 한 그룹으로 붙인다 — 첨부 행에는 작성자도
+  /// 메시지 연결도 없으므로(서버 연동 후속, iq_annotation_repository 참조)
+  /// 귀속을 지어내지 않고 카드 시절과 같은 묶음을 유지한다.
+  Widget _questionBubble(IqDetailData data) {
+    final IndividualQuestion q = data.question;
+    final IqMessageAuthor author = iqMessageAuthorOf(
+      authorId: q.studentId,
+      studentId: q.studentId,
+      mentorId: q.mentorId,
+    );
+    final bool? mine =
+        iqMessageIsMine(authorId: q.studentId, viewerId: _viewerId);
+    final bool isMentor = _role == AppRole.mentor;
+
+    return ConversationBubble(
+      body: q.body,
+      titleLabel: q.title.trim().isEmpty ? null : q.title,
+      align: mine == true ? ConversationAlign.end : ConversationAlign.start,
+      tone: mine == true ? ConversationTone.accent : ConversationTone.neutral,
+      authorLabel: iqMessageAuthorLabel(author),
+      timeLabel:
+          q.createdAt == null ? null : Formatters.relativeKorean(q.createdAt!),
+      attachments: data.attachments.isEmpty
+          ? const <Widget>[]
+          : <Widget>[
+              _IqAttachmentGroup(
+                // 레포 정렬은 최신순(created_at desc) — 표시는 원본이 먼저
+                // 오는 작성순으로 뒤집는다(첨삭본이 원본 뒤에 붙는다).
+                attachments: data.attachments.reversed.toList(growable: false),
+                urlResolver: _urlResolver,
+                // 첨삭 진입은 멘토만(§3). 학생의 전송 전 필기는 작성 화면 쪽.
+                // ★ 상태 게이트: 답변을 쓸 수 있는 구간(assigned/claimed)에서만
+                //   첨삭한다. 종결(released·refunded·expired·canceled)과 답변
+                //   완료(answered), 답변자 미정(escrowed·open), 미지(unknown)는
+                //   읽기 전용이다. 첨부 조회·저장은 상태와 무관하게 유지한다.
+                onAnnotate: isMentor && !_busy && iqCanMentorAnswer(q.status)
+                    ? _annotateAttachment
+                    : null,
+                // §6: 당사자 저장(다운로드) — RLS 가 당사자 외 접근을 차단한다.
+                onSave: _saveAttachment,
+              ),
+            ],
     );
   }
 
@@ -546,9 +620,32 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
       align: mine == true ? ConversationAlign.end : ConversationAlign.start,
       tone: mine == true ? ConversationTone.accent : ConversationTone.neutral,
       authorLabel: iqMessageAuthorLabel(author),
-      timeLabel: m.createdAt == null
-          ? null
-          : Formatters.relativeKorean(m.createdAt!),
+      timeLabel:
+          m.createdAt == null ? null : Formatters.relativeKorean(m.createdAt!),
+    );
+  }
+
+  /// 하단 고정 영역 — 타임라인과 시각적으로 분리된 흰 띠 + 시스템 제스처
+  /// 안전영역. 키보드는 Scaffold(resizeToAvoidBottomInset 기본값)가 밀어올린다.
+  Widget _bottomArea(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: ColorTokens.page,
+        border: Border(top: BorderSide(color: ColorTokens.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenH, 10, AppSpacing.screenH, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+      ),
     );
   }
 
@@ -566,7 +663,6 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         label: '해결 완료 (멘토에게 정산)',
         onPressed: _busy ? null : _release,
       ));
-      out.add(const SizedBox(height: 8));
     }
     if (iqCanStudentRefund(q.status)) {
       out.add(SecondaryButton(
@@ -580,7 +676,7 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         style: AppTypography.caption,
       ));
     }
-    // 환불·만료·취소는 지금까지 아무것도 렌더하지 않아 화면이 비어 보였다.
+    // 환불·만료·취소 종결 안내 — 하단 영역이 빈 띠로 남지 않게 한다.
     final String? notice = iqReadOnlyNotice(q.status);
     if (notice != null) {
       out.add(Text(notice, style: AppTypography.caption));
@@ -686,87 +782,87 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
       return const <Widget>[];
     }
     return <Widget>[
-      AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      const Text('답변 작성', style: AppTypography.caption),
+      const SizedBox(height: 8),
+      TextField(
+        controller: _answerController,
+        // 하단 고정 컴포저 — 짧은 뷰포트(가로 모드)에서도 타임라인이 남게
+        // 낮게 시작하고, 길어지면 내부 스크롤로 늘어난다(카드 시절 4~10줄).
+        minLines: 2,
+        maxLines: 5,
+        decoration: const InputDecoration(
+          hintText: '학생이 이해할 수 있게 풀이 과정을 함께 적어 주세요.',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      // §6: 답변 첨부(이미지·카메라·파일) — 선택 즉시 업로드,
+      // 실패분은 아래 목록에 남아 재시도(중복 업로드 0).
+      for (final _PendingIqUpload p in _pendingUploads) ...<Widget>[
+        const SizedBox(height: 8),
+        Row(
           children: <Widget>[
-            const Text('답변 작성', style: AppTypography.caption),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _answerController,
-              minLines: 4,
-              maxLines: 10,
-              decoration: const InputDecoration(
-                hintText: '학생이 이해할 수 있게 풀이 과정을 함께 적어 주세요.',
-                border: OutlineInputBorder(),
-              ),
+            Icon(
+              p.error == null ? Icons.attach_file : Icons.error_outline_rounded,
+              size: 18,
+              color:
+                  p.error == null ? ColorTokens.secondary : ColorTokens.danger,
             ),
-            // §6: 답변 첨부(이미지·카메라·파일) — 선택 즉시 업로드,
-            // 실패분은 아래 목록에 남아 재시도(중복 업로드 0).
-            for (final _PendingIqUpload p in _pendingUploads) ...<Widget>[
-              const SizedBox(height: 8),
-              Row(
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(
-                    p.error == null
-                        ? Icons.attach_file
-                        : Icons.error_outline_rounded,
-                    size: 18,
-                    color: p.error == null
-                        ? ColorTokens.secondary
-                        : ColorTokens.danger,
+                  Text(
+                    '${p.file.fileName} (${_formatBytes(p.file.bytes.length)})',
+                    style: AppTypography.caption,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '${p.file.fileName} (${_formatBytes(p.file.bytes.length)})',
-                          style: AppTypography.caption,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (p.error != null)
-                          Text(p.error!,
-                              style: AppTypography.caption
-                                  .copyWith(color: ColorTokens.danger)),
-                      ],
-                    ),
-                  ),
-                  if (p.uploading)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else if (p.error != null)
-                    TextButton(
-                      onPressed: () => _uploadPending(q.id, p),
-                      child: const Text('재시도'),
-                    ),
-                  if (!p.uploading)
-                    IconButton(
-                      tooltip: '제거',
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: () =>
-                          setState(() => _pendingUploads.remove(p)),
-                    ),
+                  if (p.error != null)
+                    Text(p.error!,
+                        style: AppTypography.caption
+                            .copyWith(color: ColorTokens.danger)),
                 ],
               ),
-            ],
-            const SizedBox(height: 8),
-            SecondaryButton(
+            ),
+            if (p.uploading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (p.error != null)
+              TextButton(
+                onPressed: () => _uploadPending(q.id, p),
+                child: const Text('재시도'),
+              ),
+            if (!p.uploading)
+              IconButton(
+                tooltip: '제거',
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () => setState(() => _pendingUploads.remove(p)),
+              ),
+          ],
+        ),
+      ],
+      const SizedBox(height: 8),
+      Row(
+        children: <Widget>[
+          Expanded(
+            child: SecondaryButton(
               label: '파일 첨부',
               icon: Icons.attach_file,
               onPressed: _busy ? null : () => _pickAndUploadAttachment(q.id),
             ),
-            const SizedBox(height: 10),
-            PrimaryButton(
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: PrimaryButton(
               label: '답변 등록',
               onPressed: _busy ? null : _submitAnswer,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ];
   }
@@ -792,15 +888,17 @@ String _formatBytes(int bytes) {
   return '${bytes}B';
 }
 
-/// 첨부 카드 — 이미지는 서명 URL 로 인라인 표시, 그 외 파일은 이름만.
-/// [onAnnotate] 가 있으면(멘토) 이미지 첨부마다 '첨삭하기'를 노출한다(S18).
-/// [onSave] 가 있으면 항목마다 '저장'(당사자 다운로드 → SAF)을 노출한다(§6).
+/// 첨부 그룹 — 질문 말풍선(첫 타임라인 항목) 안에 세로로 쌓인다. 이미지는
+/// 서명 URL 로 인라인 표시, 그 외 파일은 이름 행만. 카드 시절의 별도 '첨부'
+/// 섹션을 대체하며, 조회·저장·첨삭 의미와 게이트는 그대로다(§6·S18).
+/// [onAnnotate] 가 있으면(멘토·답변 가능 상태) 이미지마다 '첨삭하기' 노출.
+/// [onSave] 가 있으면 항목마다 '저장'(당사자 다운로드 → SAF) 노출.
 ///
 /// ★ P3-6: Future 는 storage_path 별로 상태에 메모한다 — build 마다 새
 ///   Future 를 만들던 이전 방식은 리빌드마다 서명 URL 을 재요청했다.
 ///   리졸버 캐시(만료 전 재사용)와 이중으로 재요청을 막는다.
-class _AttachmentsCard extends StatefulWidget {
-  const _AttachmentsCard({
+class _IqAttachmentGroup extends StatefulWidget {
+  const _IqAttachmentGroup({
     required this.attachments,
     required this.urlResolver,
     this.onAnnotate,
@@ -815,10 +913,10 @@ class _AttachmentsCard extends StatefulWidget {
   final void Function(IqAttachment attachment)? onSave;
 
   @override
-  State<_AttachmentsCard> createState() => _AttachmentsCardState();
+  State<_IqAttachmentGroup> createState() => _IqAttachmentGroupState();
 }
 
-class _AttachmentsCardState extends State<_AttachmentsCard> {
+class _IqAttachmentGroupState extends State<_IqAttachmentGroup> {
   /// storage_path → 진행 중/완료 Future 메모(리빌드 시 재사용).
   final Map<String, Future<String>> _urlFutures = <String, Future<String>>{};
 
@@ -843,95 +941,96 @@ class _AttachmentsCardState extends State<_AttachmentsCard> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text('첨부', style: AppTypography.caption),
-          for (final IqAttachment a in widget.attachments) ...<Widget>[
-            const SizedBox(height: 8),
-            if (_isImage(a)) ...<Widget>[
-              FutureBuilder<String>(
-                future: _signedUrl(a),
-                builder: (BuildContext context, AsyncSnapshot<String> snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const SizedBox(
-                      height: 120,
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snap.hasError || snap.data == null) {
-                    return const Text('이미지를 불러오지 못했어요.',
-                        style: AppTypography.caption);
-                  }
-                  return GestureDetector(
-                    onTap: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => _IqAttachmentViewer(
-                          url: snap.data!,
-                          title: a.fileName ?? '첨부 이미지',
-                          onAnnotate: widget.onAnnotate == null
-                              ? null
-                              : () => widget.onAnnotate!(a),
-                        ),
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        snap.data!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Text(
-                          '이미지를 불러오지 못했어요.',
-                          style: AppTypography.caption,
-                        ),
-                      ),
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        for (final IqAttachment a in widget.attachments) ...<Widget>[
+          if (a != widget.attachments.first) const SizedBox(height: 8),
+          if (_isImage(a)) ...<Widget>[
+            FutureBuilder<String>(
+              future: _signedUrl(a),
+              builder: (BuildContext context, AsyncSnapshot<String> snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()),
                   );
-                },
-              ),
-              if (widget.onAnnotate != null || widget.onSave != null)
-                Row(
-                  children: <Widget>[
-                    if (widget.onAnnotate != null)
-                      TextButton.icon(
-                        onPressed: () => widget.onAnnotate!(a),
-                        icon: const Icon(Icons.draw_rounded, size: 18),
-                        label: const Text('첨삭하기'),
+                }
+                if (snap.hasError || snap.data == null) {
+                  return const Text('이미지를 불러오지 못했어요.',
+                      style: AppTypography.caption);
+                }
+                return GestureDetector(
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => _IqAttachmentViewer(
+                        url: snap.data!,
+                        title: a.fileName ?? '첨부 이미지',
+                        onAnnotate: widget.onAnnotate == null
+                            ? null
+                            : () => widget.onAnnotate!(a),
                       ),
-                    if (widget.onSave != null)
-                      TextButton.icon(
-                        onPressed: () => widget.onSave!(a),
-                        icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('저장'),
-                      ),
-                  ],
-                ),
-            ] else
-              Row(
-                children: <Widget>[
-                  const Icon(Icons.attach_file,
-                      size: 18, color: ColorTokens.secondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      a.fileName ?? '첨부 파일',
-                      style: AppTypography.body,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // §6: 구 '웹에서 확인' 폐기 — 앱에서 당사자 저장 지원.
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      snap.data!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Text(
+                        '이미지를 불러오지 못했어요.',
+                        style: AppTypography.caption,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (widget.onAnnotate != null || widget.onSave != null)
+              // 말풍선 폭(화면 72%) 안에서 좁은 기기는 줄바꿈한다(가로 오버플로 0).
+              Wrap(
+                spacing: 4,
+                children: <Widget>[
+                  if (widget.onAnnotate != null)
+                    TextButton.icon(
+                      onPressed: () => widget.onAnnotate!(a),
+                      icon: const Icon(Icons.draw_rounded, size: 18),
+                      label: const Text('첨삭하기'),
+                    ),
                   if (widget.onSave != null)
                     TextButton.icon(
                       onPressed: () => widget.onSave!(a),
                       icon: const Icon(Icons.download_rounded, size: 18),
                       label: const Text('저장'),
-                    )
+                    ),
                 ],
               ),
-          ],
+          ] else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.attach_file,
+                    size: 18, color: ColorTokens.secondary),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    a.fileName ?? '첨부 파일',
+                    style: AppTypography.body,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // §6: 구 '웹에서 확인' 폐기 — 앱에서 당사자 저장 지원.
+                if (widget.onSave != null)
+                  TextButton.icon(
+                    onPressed: () => widget.onSave!(a),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text('저장'),
+                  )
+              ],
+            ),
         ],
-      ),
+      ],
     );
   }
 }

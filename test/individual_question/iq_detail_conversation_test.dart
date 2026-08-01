@@ -8,6 +8,11 @@ import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
 
 /// D-10 렌더 계약: 개별질문 상세의 대화 영역이 학생·멘토 작성자를 구분한다.
+///
+/// vc11: 화면 전체가 대화방이 되면서 원본 질문도 첫 학생 말풍선으로 타임라인에
+/// 들어간다(iq_fullscreen_chat_test 참조). 그래서 라벨 단언은 전역 텍스트
+/// 개수가 아니라 말풍선 단위로 한다 — 질문 말풍선의 '학생' 라벨이 메시지
+/// 라벨 개수에 합산되기 때문이다.
 const String kStudentId = 's1';
 const String kMentorId = 'm1';
 
@@ -77,33 +82,38 @@ ConversationBubble _bubbleWithBody(WidgetTester tester, String body) {
 }
 
 void main() {
-  testWidgets('학생 작성 메시지 → 대화 영역에 학생 라벨', (WidgetTester tester) async {
+  testWidgets('학생 작성 메시지 → 학생 라벨(질문 말풍선과 별개로)', (WidgetTester tester) async {
     await _pump(tester,
         role: AppRole.student,
         messages: <IqMessage>[_msg('m1', kStudentId, '추가로 여쭤봐요')]);
 
-    expect(_inBubbles('학생'), findsOneWidget);
+    expect(_bubbleWithBody(tester, '추가로 여쭤봐요').authorLabel, '학생');
     expect(_inBubbles('멘토'), findsNothing);
+    // 질문 말풍선(첫 항목) + 학생 메시지 = '학생' 라벨 2개.
+    expect(_inBubbles('학생'), findsNWidgets(2));
   });
 
-  testWidgets('멘토 작성 메시지 → 대화 영역에 멘토 라벨', (WidgetTester tester) async {
+  testWidgets('멘토 작성 메시지 → 멘토 라벨', (WidgetTester tester) async {
     await _pump(tester,
         role: AppRole.student,
         messages: <IqMessage>[_msg('m1', kMentorId, '이렇게 푸시면 돼요')]);
 
+    expect(_bubbleWithBody(tester, '이렇게 푸시면 돼요').authorLabel, '멘토');
     expect(_inBubbles('멘토'), findsOneWidget);
-    expect(_inBubbles('학생'), findsNothing);
+    // '학생' 은 질문 말풍선의 것 하나뿐 — 멘토 메시지에 붙지 않는다.
+    expect(_inBubbles('학생'), findsOneWidget);
   });
 
-  testWidgets('혼합 스레드: 학생·멘토·미확인 3건이 각각 다르게 표기된다',
-      (WidgetTester tester) async {
+  testWidgets('혼합 스레드: 학생·멘토·미확인 3건이 각각 다르게 표기된다', (WidgetTester tester) async {
     await _pump(tester, role: AppRole.student, messages: <IqMessage>[
       _msg('a', kStudentId, '질문 추가'),
       _msg('b', kMentorId, '답변'),
       _msg('c', 'x9', '운영자 메모'),
     ]);
 
-    expect(_inBubbles('학생'), findsOneWidget);
+    expect(_bubbleWithBody(tester, '질문 추가').authorLabel, '학생');
+    expect(_bubbleWithBody(tester, '답변').authorLabel, '멘토');
+    expect(_bubbleWithBody(tester, '운영자 메모').authorLabel, '작성자 미확인');
     expect(_inBubbles('멘토'), findsOneWidget);
     expect(_inBubbles('작성자 미확인'), findsOneWidget);
   });
@@ -127,8 +137,7 @@ void main() {
     expect(theirs.tone, ConversationTone.neutral);
   });
 
-  testWidgets('멘토 시점: 거울상 — 내 답변이 우측으로 간다',
-      (WidgetTester tester) async {
+  testWidgets('멘토 시점: 거울상 — 내 답변이 우측으로 간다', (WidgetTester tester) async {
     await _pump(tester,
         role: AppRole.mentor,
         viewerId: kMentorId,
@@ -148,14 +157,15 @@ void main() {
       _msg('b', kMentorId, '상대 글'),
     ]);
 
-    for (final String body in <String>['내 글', '상대 글']) {
+    // 질문 말풍선('문제 본문')도 뷰어 uid 없이는 좌측 중립이어야 한다.
+    for (final String body in <String>['문제 본문', '내 글', '상대 글']) {
       final ConversationBubble b = _bubbleWithBody(tester, body);
       expect(b.align, ConversationAlign.start);
       expect(b.tone, ConversationTone.neutral);
     }
     // 방향 구분은 uid 없이도 살아 있다 — 그게 D-10 의 핵심.
-    expect(_inBubbles('학생'), findsOneWidget);
-    expect(_inBubbles('멘토'), findsOneWidget);
+    expect(_bubbleWithBody(tester, '내 글').authorLabel, '학생');
+    expect(_bubbleWithBody(tester, '상대 글').authorLabel, '멘토');
   });
 
   testWidgets('작성자 미확인은 accent 를 절대 받지 않는다', (WidgetTester tester) async {
@@ -182,8 +192,7 @@ void main() {
     expect(_inBubbles('멘토'), findsNothing);
   });
 
-  testWidgets('author_id UUID 원문은 화면에 노출되지 않는다',
-      (WidgetTester tester) async {
+  testWidgets('author_id UUID 원문은 화면에 노출되지 않는다', (WidgetTester tester) async {
     const String uuid = '3f2b1c9e-0000-4aaa-bbbb-cccccccccccc';
     await _pump(tester,
         role: AppRole.student,
@@ -194,10 +203,13 @@ void main() {
     expect(find.textContaining('3f2b1c9e'), findsNothing);
   });
 
-  testWidgets('메시지 0건 → 대화 영역 미노출', (WidgetTester tester) async {
+  testWidgets('메시지 0건 → 질문 말풍선 하나만(빈 대화 카드·헤더 없음)',
+      (WidgetTester tester) async {
     await _pump(tester, role: AppRole.student, messages: const <IqMessage>[]);
 
-    expect(find.byType(ConversationBubble), findsNothing);
+    // vc11: 대화 영역은 항상 있고, 원본 질문이 유일한 첫 항목이다.
+    expect(find.byType(ConversationBubble), findsOneWidget);
+    expect(_bubbleWithBody(tester, '문제 본문').authorLabel, '학생');
     expect(find.text('대화'), findsNothing);
   });
 
@@ -212,15 +224,16 @@ void main() {
     expect(_inBubbles('멘토'), findsOneWidget);
   });
 
-  testWidgets("'답변' 고정 헤더는 더 이상 쓰지 않는다(작성자 단정 제거)",
+  testWidgets("'답변'·'대화' 고정 헤더는 더 이상 쓰지 않는다(카드 스택 해체)",
       (WidgetTester tester) async {
     await _pump(tester,
         role: AppRole.student,
         messages: <IqMessage>[_msg('a', kStudentId, '학생 추가 질문')]);
 
-    expect(find.text('대화'), findsOneWidget);
-    // 학생이 쓴 행까지 '답변' 이라고 부르던 헤더는 사라졌다.
+    // 학생이 쓴 행까지 '답변' 이라고 부르던 헤더도, vc10 의 작은 '대화'
+    // 카드 헤더도 없다 — 화면 전체가 대화방이다(vc11).
     expect(find.text('답변'), findsNothing);
+    expect(find.text('대화'), findsNothing);
   });
 
   testWidgets('멘토 테마에서 내 답변은 멘토 accentSoft 로 칠해진다',
@@ -230,9 +243,11 @@ void main() {
         viewerId: kMentorId,
         messages: <IqMessage>[_msg('b', kMentorId, '내 답변')]);
 
+    // 첫 말풍선은 이제 원본 질문(학생·중립)이므로 '내 답변' 말풍선으로 스코프.
     final Finder box = find
         .descendant(
-          of: find.byType(ConversationBubble),
+          of: find.byWidgetPredicate(
+              (Widget w) => w is ConversationBubble && w.body == '내 답변'),
           matching: find.byType(Container),
         )
         .first;
