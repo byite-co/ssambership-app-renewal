@@ -49,8 +49,7 @@ void main() {
     expect(_bubbleRow(tester).mainAxisAlignment, MainAxisAlignment.start);
   });
 
-  testWidgets('align=center → 가운데 정렬(작성자 미확정용)',
-      (WidgetTester tester) async {
+  testWidgets('align=center → 가운데 정렬(작성자 미확정용)', (WidgetTester tester) async {
     await tester.pumpWidget(_themed(
       AppRole.student,
       const ConversationBubble(body: '안녕', align: ConversationAlign.center),
@@ -113,7 +112,8 @@ void main() {
       AppRole.student,
       const ConversationBubble(body: '안녕'),
     ));
-    final double screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    final double screen =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
     expect(
       _bubbleBox(tester).constraints!.maxWidth,
       closeTo(screen * ConversationMetrics.maxWidthFactor, 0.01),
@@ -147,6 +147,26 @@ void main() {
       const ConversationBubble(body: '안녕'),
     ));
     expect(find.text('학생'), findsNothing);
+  });
+
+  testWidgets('titleLabel 은 본문 위 제목 줄로 렌더, null 이면 미노출',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_themed(
+      AppRole.student,
+      const ConversationBubble(body: '본문', titleLabel: '제목 줄'),
+    ));
+    expect(find.text('제목 줄'), findsOneWidget);
+    // 제목이 본문보다 위에 있다(같은 말풍선 안 한 그룹).
+    expect(
+      tester.getTopLeft(find.text('제목 줄')).dy,
+      lessThan(tester.getTopLeft(find.text('본문')).dy),
+    );
+
+    await tester.pumpWidget(_themed(
+      AppRole.student,
+      const ConversationBubble(body: '본문'),
+    ));
+    expect(find.text('제목 줄'), findsNothing);
   });
 
   testWidgets('본문 빈 문자열 + 첨부만 → 첨부만 렌더', (WidgetTester tester) async {

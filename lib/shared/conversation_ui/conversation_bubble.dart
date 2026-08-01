@@ -54,6 +54,7 @@ class ConversationBubble extends StatelessWidget {
     this.tone = ConversationTone.neutral,
     this.timeLabel,
     this.authorLabel,
+    this.titleLabel,
     this.attachments = const <Widget>[],
   });
 
@@ -70,6 +71,10 @@ class ConversationBubble extends StatelessWidget {
   /// 작성자 표기(예: '학생'). null 이면 표시하지 않는다.
   /// 내부 id·영문 코드를 그대로 넘기지 말 것 — 화면 노출 금지 규약.
   final String? authorLabel;
+
+  /// 제목 줄(본문 위에 굵게). 제목이 있는 메시지(예: 최초 게시 글)를 하나의
+  /// 말풍선으로 통합할 때 쓴다. null 이면 표시하지 않는다 — 기존 호출부 불변.
+  final String? titleLabel;
 
   /// 이 말풍선에 딸린 첨부 위젯(썸네일·파일 칩). 상위가 만들어 넣는다.
   final List<Widget> attachments;
@@ -104,9 +109,8 @@ class ConversationBubble extends StatelessWidget {
       bottomRight: _isEnd ? tail : r,
     );
 
-    final Widget? time = timeLabel == null
-        ? null
-        : Text(timeLabel!, style: AppType.caption);
+    final Widget? time =
+        timeLabel == null ? null : Text(timeLabel!, style: AppType.caption);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ConversationMetrics.gap),
@@ -123,16 +127,23 @@ class ConversationBubble extends StatelessWidget {
             child: Container(
               constraints: BoxConstraints(maxWidth: maxBubbleWidth),
               padding: ConversationMetrics.padding,
-              decoration:
-                  BoxDecoration(color: bg, borderRadius: bubbleRadius),
+              decoration: BoxDecoration(color: bg, borderRadius: bubbleRadius),
               child: Column(
-                crossAxisAlignment: _isEnd
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    _isEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (authorLabel != null) ...<Widget>[
                     Text(authorLabel!, style: AppType.caption),
+                    const SizedBox(height: 4),
+                  ],
+                  if (titleLabel != null) ...<Widget>[
+                    Text(
+                      titleLabel!,
+                      style: AppType.cardTitle.copyWith(
+                        height: ConversationMetrics.bodyHeight,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                   ],
                   if (body.isNotEmpty)
