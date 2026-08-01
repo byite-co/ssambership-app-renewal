@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
+import '../../../core/supabase/supabase_client.dart';
+import '../../../shared/conversation_ui/conversation_bubble.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/tokens/typography.dart';
@@ -64,9 +66,15 @@ class IqDetailScreen extends StatefulWidget {
     this.attachmentsOverride,
     this.sourcePickerOverride,
     this.fileSaverOverride,
+    this.currentUserId,
   });
 
   final String questionId;
+
+  /// 내 사용자 id 오버라이드(테스트용). null 이면 Supabase 세션에서 얻는다.
+  /// 좌우 거울상 정렬에만 쓰이며, 학생·멘토 작성자 판정에는 필요 없다
+  /// (그건 질문 행의 당사자 id 로 결정된다).
+  final String? currentUserId;
 
   /// 테스트용 데이터 주입. null 이면 실제 레포 사용.
   final Future<IqDetailData> Function()? loaderOverride;
@@ -408,6 +416,10 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
 
   AppRole get _role => widget.roleOverride ?? AuthService.instance.currentRole;
 
+  /// 뷰어 uid. Supabase 미초기화(위젯 테스트)면 null → 거울상 없이 전부 좌측.
+  String? get _viewerId =>
+      widget.currentUserId ?? SupabaseInit.clientOrNull?.auth.currentUser?.id;
+
   Widget _body(IqDetailData data) {
     final IndividualQuestion q = data.question;
     final bool isStudent = _role == AppRole.student;
@@ -459,7 +471,16 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text('질문', style: AppTypography.caption),
+              // 본문 작성자는 정의상 학생이다(question.student_id).
+              // 아래 '대화' 카드의 멘토 답변과 같은 종류의 블록으로 보이지 않게
+              // 여기서도 작성자를 밝힌다.
+              Row(
+                children: <Widget>[
+                  const Text('질문', style: AppTypography.caption),
+                  const SizedBox(width: 6),
+                  const AppBadge(label: '학생', tinted: true),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(q.body, style: AppTypography.body),
             ],
@@ -482,16 +503,12 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text('답변', style: AppTypography.caption),
-                for (final IqMessage m in data.messages) ...<Widget>[
-                  const SizedBox(height: 8),
-                  Text(m.body, style: AppTypography.body),
-                  if (m.createdAt != null) ...<Widget>[
-                    const SizedBox(height: 4),
-                    Text(Formatters.relativeKorean(m.createdAt!),
-                        style: AppTypography.caption),
-                  ],
-                ],
+                // '답변' 이 아니라 '대화' — 작성자 미확인 행이 섞일 수 있고,
+                // 모든 행이 멘토 답변이라는 단정은 데이터가 뒷받침하지 않는다.
+                const Text('대화', style: AppTypography.caption),
+                const SizedBox(height: 8),
+                for (final IqMessage m in data.messages)
+                  _iqMessageBubble(q, m),
               ],
             ),
           ),
@@ -501,6 +518,31 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         if (isStudent) ..._studentActions(q),
         if (isMentor) ..._mentorActions(q),
       ],
+    );
+  }
+
+  /// 메시지 1건 → 대화 말풍선.
+  ///
+  /// 작성자 방향(학생/멘토)은 질문 행의 당사자 id 로 판정한다 — 뷰어 신원이
+  /// 없어도 성립한다. 좌우 거울상은 뷰어 uid 가 있을 때만 적용하고, 모르면
+  /// 좌측 중립으로 둔다(내 메시지로 오인시키지 않는다).
+  Widget _iqMessageBubble(IndividualQuestion q, IqMessage m) {
+    final IqMessageAuthor author = iqMessageAuthorOf(
+      authorId: m.authorId,
+      studentId: q.studentId,
+      mentorId: q.mentorId,
+    );
+    final bool? mine =
+        iqMessageIsMine(authorId: m.authorId, viewerId: _viewerId);
+
+    return ConversationBubble(
+      body: m.body,
+      align: mine == true ? ConversationAlign.end : ConversationAlign.start,
+      tone: mine == true ? ConversationTone.accent : ConversationTone.neutral,
+      authorLabel: iqMessageAuthorLabel(author),
+      timeLabel: m.createdAt == null
+          ? null
+          : Formatters.relativeKorean(m.createdAt!),
     );
   }
 
@@ -531,6 +573,11 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         '해결 완료했어요. 안전 보관 중이던 캐시가 멘토에게 정산됐어요.',
         style: AppTypography.caption,
       ));
+    }
+    // 환불·만료·취소는 지금까지 아무것도 렌더하지 않아 화면이 비어 보였다.
+    final String? notice = iqReadOnlyNotice(q.status);
+    if (notice != null) {
+      out.add(Text(notice, style: AppTypography.caption));
     }
     return out;
   }
@@ -625,6 +672,10 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         return const <Widget>[
           Text('정산이 완료된 질문이에요.', style: AppTypography.caption),
         ];
+      }
+      final String? notice = iqReadOnlyNotice(q.status);
+      if (notice != null) {
+        return <Widget>[Text(notice, style: AppTypography.caption)];
       }
       return const <Widget>[];
     }
