@@ -20,10 +20,20 @@ IndividualQuestion _q(IndividualQuestionStatus status) => IndividualQuestion(
       createdAt: DateTime(2026, 7, 1),
     );
 
+const List<IqAttachment> _oneImage = <IqAttachment>[
+  IqAttachment(
+    id: 'a1',
+    storagePath: 'q1/1-000001.png',
+    fileName: '문제.png',
+    mimeType: 'image/png',
+  ),
+];
+
 Future<void> _pump(
   WidgetTester tester,
   IndividualQuestionStatus status, {
   required AppRole role,
+  List<IqAttachment> attachments = const <IqAttachment>[],
 }) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pumpWidget(MaterialApp(
@@ -33,7 +43,7 @@ Future<void> _pump(
       loaderOverride: () async => IqDetailData(
         question: _q(status),
         messages: const <IqMessage>[],
-        attachments: const <IqAttachment>[],
+        attachments: attachments,
         mentorName: '수학멘토',
       ),
     ),
@@ -131,6 +141,66 @@ void main() {
           role: AppRole.mentor);
 
       expect(find.text('답변 등록'), findsOneWidget);
+    });
+  });
+
+  group('첨삭 진입 상태 게이트 — 답변 가능 구간에서만', () {
+    // 첨삭이 허용되는 유일한 구간(= iqCanMentorAnswer).
+    for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
+      IndividualQuestionStatus.assigned,
+      IndividualQuestionStatus.claimed,
+    ]) {
+      testWidgets('멘토 · $s: 첨삭하기 표시', (WidgetTester tester) async {
+        await _pump(tester, s,
+            role: AppRole.mentor, attachments: _oneImage);
+
+        expect(find.text('첨삭하기'), findsOneWidget);
+      });
+    }
+
+    // 나머지 8개 상태는 전부 읽기 전용.
+    for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
+      IndividualQuestionStatus.escrowed,
+      IndividualQuestionStatus.open,
+      IndividualQuestionStatus.answered,
+      IndividualQuestionStatus.released,
+      IndividualQuestionStatus.refunded,
+      IndividualQuestionStatus.expired,
+      IndividualQuestionStatus.canceled,
+      IndividualQuestionStatus.unknown,
+    ]) {
+      testWidgets('멘토 · $s: 첨삭하기 미표시(첨부 조회·저장은 유지)',
+          (WidgetTester tester) async {
+        await _pump(tester, s,
+            role: AppRole.mentor, attachments: _oneImage);
+
+        expect(find.text('첨삭하기'), findsNothing);
+        // 게이트가 첨부 카드 자체를 죽이면 안 된다 — 저장(다운로드)은 유지된다.
+        expect(find.text('저장'), findsOneWidget);
+      });
+    }
+
+    for (final IndividualQuestionStatus s in IndividualQuestionStatus.values) {
+      testWidgets('학생 · $s: 첨삭하기 미표시', (WidgetTester tester) async {
+        await _pump(tester, s,
+            role: AppRole.student, attachments: _oneImage);
+
+        expect(find.text('첨삭하기'), findsNothing);
+      });
+    }
+
+    testWidgets('게이트는 iqCanMentorAnswer 와 같은 구간을 쓴다(정의 이탈 가드)',
+        (WidgetTester tester) async {
+      for (final IndividualQuestionStatus s
+          in IndividualQuestionStatus.values) {
+        await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
+
+        expect(
+          find.text('첨삭하기'),
+          iqCanMentorAnswer(s) ? findsOneWidget : findsNothing,
+          reason: '$s: iqCanMentorAnswer=${iqCanMentorAnswer(s)} 와 어긋난다',
+        );
+      }
     });
   });
 

@@ -492,7 +492,13 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
             attachments: data.attachments,
             urlResolver: _urlResolver,
             // 첨삭 진입은 멘토만(§3). 학생의 전송 전 필기는 작성 화면 쪽.
-            onAnnotate: isMentor && !_busy ? _annotateAttachment : null,
+            // ★ 상태 게이트: 답변을 쓸 수 있는 구간(assigned/claimed)에서만 첨삭한다.
+            //   종결(released·refunded·expired·canceled)과 답변 완료(answered),
+            //   답변자 미정(escrowed·open), 미지(unknown)는 읽기 전용이다.
+            //   첨부 조회·저장은 상태와 무관하게 유지한다.
+            onAnnotate: isMentor && !_busy && iqCanMentorAnswer(q.status)
+                ? _annotateAttachment
+                : null,
             // §6: 당사자 저장(다운로드) — RLS 가 당사자 외 접근을 차단한다.
             onSave: _saveAttachment,
           ),
