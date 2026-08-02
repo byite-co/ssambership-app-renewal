@@ -273,6 +273,13 @@ void main() {
       final _Harness h = _Harness(fetchError: Exception('network'));
       expect(await _catch(() => h.run()), isA<AppError>());
     });
+
+    test('RPC 전송 자체가 실패하면 성공 처리하지 않는다(예외를 삼키지 않는다)',
+        () async {
+      final _Harness h = _Harness(rpcError: Exception('network down'));
+      expect(await _catch(() => h.run()), isNotNull);
+      expect(h.fetchCalls, 0);
+    });
   });
 
   group('서버 오류 코드 → 한글 문구', () {
@@ -496,7 +503,13 @@ void main() {
         (WidgetTester tester) async {
       final FakeCommunityWrite fake = FakeCommunityWrite();
 
+      // 성공하면 화면이 pop 되어 Navigator 스택이 빈다. 그 상태로 같은
+      // MaterialApp 을 다시 pump 하면 Element 가 재사용돼 빈 Navigator 를
+      // rebuild 하다 죽는다(_history.isNotEmpty assertion). 루트 위젯 타입을
+      // 바꿔 앱 전체를 해제한 뒤 새로 세워야 진짜 '새 작성 작업'이 된다.
       Future<void> writeOnce(String title) async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
         await tester
             .pumpWidget(MaterialApp(home: BoardWriteScreen(write: fake)));
         await tester.pumpAndSettle();
@@ -507,10 +520,7 @@ void main() {
       }
 
       await writeOnce('첫 글');
-      // 화면을 완전히 교체 = 새 작성 작업.
-      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
-      await tester.pumpAndSettle();
-      await writeOnce('두 번째 글');
+      await writeOnce('두 번째 글'); // 새 작성 작업
 
       expect(fake.postCalls, 2);
       expect(fake.postIdempotencyKeys.toSet(), hasLength(2),
