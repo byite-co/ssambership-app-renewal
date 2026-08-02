@@ -5,6 +5,7 @@ import '../../../../design/spacing_tokens.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../../../design/widgets/primary_button.dart';
+import '../../data/board_post_create_gateway.dart';
 import '../../data/community_labels.dart';
 import '../../data/community_write_repository.dart';
 import '../widgets/content_policy_gate.dart';
@@ -30,6 +31,12 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   String _category = communityCategoryOptions.first.key;
   bool _submitting = false;
 
+  /// 이 작성 작업(operation)의 멱등키. 실패해도 **버리지 않는다** — 응답이
+  /// 유실됐을 뿐 서버에 글이 남았을 수 있어, 재시도는 같은 키로 보내야 서버가
+  /// 기존 글로 수렴시킨다(중복 글 방지). 성공하면 작업이 끝나므로 비우고,
+  /// 새 작성 화면(새 State)은 자연히 새 키로 시작한다.
+  String? _operationKey;
+
   @override
   void dispose() {
     _title.dispose();
@@ -49,12 +56,16 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     if (!await ContentPolicyGate.ensureAgreed(context)) return;
     if (!mounted) return;
     setState(() => _submitting = true);
+    // 같은 제출 작업은 재시도해도 같은 키를 유지한다(첫 제출에서만 새로 만든다).
+    final String operationKey = _operationKey ??= newBoardPostIdempotencyKey();
     try {
       await widget.write.createPost(
         title: title,
         body: body,
         category: _category,
+        idempotencyKey: operationKey,
       );
+      _operationKey = null; // 작업 종료 — 다음 작성은 새 키.
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
