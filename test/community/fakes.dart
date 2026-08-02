@@ -2,6 +2,7 @@ import 'package:ssambership_app/features/community/data/comments_gateway.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 import 'package:ssambership_app/features/community/data/community_read_repository.dart';
 import 'package:ssambership_app/features/community/data/community_write_repository.dart';
+import 'package:ssambership_app/shared/errors/app_error.dart';
 
 /// 실제 DB·네트워크 대신 주입할 가짜 레포. 고정 데이터만 반환(Supabase 미접촉).
 class FakeCommunityRead extends CommunityReadRepository {
@@ -85,6 +86,12 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   String? lastPostBody;
   String? lastPostCategory;
 
+  /// createPost 로 들어온 멱등키 이력(재시도 시 같은 키가 유지되는지 검증용).
+  final List<String> postIdempotencyKeys = <String>[];
+
+  /// true 면 createPost 가 호출 기록 후 throw(재시도 경로 테스트).
+  bool failPost = false;
+
   /// true 면 반응 토글이 호출 기록 후 throw(낙관적 상태 롤백 경로 테스트).
   bool failReactions = false;
 
@@ -137,11 +144,14 @@ class FakeCommunityWrite extends CommunityWriteRepository {
     required String title,
     required String body,
     required String category,
+    required String idempotencyKey,
   }) async {
     postCalls++;
     lastPostTitle = title;
     lastPostBody = body;
     lastPostCategory = category;
+    postIdempotencyKeys.add(idempotencyKey);
+    if (failPost) throw const AppError('등록에 실패했어요.');
     return BoardPost(
       id: 'fake-post',
       title: title,

@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
-import 'board_author_gate.dart';
+import 'board_post_create_gateway.dart';
 import 'comments_gateway.dart';
 import 'community_models.dart';
 
@@ -171,43 +171,44 @@ class CommunityWriteRepository {
     return null;
   }
 
-  /// 게시판 글 작성(본인). ★ 검수 없이 즉시 공개(status='published' — 동업자 확정).
-  /// author_role 정본 = 본인 users 행 role SELECT(BoardAuthorGate) — DB
-  /// DEFAULT('mentor') 의존 금지, 모든 실패 fail-closed(INSERT 0회), 저장 후
-  /// 반환 행 author_id/author_role 재검증까지 통과해야 성공 처리한다.
+  /// 게시판 글 작성(본인) — **서버 RPC 단일 경로**(S3-D).
+  ///
+  /// 운영 DB 는 `community_posts` 에 authenticated SELECT 만 허용한다(INSERT
+  /// 권한·policy 없음). 그래서 직접 INSERT 도, 그 뒤처리용 보상 DELETE 도 이
+  /// 경로에 존재하지 않는다 — 작성 판정·본문 정규화·author_role 도출은 전부
+  /// `api_app_v1.community_post_create` 가 수행한다.
+  ///
+  /// [idempotencyKey] 는 **제출 작업 1건**을 식별한다. 같은 작업의 재시도는
+  /// 같은 키를 보내야 서버가 기존 글로 수렴시킨다(중복 글 방지). 새 키 생성은
+  /// 화면(작성 작업 시작 시점)의 책임이다 — `newBoardPostIdempotencyKey()`.
   Future<BoardPost> createPost({
     required String title,
     required String body,
     required String category,
+    required String idempotencyKey,
   }) {
     final SupabaseClient client = _client;
-    return createBoardPostGated(
+    return createBoardPostViaRpc(
       authUserId: client.auth.currentUser?.id,
-      fetchOwnUserRows: (String userId) async {
-        final List<dynamic> rows =
-            await client.from('users').select('id, role').eq('id', userId);
-        return rows.cast<Map<String, dynamic>>();
-      },
-      insert: (Map<String, dynamic> payload) =>
-          client.from('community_posts').insert(payload).select().single(),
       title: title,
       body: body,
       category: category,
-      // 보정2: 반환 정본 불일치 '보상 전용' 내부 삭제 — 공개 API·UI·라우트로
-      // 노출하지 않는다. id+본인 author_id 로 클라이언트 범위를 좁히고,
-      // 실제 권한 판정은 RLS cp_delete_own(author 본인 또는 admin)에 맡긴다.
-      deleteOwnPostForCompensation: (String postId) async {
-        final String? uid = client.auth.currentUser?.id;
-        if (uid == null) throw const AppError('로그인이 필요해요.');
-        // v19 보정2: representation 을 요청해 실제 삭제 행을 확인한다 —
-        // 0행(조건 불일치·RLS 비가시성·기삭제)은 성공이 아니다.
-        final List<dynamic> deleted = await client
+      idempotencyKey: idempotencyKey,
+      callRpc: (Map<String, dynamic> params) async {
+        // ★ schema() 를 생략하면 public 으로 나가 함수를 찾지 못한다(PGRST202).
+        final Object? data = await client
+            .schema(kBoardPostCreateSchema)
+            .rpc(kBoardPostCreateFunction, params: params);
+        return data;
+      },
+      // 저장 정본 재조회 — 읽기 레포(D-3 계약)를 건드리지 않는 단건 SELECT.
+      fetchPostById: (String postId) async {
+        final List<dynamic> rows = await client
             .from('community_posts')
-            .delete()
+            .select('*')
             .eq('id', postId)
-            .eq('author_id', uid)
-            .select('id');
-        verifyCompensationDeleteReturn(deleted, postId);
+            .limit(1);
+        return rows.cast<Map<String, dynamic>>();
       },
     );
   }
