@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../../../shared/errors/app_error.dart';
 import 'community_models.dart';
+import 'community_post_error_mapper.dart';
 
 /// 게시판 글 작성 = 서버 RPC 단일 경로(S3-D).
 ///
@@ -31,7 +32,9 @@ const String kBoardPostCreateFunction = 'community_post_create';
 /// 앱 게시판 작성은 검수 없이 즉시 공개(동업자 확정) — draft 를 보내지 않는다.
 const String kBoardPostCreateStatus = 'published';
 
-/// 앱 게시판 작성은 텍스트 전용 — 이미지 ref 집합은 항상 비어 있다.
+/// 이미지 미첨부 작성의 기본 ref 집합. 이미지 첨부 시 정본 ref
+/// (`community-post-images/{uid}/{object}` — board_post_media_gateway.dart)만
+/// 담아 보낸다.
 const List<String> kBoardPostCreateEmptyImageRefs = <String>[];
 
 /// RPC 호출 seam(반환 = 디코딩된 jsonb). 테스트가 네트워크 없이 계약을 고정한다.
@@ -104,47 +107,10 @@ const AppError kBoardPostCreatedButUnverified =
 
 /// 서버 오류 코드 → 사용자용 한글 문구.
 ///
-/// 계약 코드는 비민감 식별자지만 **화면에는 코드를 싣지 않는다**(한글 문구만).
-/// 미지의 코드·비문자 코드는 전부 공통 문구로 수렴한다(fail-closed).
+/// 코드 집합·문구는 작성·수정 공용 매퍼(community_post_error_mapper.dart)가
+/// 정본이다. 미지의 코드·비문자 코드는 전부 공통 문구로 수렴한다(fail-closed).
 AppError boardPostCreateError(Object? code) {
-  if (code is! String) return kBoardPostCreateMalformed;
-  switch (code) {
-    case 'AUTH_REQUIRED':
-      return const AppError('로그인이 필요해요.');
-    // 역할 계약: S3-C 가 student+mentor 로 수렴한다. 수렴 전 서버가 쓰는
-    // ROLE_NOT_MENTOR 도 같은 상황이므로 같은 문구로 묶는다.
-    case 'ROLE_NOT_ALLOWED':
-    case 'ROLE_NOT_MENTOR':
-      return const AppError('현재 회원 유형으로는 게시판 글을 쓸 수 없어요.');
-    case 'MENTOR_NOT_APPROVED':
-      return const AppError('멘토 승인 후에 글을 쓸 수 있어요.');
-    case 'ACCOUNT_BANNED':
-      return const AppError('이용이 제한된 계정이에요. 고객센터로 문의해 주세요.');
-    case 'ACCOUNT_SUSPENDED':
-      return const AppError('일시 정지된 계정이에요. 정지 기간이 끝난 뒤 다시 시도해 주세요.');
-    case 'ACCOUNT_DELETION_IN_PROGRESS':
-      return const AppError('탈퇴 처리 중에는 글을 쓸 수 없어요.');
-    case 'ACCOUNT_NOT_ACTIVE':
-      return const AppError('현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
-    case 'TITLE_REQUIRED':
-      return const AppError('제목을 입력해 주세요.');
-    case 'CATEGORY_INVALID':
-      return const AppError('카테고리를 다시 선택해 주세요.');
-    case 'BODY_TOO_SHORT':
-      return const AppError('내용을 10자 이상 입력해 주세요.');
-    case 'IMAGE_COUNT_EXCEEDED':
-      return const AppError('이미지는 최대 5장까지 첨부할 수 있어요.');
-    case 'IMAGE_MIME_NOT_ALLOWED':
-      return const AppError('JPG·PNG·WEBP·GIF 이미지만 첨부할 수 있어요.');
-    case 'IMAGE_SIZE_EXCEEDED':
-      return const AppError('이미지는 한 장당 5MB까지 첨부할 수 있어요.');
-  }
-  // IMAGE_REF_INVALID · IMAGE_NOT_OWNED · IMAGE_OBJECT_NOT_FOUND 등 나머지
-  // 첨부 계열은 사용자가 할 수 있는 조치가 같다(다시 첨부).
-  if (code.startsWith('IMAGE_')) {
-    return const AppError('첨부한 이미지를 확인하지 못했어요. 다시 첨부해 주세요.');
-  }
-  return kBoardPostCreateMalformed;
+  return communityPostWriteContractError(code) ?? kBoardPostCreateMalformed;
 }
 
 /// jsonb 봉투 파싱 — 성공만 통과시키고 나머지는 전부 throw.

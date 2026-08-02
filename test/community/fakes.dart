@@ -1,3 +1,4 @@
+import 'package:ssambership_app/core/scan/picked_image.dart';
 import 'package:ssambership_app/features/community/data/comments_gateway.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 import 'package:ssambership_app/features/community/data/community_read_repository.dart';
@@ -71,12 +72,17 @@ class FakeCommunityRead extends CommunityReadRepository {
 /// 반응·댓글·신고 쓰기를 삼키는 가짜 레포(호출 기록만).
 /// [failReactions] 로 반응 토글 실패(서버 오류)를 흉내낼 수 있다(낙관적 롤백 검증용).
 class FakeCommunityWrite extends CommunityWriteRepository {
-  FakeCommunityWrite();
+  FakeCommunityWrite({this.uid});
+
+  /// currentUserId 로 돌려줄 값(null=비로그인) — 소유권 UI 게이트 테스트용.
+  final String? uid;
 
   int reactionCalls = 0;
   int commentCalls = 0;
   int reportCalls = 0;
   int postCalls = 0;
+  int updateCalls = 0;
+  int uploadImageCalls = 0;
   String? lastReportReason;
   String? lastReportTargetType;
   String? lastReportTargetId;
@@ -85,12 +91,28 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   String? lastPostTitle;
   String? lastPostBody;
   String? lastPostCategory;
+  List<String>? lastPostImageRefs;
+  String? lastUpdatePostId;
+  String? lastUpdateTitle;
+  String? lastUpdateBody;
+  String? lastUpdateCategory;
+  String? lastUpdateExpectedUpdatedAt;
+  List<String>? lastUpdateImageRefs;
 
   /// createPost 로 들어온 멱등키 이력(재시도 시 같은 키가 유지되는지 검증용).
   final List<String> postIdempotencyKeys = <String>[];
 
+  /// uploadPostImage 로 들어온 이미지 이력(업로드 횟수·중복 방지 검증용).
+  final List<PickedImage> uploadedImages = <PickedImage>[];
+
   /// true 면 createPost 가 호출 기록 후 throw(재시도 경로 테스트).
   bool failPost = false;
+
+  /// true 면 updatePost 가 호출 기록 후 throw(수정 실패 경로 테스트).
+  bool failUpdate = false;
+
+  /// true 면 uploadPostImage 가 throw(업로드 실패 시 RPC 미호출 검증용).
+  bool failUpload = false;
 
   /// true 면 반응 토글이 호출 기록 후 throw(낙관적 상태 롤백 경로 테스트).
   bool failReactions = false;
@@ -140,16 +162,21 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   }
 
   @override
+  String? get currentUserId => uid;
+
+  @override
   Future<BoardPost> createPost({
     required String title,
     required String body,
     required String category,
     required String idempotencyKey,
+    List<String> imageRefs = const <String>[],
   }) async {
     postCalls++;
     lastPostTitle = title;
     lastPostBody = body;
     lastPostCategory = category;
+    lastPostImageRefs = List<String>.of(imageRefs);
     postIdempotencyKeys.add(idempotencyKey);
     if (failPost) throw const AppError('등록에 실패했어요.');
     return BoardPost(
@@ -164,6 +191,45 @@ class FakeCommunityWrite extends CommunityWriteRepository {
       viewCount: 0,
       createdAt: DateTime(2026, 7, 1),
     );
+  }
+
+  @override
+  Future<BoardPost> updatePost({
+    required String postId,
+    required String title,
+    required String body,
+    required String category,
+    required String expectedUpdatedAt,
+    required List<String> imageRefs,
+  }) async {
+    updateCalls++;
+    lastUpdatePostId = postId;
+    lastUpdateTitle = title;
+    lastUpdateBody = body;
+    lastUpdateCategory = category;
+    lastUpdateExpectedUpdatedAt = expectedUpdatedAt;
+    lastUpdateImageRefs = List<String>.of(imageRefs);
+    if (failUpdate) throw const AppError('수정에 실패했어요.');
+    return BoardPost(
+      id: postId,
+      title: title,
+      body: body,
+      category: category,
+      authorLabel: '나',
+      authorRole: 'student',
+      likeCount: 0,
+      commentCount: 0,
+      viewCount: 0,
+      createdAt: DateTime(2026, 7, 1),
+    );
+  }
+
+  @override
+  Future<String> uploadPostImage(PickedImage image) async {
+    uploadImageCalls++;
+    if (failUpload) throw const AppError('이미지를 올리지 못했어요. 잠시 후 다시 시도해 주세요.');
+    uploadedImages.add(image);
+    return 'community-post-images/fake-uid/${uploadedImages.length}_${image.fileName}';
   }
 
   @override
@@ -246,6 +312,10 @@ BoardPost sampleBoard({
   String id = 'b1',
   String title = '게시판 제목',
   String category = 'study',
+  String authorRole = 'student',
+  String? authorId,
+  String? updatedAtRaw,
+  List<String> imageRefs = const <String>[],
   int likeCount = 3,
   int commentCount = 7,
   int viewCount = 100,
@@ -256,7 +326,10 @@ BoardPost sampleBoard({
     body: '본문 내용입니다.',
     category: category,
     authorLabel: '익명1',
-    authorRole: 'student',
+    authorRole: authorRole,
+    authorId: authorId,
+    updatedAtRaw: updatedAtRaw,
+    imageRefs: imageRefs,
     likeCount: likeCount,
     commentCount: commentCount,
     viewCount: viewCount,

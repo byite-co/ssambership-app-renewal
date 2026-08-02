@@ -119,4 +119,73 @@ void main() {
     // 헤더는 리스트 길이(1) — 카드/반응바의 comment_count(서버 유지 컬럼)와 별개 표기.
     expect(find.text('댓글 1'), findsOneWidget);
   });
+
+  group('수정 진입점 — 내 글에만 노출(역할 무관, 판정 정본은 서버)', () {
+    BoardDetailScreen screenFor(FakeCommunityWrite write, BoardPost post) =>
+        BoardDetailScreen(
+          post: post,
+          read: const FakeCommunityRead(),
+          write: write,
+        );
+
+    testWidgets('내 글(학생·멘토 동일): 더보기 메뉴에 수정이 보인다',
+        (WidgetTester tester) async {
+      for (final String role in <String>['student', 'mentor']) {
+        _bigSurface(tester);
+        final FakeCommunityWrite write = FakeCommunityWrite(uid: 'me');
+        await tester.pumpWidget(_wrap(screenFor(
+            write, sampleBoard(authorId: 'me', authorRole: role))));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('더보기'));
+        await tester.pumpAndSettle();
+        expect(find.text('수정'), findsOneWidget, reason: role);
+
+        // 수정 탭 → 수정 화면 진입(글 수정 타이틀).
+        await tester.tap(find.text('수정'));
+        await tester.pumpAndSettle();
+        expect(find.text('글 수정'), findsOneWidget, reason: role);
+
+        // 다음 역할 검증을 위해 수정 화면을 닫는다(재-pump 시 잔존 route 방지).
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('타인 글: 수정 항목이 아예 노출되지 않는다', (WidgetTester tester) async {
+      _bigSurface(tester);
+      final FakeCommunityWrite write = FakeCommunityWrite(uid: 'me');
+      await tester.pumpWidget(
+          _wrap(screenFor(write, sampleBoard(authorId: 'someone-else'))));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('더보기'));
+      await tester.pumpAndSettle();
+      expect(find.text('수정'), findsNothing);
+      expect(find.text('이 사용자 차단'), findsOneWidget); // 기존 항목 유지
+    });
+
+    testWidgets('비로그인·author_id 미상: 수정 미노출(fail-closed)',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      // 비로그인(uid null).
+      await tester.pumpWidget(_wrap(screenFor(
+          FakeCommunityWrite(), sampleBoard(authorId: 'me'))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('더보기'));
+      await tester.pumpAndSettle();
+      expect(find.text('수정'), findsNothing);
+      // 메뉴 닫기.
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      // author_id 를 모르는 행(구 스냅샷) — 내 글 확신 불가 → 미노출.
+      await tester.pumpWidget(_wrap(
+          screenFor(FakeCommunityWrite(uid: 'me'), sampleBoard())));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('더보기'));
+      await tester.pumpAndSettle();
+      expect(find.text('수정'), findsNothing);
+    });
+  });
 }

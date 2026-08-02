@@ -584,6 +584,7 @@ class _SlowFakeWrite extends FakeCommunityWrite {
     required String body,
     required String category,
     required String idempotencyKey,
+    List<String> imageRefs = const <String>[],
   }) async {
     await gate.future;
     return super.createPost(
@@ -591,6 +592,7 @@ class _SlowFakeWrite extends FakeCommunityWrite {
       body: body,
       category: category,
       idempotencyKey: idempotencyKey,
+      imageRefs: imageRefs,
     );
   }
 }

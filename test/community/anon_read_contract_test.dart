@@ -234,15 +234,32 @@ void main() {
       }
     });
 
-    test('모델이 author_id 를 필드로 승격하지 않는다(소스 잠금)', () {
-      // author_id 는 raw 행에서 차단 필터가 쓰는 값일 뿐이다
-      // (community_read_repository 의 _dropBlocked). 뷰모델로 올라오면
-      // 어떤 위젯이든 UUID 를 렌더할 수 있게 된다.
-      final String src = File(modelsPath).readAsStringSync();
-      expect(RegExp(r'\bfinal\s+String\??\s+authorId\b').hasMatch(src), isFalse,
-          reason: '뷰모델에 authorId 필드가 생겼다');
-      expect(src.contains("m['author_id']"), isFalse,
-          reason: '모델이 author_id 를 파싱하기 시작했다');
+    test('authorId 는 내부 게이트 전용 — UI 가 렌더하지 않는다(소스 잠금)', () {
+      // Build 13 수정 기능이 소유권 UI 게이트(내 글에만 수정 노출)를 위해
+      // BoardPost.authorId 를 내부 필드로 승격했다(리뷰 승인 계약 변경).
+      // 잠금의 목적은 유지된다: UUID 를 **화면에 렌더**하는 코드가 없어야 한다.
+      // 위 표면(runtime) 대조가 공개 문자열 필드를 지키고, 여기서는 커뮤니티
+      // UI 코드가 authorId 를 텍스트로 보간하지 않음을 소스로 잠근다.
+      final List<File> uiFiles = Directory('lib/features/community/ui')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((File f) => f.path.endsWith('.dart'))
+          .toList();
+      expect(uiFiles, isNotEmpty);
+      for (final File f in uiFiles) {
+        final String src = f.readAsStringSync();
+        // Text(...authorId...)·문자열 보간($...authorId) 금지 — 비교 연산만 허용.
+        expect(RegExp(r'Text\([^)]*authorId').hasMatch(src), isFalse,
+            reason: '${f.path} 가 authorId 를 렌더한다');
+        expect(RegExp(r'\$\{?[a-zA-Z._]*authorId').hasMatch(src), isFalse,
+            reason: '${f.path} 가 authorId 를 문자열에 보간한다');
+      }
+      // ShortformPost 는 여전히 author_id 를 승격하지 않는다(수정 기능 없음).
+      final String models = File(modelsPath).readAsStringSync();
+      final int idx = models.indexOf('class ShortformPost');
+      expect(idx, greaterThan(0));
+      expect(models.substring(idx).contains('authorId'), isFalse,
+          reason: 'ShortformPost 에 authorId 가 생겼다');
     });
 
     test('가드 자기-검증 — 위 대조가 실제로 UUID 를 잡아낸다', () {

@@ -17,6 +17,7 @@ import '../widgets/comment_tile.dart';
 import '../widgets/content_policy_gate.dart';
 import '../widgets/reaction_bar.dart';
 import '../widgets/report_sheet.dart';
+import 'board_write_screen.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
 /// 게시판 상세 — 본문 + 반응(좋아요·스크랩·신고) + 댓글(읽기+작성).
@@ -141,6 +142,29 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     }
   }
 
+  /// 내 글 여부 — 수정 진입점 노출 게이트(내부 비교 전용, UUID 비노출).
+  /// ★ 역할(학생/멘토) 무관 — 자기 글이면 동일하게 노출. 편의 게이트일 뿐
+  ///   보안 정본은 서버(community_post_update 의 author_id 검사)다.
+  bool get _isMyPost {
+    final String? uid = widget.write.currentUserId;
+    final String? authorId = widget.post.authorId;
+    return uid != null && authorId != null && uid == authorId;
+  }
+
+  /// 내 글 수정 — 수정 화면으로. 성공(pop true)하면 상세를 닫아 목록을
+  /// 새로고침시킨다(상세의 글 스냅샷은 이미 낡은 값이라 유지하지 않는다).
+  Future<void> _editMyPost() async {
+    final bool? updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => BoardWriteScreen(
+          write: widget.write,
+          editing: widget.post,
+        ),
+      ),
+    );
+    if (updated == true && mounted) Navigator.of(context).pop(true);
+  }
+
   /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
   Future<void> _blockPostAuthor() async {
     final bool blocked = await confirmAndBlockAuthor(
@@ -250,10 +274,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           PopupMenuButton<String>(
             tooltip: '더보기',
             onSelected: (String v) {
+              if (v == 'edit') _editMyPost();
               if (v == 'block') _blockPostAuthor();
             },
-            itemBuilder: (BuildContext ctx) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(value: 'block', child: Text('이 사용자 차단')),
+            itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
+              // 수정은 내 글에만 노출(타인 글 수정 UI 미노출 — 서버도 거부).
+              if (_isMyPost)
+                const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+              const PopupMenuItem<String>(
+                  value: 'block', child: Text('이 사용자 차단')),
             ],
           ),
         ],
