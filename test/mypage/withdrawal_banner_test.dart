@@ -46,8 +46,14 @@ class _FakePort implements AccountDeletionPort {
   }
 
   @override
-  Future<DeletionRequestResult> requestDeletion() async =>
+  Future<DeletionRequestOutcome> requestDeletion() async =>
       throw StateError('탈퇴 요청은 배너에서 호출하지 않는다');
+
+  @override
+  Future<DeletionRequestOutcome> requestDeletionWithForfeitConsent({
+    required int acknowledgedBalanceCents,
+  }) async =>
+      throw StateError('잔액 소멸 동의 RPC 도 배너에서 호출하지 않는다');
 
   @override
   Future<DeletionCancelResult> cancelDeletion() async =>
