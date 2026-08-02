@@ -28,16 +28,24 @@ import '../format/cash_format.dart';
 ///   (해당 상태는 앱 진입 자체가 차단됨 — blocked_screen).
 /// ★ 42501 / RPC 미배포에서만 [AccountDeletionUnavailable] → 웹 진행 폴백.
 ///
-/// ── 잔액 보유 계정(Build 12 실기기 FAIL 수정 — 학생/멘토 공통) ─────────────
+/// ── 캐시 잔액 보유 계정(Build 12 실기기 FAIL 수정 — 학생/멘토 공통) ────────
 /// 잔액이 남은 계정은 일반 RPC 가 `FORFEIT_CONSENT_REQUIRED` + 서버 잔액을
 /// 돌려준다. 이때는 오류·웹 폴백이 아니라 **잔액 소멸 동의 단계**로 넘어간다:
 ///   1) 서버가 준 잔액을 그대로 표시(앱 계산·지갑 테이블 직접 조회 금지)
-///   2) 탈퇴와 함께 소멸·복구 불가·취소 가능 기간을 고지
+///   2) 소멸 시점·복구 불가·취소 가능 기간을 고지
 ///   3) 일반 확인과 **별도의** 잔액 소멸 동의 체크박스
 ///   4) 금액을 다시 적은 확인 다이얼로그
 ///   5) 동의 후에만 account_deletion_request_self_consented 호출
-/// 동의 금액과 서버 잔액이 어긋나면(TOCTOU) 서버가 거절하고, 화면은
-/// 성공 안내도 로그아웃도 하지 않는다(fail-closed) — 새 금액으로 다시 동의받는다.
+/// 동의 금액이 낡으면(`FORFEIT_CONSENT_STALE`) 서버가 거절하고, 화면은 성공
+/// 안내도 로그아웃도 하지 않는다(fail-closed) — 서버가 준 `current_balance_cents`
+/// 로 금액을 갱신하고 동의를 다시 받는다.
+///
+/// ★ 소멸 시점 정본: 탈퇴 **요청** 단계는 job 과 동의 금액만 기록한다. 실제
+///   캐시 몰수와 지갑 0화는 취소 가능 시간이 지난 뒤 worker 가(storage_purged
+///   이후) 수행한다 — 취소창 안에서 요청을 취소하면 캐시는 소멸되지 않는다.
+///   따라서 "탈퇴를 취소해도 캐시가 돌아오지 않는다"고 적지 않는다.
+/// ★ 서버가 보는 잔액은 역할과 무관하게 `public.cash_wallets.balance_cents`
+///   하나다(멘토 수익·지급·정산 원장이 아니다) → 학생·멘토 모두 '캐시 잔액'.
 class AccountDeleteScreen extends StatefulWidget {
   const AccountDeleteScreen({
     super.key,
@@ -45,7 +53,6 @@ class AccountDeleteScreen extends StatefulWidget {
     this.signOutOverride,
     this.openWebFallbackOverride,
     this.pendingOverride,
-    this.roleOverride,
   });
 
   final AccountDeletionPort port;
@@ -58,10 +65,6 @@ class AccountDeleteScreen extends StatefulWidget {
 
   /// 테스트 주입: 탈퇴 접수(deletionPending) 상태 여부. null 이면 AuthService.
   final bool? pendingOverride;
-
-  /// 테스트 주입: 역할. 잔여 금액을 부르는 **말**만 역할에 맞춘다
-  /// (학생=캐시 / 멘토=정산 금액). 금액 자체는 언제나 서버 값 그대로다.
-  final AppRole? roleOverride;
 
   @override
   State<AccountDeleteScreen> createState() => _AccountDeleteScreenState();
@@ -89,26 +92,6 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   bool _forfeitAcknowledged = false;
 
   bool get _consentStage => _forfeitBalanceCents != null;
-
-  AppRole get _role => widget.roleOverride ?? AuthService.instance.currentRole;
-
-  /// 역할별 잔액 호칭 — 앱이 이미 쓰는 어휘(학생 캐시 / 멘토 정산)를 따른다.
-  String get _balanceNoun => _role == AppRole.mentor ? '정산 금액' : '캐시';
-
-  /// 호칭 + 주격 조사('캐시가' / '정산 금액이').
-  String get _balanceSubject => '$_balanceNoun${_particle(_balanceNoun, '이', '가')}';
-
-  /// 호칭 + 보조사('캐시는' / '정산 금액은').
-  String get _balanceTopic => '$_balanceNoun${_particle(_balanceNoun, '은', '는')}';
-
-  /// 받침 유무로 조사를 고른다 — 역할에 따라 호칭이 바뀌므로 문구를 하드코딩할 수 없다.
-  /// 한글 음절이 아니면(숫자·영문) 받침 있는 쪽을 쓴다.
-  static String _particle(String word, String withJong, String withoutJong) {
-    if (word.isEmpty) return withJong;
-    final int code = word.runes.last;
-    if (code < 0xAC00 || code > 0xD7A3) return withJong;
-    return (code - 0xAC00) % 28 == 0 ? withoutJong : withJong;
-  }
 
   bool get _pending =>
       widget.pendingOverride ??
@@ -175,10 +158,11 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     setState(() => _busy = true);
     try {
       final bool ok = await _confirm(
-        '$_balanceNoun ${CashFormat.won(balance)}이 사라져요',
-        '탈퇴하면 남은 $_balanceNoun ${CashFormat.won(balance)}이 소멸되고 '
-            '되돌릴 수 없어요.\n계정과 데이터도 함께 삭제돼요.\n'
-            '접수 후 취소 가능 시간 내에는 취소할 수 있어요.',
+        '캐시 잔액 ${CashFormat.won(balance)}이 소멸돼요',
+        '취소 가능 시간이 지나 삭제 처리가 시작되면 남은 캐시 잔액 '
+            '${CashFormat.won(balance)}이 소멸되고 되돌릴 수 없어요.\n'
+            '계정과 데이터도 함께 삭제돼요.\n'
+            '취소 가능 시간 내에는 탈퇴 요청을 취소할 수 있어요.',
         '동의하고 탈퇴',
       );
       if (!ok || !mounted) return; // 취소 → consent RPC 0회.
@@ -222,9 +206,9 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
             if (cents == null || cents <= 0) _forfeitBalanceCents = null;
           });
           _snack(cents != null && cents > 0
-              ? '남은 $_balanceSubject ${CashFormat.won(cents)}으로 바뀌었어요. '
+              ? '남은 캐시 잔액이 ${CashFormat.won(cents)}으로 바뀌었어요. '
                   '다시 확인하고 동의해 주세요.'
-              : '남은 $_balanceSubject 변경돼 탈퇴를 접수하지 못했어요. 다시 시도해 주세요.');
+              : '남은 캐시 잔액이 변경돼 탈퇴를 접수하지 못했어요. 다시 시도해 주세요.');
       }
     } on AccountDeletionUnavailable {
       if (mounted) setState(() => _unavailable = true);
@@ -346,14 +330,14 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     return <Widget>[
       Text('탈퇴 전에 꼭 확인해 주세요', style: AppType.title),
       const SizedBox(height: AppSpacing.s16),
-      Text(
+      const Text(
         // 접수 전에는 서버 마감 시각이 없다 — 구체 시각은 접수 후 안내·배너가 낸다.
         // 잔액도 아직 서버에 묻기 전이라 금액을 적지 않는다(앱 추정 금지) —
         // 남아 있으면 요청 시 서버가 알려주고 별도 동의 단계로 넘어간다.
         '· 계정과 프로필, 질문/답변 기록이 삭제돼요.\n'
         '· 삭제 후에는 되돌릴 수 없어요.\n'
         '· 접수 후 취소 가능 시간 내에만 취소할 수 있어요.\n'
-        '· 남은 $_balanceSubject 있으면 탈퇴와 함께 소멸돼요.',
+        '· 남은 캐시 잔액이 있으면 삭제 처리와 함께 소멸돼요.',
         style: AppType.body,
       ),
       const SizedBox(height: AppSpacing.s16),
@@ -379,20 +363,23 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   List<Widget> _forfeitConsentBody() {
     final int balance = _forfeitBalanceCents!;
     return <Widget>[
-      Text('남은 $_balanceSubject 있어요', style: AppType.title),
+      Text('남은 캐시 잔액이 있어요', style: AppType.title),
       const SizedBox(height: AppSpacing.s16),
       // 금액은 서버 응답(balance_cents) 정본 — 앱에서 계산하지 않는다.
       MoneyDisplay(
-        label: '탈퇴와 함께 소멸되는 $_balanceNoun',
+        label: '삭제 처리 시 소멸되는 캐시 잔액',
         amount: CashFormat.won(balance),
         emphasizeColor: ColorTokens.danger,
       ),
       const SizedBox(height: AppSpacing.s16),
       Text(
-        '· 탈퇴하면 남은 $_balanceNoun ${CashFormat.won(balance)}이 전액 소멸돼요.\n'
-        '· 소멸된 $_balanceTopic 환불·복구할 수 없어요.\n'
-        '· 탈퇴를 취소해도 소멸된 $_balanceTopic 돌아오지 않아요.\n'
-        '· 접수 후 취소 가능 시간 내에만 탈퇴를 취소할 수 있어요.',
+        // 소멸 시점 정본: 요청 단계는 job·동의 금액만 기록하고, 실제 몰수와
+        // 지갑 0화는 취소창이 지난 뒤 worker(storage_purged 이후)가 수행한다.
+        // → "탈퇴를 취소해도 캐시가 돌아오지 않는다"는 서버 동작과 다르다.
+        '· 취소 가능 시간이 지나 삭제 처리가 시작되면 남은 캐시 잔액 '
+        '${CashFormat.won(balance)}이 소멸돼요.\n'
+        '· 소멸 처리 후에는 환불·복구할 수 없어요.\n'
+        '· 취소 가능 시간 내에 탈퇴 요청을 취소하면 캐시 잔액은 소멸되지 않아요.',
         style: AppType.body,
       ),
       const SizedBox(height: AppSpacing.s16),
@@ -402,7 +389,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
             ? null
             : (bool? v) => setState(() => _forfeitAcknowledged = v ?? false),
         title: Text(
-          '남은 $_balanceNoun ${CashFormat.won(balance)}이 소멸되는 데 동의해요',
+          '삭제 처리 시 남은 캐시 잔액 ${CashFormat.won(balance)}이 소멸되는 데 동의해요',
           style: AppType.body,
         ),
         controlAffinity: ListTileControlAffinity.leading,

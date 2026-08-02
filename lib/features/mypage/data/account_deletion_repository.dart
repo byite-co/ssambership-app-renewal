@@ -13,7 +13,8 @@ import '../../../shared/errors/app_error.dart';
 ///     | {ok:false, code:FORFEIT_CONSENT_REQUIRED, balance_cents}
 ///   - account_deletion_request_self_consented(p_cancelable_minutes, p_dry_run,
 ///     p_acknowledged_balance_cents) → 위와 동일 성공형
-///     | {ok:false, code:BALANCE_ACK_MISMATCH, balance_cents}
+///     | {ok:false, code:FORFEIT_CONSENT_STALE, acknowledged_balance_cents,
+///        current_balance_cents}   ← 운영 함수 exact 계약
 ///   - account_deletion_cancel_self() → {ok} | {ok:false, code:NOT_FOUND|NOT_CANCELABLE|
 ///     CANCEL_WINDOW_PASSED}
 ///   - account_deletion_status_self() → {ok, exists, state, cancelable_until,
@@ -57,14 +58,18 @@ class DeletionForfeitConsentRequired extends DeletionRequestOutcome {
   final int balanceCents;
 }
 
-/// 동의한 잔액과 서버 실제 잔액이 어긋남(TOCTOU — 동의 화면을 띄운 사이에 잔액 변동).
+/// 동의한 잔액과 서버 실제 잔액이 어긋남 — 운영 코드 `FORFEIT_CONSENT_STALE`
+/// (TOCTOU: 동의 화면을 띄운 사이에 지갑 잔액이 변동).
 ///
 /// ★ fail-closed: 탈퇴는 접수되지 않았다. 화면은 성공 안내도 로그아웃도 하지
-///   않고, 서버가 새 잔액을 줬다면 그 값으로 동의를 다시 받는다.
+///   않고, 서버가 새 잔액(`current_balance_cents`)을 줬다면 그 값으로 동의를
+///   다시 받는다. 새 잔액이 없거나 형식이 깨졌으면 [serverBalanceCents] 는
+///   null 이고, 화면은 동의 단계를 폐기하고 처음부터 다시 시작한다
+///   — 옛 동의 금액을 절대 재사용하지 않는다.
 class DeletionBalanceMismatch extends DeletionRequestOutcome {
   const DeletionBalanceMismatch({this.serverBalanceCents});
 
-  /// 서버가 알려준 현재 잔액(없으면 null — 처음부터 다시 받는다).
+  /// 서버가 알려준 현재 잔액(`current_balance_cents`). 없으면 null.
   final int? serverBalanceCents;
 }
 
@@ -248,31 +253,55 @@ class SupabaseAccountDeletionRepository implements AccountDeletionPort {
 
     final Object? rawCode = data['code'];
     final String code = rawCode is String ? rawCode : '';
-    final int? balance = _parseCents(data['balance_cents']);
 
+    // ── 운영 exact 코드를 가장 먼저 처리한다(alias 휴리스틱보다 우선). ──
     if (code == kForfeitConsentRequiredCode) {
+      final int? balance = _parseBalance(data, 'balance_cents');
       // 잔액을 모르면 동의 UI 를 만들 수 없다 — 금액 없는 동의는 받지 않는다.
-      if (balance == null || balance <= 0) {
-        throw const AppError('남은 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      if (balance == null) {
+        throw const AppError('남은 캐시 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
       }
       return DeletionForfeitConsentRequired(balanceCents: balance);
     }
-    if (_isBalanceMismatchCode(code)) {
-      return DeletionBalanceMismatch(serverBalanceCents: balance);
+    if (code == kForfeitConsentStaleCode) {
+      return DeletionBalanceMismatch(serverBalanceCents: _staleBalance(data));
+    }
+    // 구/동등 코드로 배포된 환경 방어 — 접수로 오인하지 않게 넓게 인식만 한다.
+    if (_isBalanceMismatchAlias(code)) {
+      return DeletionBalanceMismatch(serverBalanceCents: _staleBalance(data));
     }
     throw const AppError('탈퇴 요청 결과를 확인하지 못했어요. 다시 시도해 주세요.');
   }
 
-  /// 잔액 소멸 동의 요구 코드(서버 정본).
+  /// 잔액 소멸 동의 요구 코드(운영 정본).
   static const String kForfeitConsentRequiredCode = 'FORFEIT_CONSENT_REQUIRED';
 
-  /// 동의 금액 ↔ 서버 잔액 불일치 코드. 서버 정본은 `BALANCE_ACK_MISMATCH` 이지만
-  /// 동등 코드로 배포된 환경에서도 **성공으로 오인하지 않도록** 넓게 인식한다.
-  /// (여기 걸리지 않는 미지 코드도 어차피 위에서 throw → fail-closed 는 동일.)
-  static bool _isBalanceMismatchCode(String code) {
+  /// 동의 금액이 낡음 = 서버 잔액 변동(운영 정본).
+  /// 응답: {ok:false, code, acknowledged_balance_cents, current_balance_cents}
+  static const String kForfeitConsentStaleCode = 'FORFEIT_CONSENT_STALE';
+
+  /// 불일치 응답의 **새 서버 잔액**. 정본은 `current_balance_cents` 이고,
+  /// `balance_cents` 는 구버전 함수 대비 하위 호환 fallback 으로만 읽는다.
+  /// 둘 다 없거나 형식이 깨졌으면 null → 화면이 동의 단계를 폐기한다(fail-closed).
+  /// ★ `acknowledged_balance_cents`(우리가 보낸 값)는 새 잔액이 아니므로 쓰지 않는다.
+  static int? _staleBalance(Map<Object?, Object?> data) =>
+      _parseBalance(data, 'current_balance_cents') ??
+      _parseBalance(data, 'balance_cents');
+
+  /// 금액 필드 하나를 읽는다. 양수만 잔액으로 인정한다 — 0·음수·비수치는
+  /// '동의받을 잔액'이 아니므로 null 로 떨어뜨려 추정을 막는다.
+  static int? _parseBalance(Map<Object?, Object?> data, String key) {
+    final int? v = _parseCents(data[key]);
+    return (v != null && v > 0) ? v : null;
+  }
+
+  /// 구/동등 불일치 코드(정본 [kForfeitConsentStaleCode] 가 아닌 배포 방어).
+  /// 여기 걸리지 않는 미지 코드는 위에서 throw → fail-closed 는 동일하다.
+  static bool _isBalanceMismatchAlias(String code) {
     if (code.isEmpty) return false;
     final String c = code.toUpperCase();
-    if (!c.contains('BALANCE')) return false;
+    final bool aboutBalance = c.contains('BALANCE') || c.contains('CONSENT');
+    if (!aboutBalance) return false;
     return c.contains('MISMATCH') ||
         c.contains('CHANGED') ||
         c.contains('STALE') ||
