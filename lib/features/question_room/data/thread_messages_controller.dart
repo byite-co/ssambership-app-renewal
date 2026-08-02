@@ -18,10 +18,30 @@ class ThreadMessagesController extends ChangeNotifier {
   bool get isEmpty => _items.isEmpty;
   int get length => _items.length;
 
-  /// 메시지 1개 추가. 이미 있는 id 면 false(중복 무시).
+  /// 메시지 1개 추가(낙관적 반영 포함). 이미 있는 id 면 false(중복 무시).
+  ///
+  /// ★ 이미 서버 정본 행이 들어와 있으면 낙관적 행이 덮어쓰지 않는다 —
+  ///   RPC 응답보다 Realtime 이 먼저 도착하는 경합에서도 서버 시각이 남는다.
   bool add(QuestionMessage m) {
     if (!_ids.add(m.id)) return false;
     _items.add(m);
+    _sort();
+    notifyListeners();
+    return true;
+  }
+
+  /// 서버 정본 행 반영(Realtime insert / 재조회).
+  ///
+  /// ★ 같은 id 의 낙관적 행이 있으면 **서버 행으로 교체**한다. append RPC 는
+  ///   `message_id`·`answered_transition` 만 돌려주고 `created_at` 을 주지 않아
+  ///   낙관적 행의 시각은 기기 추정값이다 — 서버 행이 도착하는 순간 그 값이
+  ///   표시·정렬의 정본이 된다(S3-E §4 우선순위 ②).
+  /// 새 id 면 [add] 와 동일하게 추가한다.
+  bool upsertFromServer(QuestionMessage m) {
+    final int i =
+        _items.indexWhere((QuestionMessage e) => e.id == m.id);
+    if (i < 0) return add(m);
+    _items[i] = m;
     _sort();
     notifyListeners();
     return true;

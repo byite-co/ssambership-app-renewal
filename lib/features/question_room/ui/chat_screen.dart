@@ -10,13 +10,18 @@ import '../data/attachments/trusted_attachment_url.dart';
 import '../data/models/question_attachment.dart';
 import '../data/models/question_message.dart';
 import '../data/models/question_thread.dart';
+import '../data/models/room.dart';
 import '../data/question_room_read_repository.dart';
 import '../data/question_room_write_repository.dart';
+import '../data/room_counterparty.dart';
+import '../data/room_safety_repository.dart';
 import '../data/thread_messages_controller.dart';
 import '../data/thread_realtime.dart';
 import '../../scan_annotation/scan_annotation_screen.dart';
 import 'attachment_viewer_screen.dart';
 import 'widgets/chat_input_bar.dart';
+import 'widgets/room_safety_actions.dart';
+import 'widgets/room_safety_menu.dart';
 import 'widgets/scan_source_sheet.dart';
 import 'widgets/live_message_list.dart';
 import 'widgets/thread_status_pill.dart';
@@ -36,15 +41,21 @@ class ChatScreen extends StatefulWidget {
     super.key,
     required this.thread,
     required this.mentorName,
+    this.room,
     this.imagePicker = const DeviceImagePicker(),
     this.scanPicker = const DeviceScanSourcePicker(),
     this.pdfRasterizer = const PdfxRasterizer(),
     this.uploader = const SupabaseAttachmentUploader(),
     this.realtimeFactory = _defaultRealtime,
+    this.safety = const SupabaseRoomSafetyRepository(),
+    this.currentUserIdOverride,
   });
 
   final QuestionThread thread;
   final String mentorName;
+
+  /// 방 참여자 정보(신고·차단 상대 도출의 **정본**). null 이면 안전 메뉴 비활성화.
+  final Room? room;
 
   /// 갤러리 선택 포트(하위호환 주입 지점 — 시트에서 '갤러리' 선택 시 사용).
   final ImagePickerPort imagePicker;
@@ -61,12 +72,23 @@ class ChatScreen extends StatefulWidget {
   /// 스레드 실시간 포트 팩토리(기본: Supabase). 테스트에서 fake 주입.
   final ThreadRealtimePort Function(String threadId) realtimeFactory;
 
+  /// 신고·차단 포트(기본: Supabase). 테스트에서 fake 주입.
+  final RoomSafetyPort safety;
+
+  /// 현재 사용자 id 주입 seam(테스트 전용). null 이면 세션에서 읽는다.
+  /// ★ 상대 도출은 이 값과 [room] 참여자 데이터로만 한다 — 화면 문자열/메시지 추정 금지.
+  final String? currentUserIdOverride;
+
   static ThreadRealtimePort _defaultRealtime(String threadId) =>
       SupabaseThreadRealtime(threadId);
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
+
+/// 차단된 방의 composer 자리에 보여줄 안내(읽기 전용 상태 설명).
+const String _blockedNotice = '차단한 사용자예요. 새 메시지·첨부를 보낼 수 없어요.'
+    ' 지난 대화는 그대로 볼 수 있고, 해제는 설정 > 차단 사용자 관리에서 할 수 있어요.';
 
 class _ChatScreenState extends State<ChatScreen> {
   final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
@@ -86,14 +108,59 @@ class _ChatScreenState extends State<ChatScreen> {
   final AttachmentUrlResolver _resolver = AttachmentUrlResolver.supabase();
   List<QuestionAttachment> _attachments = <QuestionAttachment>[];
 
-  String? get _uid => SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  String? get _uid =>
+      widget.currentUserIdOverride ??
+      SupabaseInit.clientOrNull?.auth.currentUser?.id;
+
+  /// 신고·차단 대상(방 참여자에서 도출). null 이면 안전 메뉴 비활성화.
+  RoomCounterparty? _counterparty;
+
+  /// 내가 상대를 차단했는가 — true 면 이 방은 읽기 전용(전송·첨부 금지).
+  bool _blocked = false;
 
   @override
   void initState() {
     super.initState();
     _status = widget.thread.status;
+    _counterparty = RoomCounterparty.of(
+      widget.room,
+      currentUid: _uid,
+      displayName: widget.mentorName,
+    );
     _realtime = widget.realtimeFactory(widget.thread.id);
     _load();
+    _loadBlockState();
+  }
+
+  /// 입장 시 차단 상태 확인 — 이미 차단한 방은 처음부터 읽기 전용으로 연다.
+  /// 조회 실패는 흐름을 막지 않는다(기본 false = 기존 동작).
+  Future<void> _loadBlockState() async {
+    final RoomCounterparty? cp = _counterparty;
+    if (cp == null) return;
+    bool blocked = false;
+    try {
+      blocked = await widget.safety.isBlockedByMe(cp.userId);
+    } catch (_) {
+      blocked = false;
+    }
+    if (mounted && blocked) setState(() => _blocked = true);
+  }
+
+  Future<void> _onSafetyAction(RoomSafetyAction action) async {
+    final RoomCounterparty? cp = _counterparty;
+    if (cp == null) return; // 상대 미확인 — 실행하지 않는다.
+    switch (action) {
+      case RoomSafetyAction.report:
+        await reportRoomCounterparty(context,
+            counterparty: cp, safety: widget.safety);
+      case RoomSafetyAction.block:
+        final bool ok = await confirmAndBlockRoomCounterparty(context,
+            counterparty: cp, safety: widget.safety);
+        if (ok && mounted) {
+          setState(() => _blocked = true); // composer 비활성 — 기존 대화는 유지.
+          await _refresh(); // 차단 후 room state 새로고침.
+        }
+    }
   }
 
   /// 스레드 상태 변경(실시간) → 최신 상태 재조회해 상태칩 갱신.
@@ -195,6 +262,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _send() async {
+    if (_blocked) {
+      _showError(_blockedNotice); // append/첨부 RPC 호출 0회.
+      return;
+    }
     final String body = _input.text.trim();
     final PickedImage? pending = _pending;
     if ((body.isEmpty && pending == null) || _sending) return;
@@ -229,6 +300,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 대기 첨부 업로드. 성공(=pending 정리 가능)이면 true.
   /// 오류를 삼키지 않는다 — 실패 사유를 표시하고 false 를 돌려준다(P2-19).
   Future<bool> _uploadPending(PickedImage image, {String? messageId}) async {
+    if (_blocked) return false; // 업로드 호출 0회(방어 — 진입은 이미 막힌다).
     if (!widget.uploader.isReady) {
       // 저장소 미준비(버킷 없음) → 안내만(골격). 텍스트는 이미 전송됨.
       _showError('이미지 첨부는 준비 중이에요. (저장소 설정 인수인계)');
@@ -253,6 +325,10 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 갤러리는 기존 imagePicker 포트(하위호환), 촬영·파일은 scanPicker 포트.
   /// PDF 분기는 expandScanPick(소스 계층)이 담당 — 이 화면은 모른다.
   Future<void> _attach() async {
+    if (_blocked) {
+      _showError(_blockedNotice); // 첨부 선택·업로드 진입 차단.
+      return;
+    }
     final ScanSource? source = await showScanSourceSheet(context);
     if (source == null || !mounted) return; // 시트 취소 — 무동작.
     try {
@@ -329,8 +405,13 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: _refresh,
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 4),
             child: Center(child: ThreadStatusPill(status: _status)),
+          ),
+          RoomSafetyMenu(
+            counterparty: _counterparty,
+            blocked: _blocked,
+            onSelected: _onSafetyAction,
           ),
         ],
       ),
@@ -343,9 +424,11 @@ class _ChatScreenState extends State<ChatScreen> {
             sending: _sending,
             onSend: _send,
             onAttach: _attach,
-            pendingImage: _pending,
+            pendingImage: _blocked ? null : _pending,
             onRemovePending: () => setState(() => _pending = null),
             onAnnotate: _annotatePending,
+            enabled: !_blocked,
+            disabledNotice: _blocked ? _blockedNotice : null,
           ),
         ],
       ),

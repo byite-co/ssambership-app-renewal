@@ -67,7 +67,9 @@ class _LiveMessageListState extends State<LiveMessageList> {
     super.initState();
     widget.controller.addListener(_onChanged);
     widget.realtime.start(
-      onMessageInsert: (QuestionMessage m) => widget.controller.add(m),
+      // 서버 정본 행 — 같은 id 의 낙관적 행이 있으면 교체한다(서버 created_at 유지).
+      onMessageInsert: (QuestionMessage m) =>
+          widget.controller.upsertFromServer(m),
       onThreadUpdate: widget.onThreadUpdate,
       onAttachmentInsert: widget.onAttachmentInsert,
     );

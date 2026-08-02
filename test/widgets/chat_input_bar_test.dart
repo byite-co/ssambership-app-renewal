@@ -76,4 +76,48 @@ void main() {
     await tester.pump();
     expect(send, 0);
   });
+
+  // S3-E §6: 차단한 상대의 질문방은 읽기 전용 — composer 만 꺼진다.
+  testWidgets('enabled=false + 안내문구 → 입력·첨부·전송 위젯 자체가 사라진다',
+      (WidgetTester tester) async {
+    int send = 0;
+    int attach = 0;
+    await tester.pumpWidget(_wrap(ChatInputBar(
+      controller: TextEditingController(),
+      hintText: '메시지 입력',
+      sending: false,
+      onSend: () => send++,
+      onAttach: () => attach++,
+      enabled: false,
+      disabledNotice: '차단한 사용자예요.',
+    )));
+
+    expect(find.text('차단한 사용자예요.'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byIcon(Icons.send_rounded), findsNothing);
+    expect(find.byIcon(Icons.attach_file), findsNothing);
+    expect(send, 0);
+    expect(attach, 0);
+  });
+
+  testWidgets('enabled=false(안내문구 없음) → 버튼·입력창 비활성(콜백 미호출)',
+      (WidgetTester tester) async {
+    int send = 0;
+    int attach = 0;
+    await tester.pumpWidget(_wrap(ChatInputBar(
+      controller: TextEditingController(),
+      hintText: '메시지 입력',
+      sending: false,
+      onSend: () => send++,
+      onAttach: () => attach++,
+      enabled: false,
+    )));
+
+    await tester.tap(find.byIcon(Icons.send_rounded), warnIfMissed: false);
+    await tester.tap(find.byIcon(Icons.attach_file), warnIfMissed: false);
+    await tester.pump();
+    expect(send, 0);
+    expect(attach, 0);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+  });
 }
