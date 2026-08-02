@@ -124,6 +124,8 @@ AppError boardPostCreateError(Object? code) {
       return const AppError('일시 정지된 계정이에요. 정지 기간이 끝난 뒤 다시 시도해 주세요.');
     case 'ACCOUNT_DELETION_IN_PROGRESS':
       return const AppError('탈퇴 처리 중에는 글을 쓸 수 없어요.');
+    case 'ACCOUNT_NOT_ACTIVE':
+      return const AppError('현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
     case 'TITLE_REQUIRED':
       return const AppError('제목을 입력해 주세요.');
     case 'CATEGORY_INVALID':

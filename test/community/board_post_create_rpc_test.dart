@@ -291,6 +291,7 @@ void main() {
       'ACCOUNT_BANNED',
       'ACCOUNT_SUSPENDED',
       'ACCOUNT_DELETION_IN_PROGRESS',
+      'ACCOUNT_NOT_ACTIVE',
       'TITLE_REQUIRED',
       'CATEGORY_INVALID',
       'BODY_TOO_SHORT',
@@ -323,6 +324,32 @@ void main() {
           isNot(boardPostCreateError('CATEGORY_INVALID').userMessage));
       expect(boardPostCreateError('ACCOUNT_BANNED').userMessage,
           isNot(boardPostCreateError('ACCOUNT_SUSPENDED').userMessage));
+    });
+
+    test('ACCOUNT_NOT_ACTIVE — 게시글 작성(create) 표면 명시 문구(공통 fallback 아님)', () {
+      final AppError e = boardPostCreateError('ACCOUNT_NOT_ACTIVE');
+      expect(e.userMessage, '현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
+      expect(e.userMessage, isNot(kBoardPostCreateMalformed.userMessage));
+    });
+
+    test('ACCOUNT_NOT_ACTIVE — 게시글 수정(update) 표면도 같은 쓰기 매퍼로 명시 문구', () {
+      // 커뮤니티 게시글 쓰기(작성·수정)는 boardPostCreateError 를 단일 오류
+      // 매퍼로 공유한다 — 수정 경로가 서버 RPC 로 확장돼도 이 명시 문구가 나온다.
+      final AppError e = boardPostCreateError('ACCOUNT_NOT_ACTIVE');
+      expect(e.userMessage, '현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
+      expect(e.userMessage, isNot(kBoardPostCreateMalformed.userMessage));
+    });
+
+    test('기존 계정 상태 문구 회귀 없음(BANNED/SUSPENDED/DELETION_IN_PROGRESS)', () {
+      expect(boardPostCreateError('ACCOUNT_BANNED').userMessage,
+          '이용이 제한된 계정이에요. 고객센터로 문의해 주세요.');
+      expect(boardPostCreateError('ACCOUNT_SUSPENDED').userMessage,
+          '일시 정지된 계정이에요. 정지 기간이 끝난 뒤 다시 시도해 주세요.');
+      expect(boardPostCreateError('ACCOUNT_DELETION_IN_PROGRESS').userMessage,
+          '탈퇴 처리 중에는 글을 쓸 수 없어요.');
+      // 신규 명시 문구가 기존 계정 상태 문구를 대체하지 않는다.
+      expect(boardPostCreateError('ACCOUNT_NOT_ACTIVE').userMessage,
+          isNot(boardPostCreateError('ACCOUNT_DELETION_IN_PROGRESS').userMessage));
     });
 
     test('역할 계약(S3-C student+mentor) 수렴 전후 코드가 같은 문구로 묶인다', () {
