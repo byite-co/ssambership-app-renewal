@@ -213,6 +213,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
         builder: (_) => MentorAnswerScreen(
           thread: t,
           studentName: widget.studentName,
+          room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
         ),
       ),
     );

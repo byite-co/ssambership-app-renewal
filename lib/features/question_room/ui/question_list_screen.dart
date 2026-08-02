@@ -196,7 +196,11 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   Future<void> _openChat(QuestionThread t) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChatScreen(thread: t, mentorName: widget.mentorName),
+        builder: (_) => ChatScreen(
+          thread: t,
+          mentorName: widget.mentorName,
+          room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
+        ),
       ),
     );
     if (mounted) _refresh();

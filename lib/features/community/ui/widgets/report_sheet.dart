@@ -14,8 +14,16 @@ const List<MapEntry<String, String>> reportReasons = <MapEntry<String, String>>[
   MapEntry<String, String>('etc', '기타'),
 ];
 
-/// 신고 시트를 열고 선택한 사유 code 를 반환(취소 시 null).
-Future<String?> showReportSheet(BuildContext context) {
+/// 게시물 신고 안내 문구(기본).
+const String _postGuidance =
+    '게시물의 출처·권리는 작성자에게 있어요. 외부 연락처 유도, 저작권·출처 위반,'
+    ' 불법·부적절한 정보는 신고해 주세요. 접수 내용은 운영팀이 검토해요.';
+
+/// 신고 시트를 열고 선택한 사유 code 를 반환(취소 시 null — 이때 쓰기 0회).
+///
+/// [guidance] 는 안내 문구만 바꾼다(사유 목록·저장 계약은 공용 그대로).
+/// 질문방의 사용자 신고처럼 대상이 게시물이 아닌 경우에 쓴다.
+Future<String?> showReportSheet(BuildContext context, {String? guidance}) {
   return showModalBottomSheet<String>(
     context: context,
     backgroundColor: ColorTokens.surface,
@@ -23,12 +31,14 @@ Future<String?> showReportSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
-    builder: (BuildContext ctx) => const _ReportSheet(),
+    builder: (BuildContext ctx) => _ReportSheet(guidance: guidance),
   );
 }
 
 class _ReportSheet extends StatefulWidget {
-  const _ReportSheet();
+  const _ReportSheet({this.guidance});
+
+  final String? guidance;
 
   @override
   State<_ReportSheet> createState() => _ReportSheetState();
@@ -49,11 +59,7 @@ class _ReportSheetState extends State<_ReportSheet> {
             Text('신고하기', style: AppType.title),
             const SizedBox(height: 8),
             // 출처/권리 확인 안내 — 외부 연락처 유도·불법 정보 신고 동선.
-            Text(
-              '게시물의 출처·권리는 작성자에게 있어요. 외부 연락처 유도, 저작권·출처 위반,'
-              ' 불법·부적절한 정보는 신고해 주세요. 접수 내용은 운영팀이 검토해요.',
-              style: AppType.caption,
-            ),
+            Text(widget.guidance ?? _postGuidance, style: AppType.caption),
             const SizedBox(height: 12),
             for (final MapEntry<String, String> r in reportReasons)
               RadioListTile<String>(
