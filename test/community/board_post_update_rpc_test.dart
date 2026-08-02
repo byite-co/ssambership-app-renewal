@@ -184,10 +184,52 @@ void main() {
           <String>['community-post-images/$_uid/0_old.png']);
     });
 
-    test('removed_image_refs 부재(null)는 빈 목록으로 허용한다', () {
-      final Map<String, dynamic> env = _okEnvelope();
-      env.remove('removed_image_refs');
-      expect(parseBoardPostUpdateEnvelope(env).removedImageRefs, isEmpty);
+    test('removed_image_refs 는 필수 — 빈 배열 [] 만 정상, null·부재는 계약 밖', () {
+      // 빈 배열은 '제거된 이미지 없음'으로 정상 성공.
+      expect(
+          parseBoardPostUpdateEnvelope(_okEnvelope(removed: const <String>[]))
+              .removedImageRefs,
+          isEmpty);
+      // 부재·null 은 삭제 대상을 확정할 수 없다 — 성공으로 처리하지 않는다.
+      final Map<String, dynamic> missing = _okEnvelope();
+      missing.remove('removed_image_refs');
+      expect(() => parseBoardPostUpdateEnvelope(missing),
+          throwsA(same(kBoardPostUpdateMalformed)));
+      expect(() => parseBoardPostUpdateEnvelope(_okEnvelope(removed: null)),
+          throwsA(same(kBoardPostUpdateMalformed)));
+    });
+
+    test('contract_version 은 정수 1 strict — 누락·null·2·"1" 전부 계약 밖', () {
+      for (final Object? version in <Object?>[null, 2, '1', 1.5, true]) {
+        final Map<String, dynamic> env = _okEnvelope();
+        if (version == null) {
+          env.remove('contract_version');
+        } else {
+          env['contract_version'] = version;
+        }
+        expect(() => parseBoardPostUpdateEnvelope(env),
+            throwsA(same(kBoardPostUpdateMalformed)),
+            reason: 'contract_version=$version');
+        // null 값 자체도 확인(누락과 별개).
+        env['contract_version'] = null;
+        expect(() => parseBoardPostUpdateEnvelope(env),
+            throwsA(same(kBoardPostUpdateMalformed)));
+      }
+      // 정수 1 은 통과.
+      expect(parseBoardPostUpdateEnvelope(_okEnvelope()).postId, _postId);
+    });
+
+    test('실패 봉투는 contract_version 을 게이트하지 않는다(공용 규칙 — code 매핑이 정본)',
+        () {
+      // 버전이 빠져도 실제 오류 코드의 사용자 안내가 가려지지 않는다.
+      expect(
+          () => parseBoardPostUpdateEnvelope(<String, dynamic>{
+                'ok': false,
+                'code': 'UPDATE_CONFLICT',
+              }),
+          throwsA(predicate((Object? e) =>
+              e is AppError &&
+              e.userMessage == '다른 곳에서 글이 수정됐어요. 새로고침 후 다시 시도해 주세요.')));
     });
 
     test('계약 밖 응답은 전부 실패(성공으로 처리하지 않는다)', () {
@@ -196,21 +238,20 @@ void main() {
         'ok',
         <String, dynamic>{},
         <String, dynamic>{'ok': 'true'},
-        <String, dynamic>{'ok': true}, // post_id 없음
-        <String, dynamic>{'ok': true, 'post_id': ''},
-        <String, dynamic>{'ok': true, 'post_id': _postId}, // updated_at 없음
-        <String, dynamic>{'ok': true, 'post_id': _postId, 'updated_at': ''},
+        <String, dynamic>{'ok': true}, // 전 필드 없음
+        <String, dynamic>{..._okEnvelope(), 'post_id': ''},
+        <String, dynamic>{..._okEnvelope(), 'post_id': null},
+        <String, dynamic>{..._okEnvelope(), 'updated_at': ''},
+        <String, dynamic>{..._okEnvelope(), 'updated_at': null},
+        <String, dynamic>{..._okEnvelope(), 'removed_image_refs': 'not-a-list'},
+        // 혼합 타입 원소 — 하나라도 문자열이 아니면 거부.
         <String, dynamic>{
-          'ok': true,
-          'post_id': _postId,
-          'updated_at': _newUpdatedAt,
-          'removed_image_refs': 'not-a-list',
+          ..._okEnvelope(),
+          'removed_image_refs': <Object?>['community-post-images/u/a.png', 2],
         },
         <String, dynamic>{
-          'ok': true,
-          'post_id': _postId,
-          'updated_at': _newUpdatedAt,
-          'removed_image_refs': <Object?>[1, 2],
+          ..._okEnvelope(),
+          'removed_image_refs': <Object?>[null],
         },
       ];
       for (final Object? raw in malformed) {
@@ -355,6 +396,29 @@ void main() {
           '다른 곳에서 글이 수정됐어요. 새로고침 후 다시 시도해 주세요.');
       expect(h.cleanerCalls, 0);
       expect(h.fetchCalls, 0);
+    });
+
+    test('malformed 성공 봉투(버전·삭제목록 계약 밖) → Storage 삭제 0회', () async {
+      final List<Map<String, dynamic>> malformed = <Map<String, dynamic>>[
+        <String, dynamic>{..._okEnvelope(), 'contract_version': 2},
+        (() {
+          final Map<String, dynamic> e = _okEnvelope();
+          e.remove('contract_version');
+          return e;
+        })(),
+        <String, dynamic>{..._okEnvelope(), 'removed_image_refs': null},
+        <String, dynamic>{
+          ..._okEnvelope(),
+          'removed_image_refs': <Object?>['x', 1],
+        },
+      ];
+      for (final Map<String, dynamic> env in malformed) {
+        final _Harness h = _Harness(envelope: env);
+        expect(await _catch(() => h.run()), same(kBoardPostUpdateMalformed),
+            reason: '$env');
+        expect(h.cleanerCalls, 0, reason: '$env');
+        expect(h.fetchCalls, 0, reason: '$env');
+      }
     });
 
     test('봉투 post_id 불일치 → 삭제도 재조회도 하지 않는다(fail-closed)', () async {

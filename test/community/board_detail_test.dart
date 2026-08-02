@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
+import 'package:ssambership_app/features/community/data/community_post_image_url_resolver.dart';
 import 'package:ssambership_app/features/community/ui/board/board_detail_screen.dart';
 import 'package:ssambership_app/features/community/ui/widgets/content_policy_gate.dart';
 
@@ -188,4 +189,104 @@ void main() {
       expect(find.text('수정'), findsNothing);
     });
   });
+
+  group('첨부 이미지 표시 — 서명 URL 경로(원문 ref 비노출)', () {
+    const String uid = 'c04a191c-fa59-49a7-8fa4-6819e65580fb';
+    const String ref1 = 'community-post-images/$uid/1_a.png';
+    const String ref2 = 'community-post-images/$uid/2_b.jpg';
+
+    CommunityPostImageUrlResolver resolver(_ImageReadBackend backend) =>
+        CommunityPostImageUrlResolver(backend);
+
+    Future<void> pump(
+      WidgetTester tester, {
+      required List<String> imageRefs,
+      required _ImageReadBackend backend,
+    }) async {
+      _bigSurface(tester);
+      await tester.pumpWidget(_wrap(BoardDetailScreen(
+        post: sampleBoard(imageRefs: imageRefs),
+        read: const FakeCommunityRead(),
+        write: FakeCommunityWrite(),
+        imageUrlResolver: resolver(backend),
+      )));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('imageRefs 순서대로 이미지가 렌더된다(여러 장)', (WidgetTester tester) async {
+      final _ImageReadBackend backend = _ImageReadBackend();
+      await pump(tester,
+          imageRefs: const <String>[ref1, ref2], backend: backend);
+
+      final Finder first = find.byKey(const ValueKey<String>('post-image-$ref1'));
+      final Finder second =
+          find.byKey(const ValueKey<String>('post-image-$ref2'));
+      expect(first, findsOneWidget);
+      expect(second, findsOneWidget);
+      // 순서 보존 — 첫 ref 가 위에 그려진다.
+      expect(tester.getTopLeft(first).dy, lessThan(tester.getTopLeft(second).dy));
+      // 두 장 모두 서명 URL 로 Image 위젯이 만들어졌다.
+      expect(
+          find.descendant(of: first, matching: find.byType(Image)), findsOneWidget);
+      expect(find.descendant(of: second, matching: find.byType(Image)),
+          findsOneWidget);
+      // 발급은 버킷 접두사를 뗀 object path 로만 나간다.
+      expect(backend.paths, <String>['$uid/1_a.png', '$uid/2_b.jpg']);
+      // 원문 ref·소유자 UUID·Storage 경로는 화면 어디에도 없다.
+      expect(find.textContaining('community-post-images'), findsNothing);
+      expect(find.textContaining(uid), findsNothing);
+      // 본문·댓글은 그대로.
+      expect(find.text('본문 내용입니다.'), findsOneWidget);
+    });
+
+    testWidgets('일부 이미지 실패는 그 장의 플레이스홀더로 끝난다(본문·다른 장 유지)',
+        (WidgetTester tester) async {
+      final _ImageReadBackend backend = _ImageReadBackend()
+        ..failPaths.add('$uid/1_a.png');
+      await pump(tester,
+          imageRefs: const <String>[ref1, ref2], backend: backend);
+
+      final Finder first = find.byKey(const ValueKey<String>('post-image-$ref1'));
+      final Finder second =
+          find.byKey(const ValueKey<String>('post-image-$ref2'));
+      // 실패 장: 중립 안내(원문 경로 없음), Image 위젯 없음.
+      expect(find.descendant(of: first, matching: find.text('이미지를 불러오지 못했어요.')),
+          findsOneWidget);
+      expect(find.descendant(of: first, matching: find.byType(Image)),
+          findsNothing);
+      // 성공 장·본문·댓글은 그대로.
+      expect(find.descendant(of: second, matching: find.byType(Image)),
+          findsOneWidget);
+      expect(find.text('본문 내용입니다.'), findsOneWidget);
+      expect(find.text('좋은 글이에요.'), findsNothing); // FakeCommunityRead() 빈 댓글
+      expect(find.textContaining('community-post-images'), findsNothing);
+    });
+
+    testWidgets('imageRefs 가 비면 기존 텍스트 게시글과 동일(이미지 영역 없음)',
+        (WidgetTester tester) async {
+      final _ImageReadBackend backend = _ImageReadBackend();
+      await pump(tester, imageRefs: const <String>[], backend: backend);
+      expect(find.textContaining('이미지를 불러오지 못했어요.'), findsNothing);
+      expect(backend.paths, isEmpty); // 발급 시도 0
+      expect(find.text('본문 내용입니다.'), findsOneWidget);
+    });
+  });
+}
+
+/// 서명 발급 가짜 백엔드 — 경로 기록 + 지정 경로 실패.
+class _ImageReadBackend implements CommunityPostImageReadBackend {
+  final List<String> paths = <String>[];
+  final Set<String> failPaths = <String>{};
+
+  @override
+  String? get currentUserId => 'viewer-1';
+
+  @override
+  Future<String> createSignedUrl(String objectPath, int expiresInSeconds) {
+    paths.add(objectPath);
+    if (failPaths.contains(objectPath)) {
+      return Future<String>.error(Exception('denied'));
+    }
+    return Future<String>.value('https://signed.example/$objectPath?token=t');
+  }
 }

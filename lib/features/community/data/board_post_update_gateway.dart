@@ -96,14 +96,27 @@ Map<String, dynamic> buildBoardPostUpdateParams({
 
 /// jsonb 봉투 파싱 — 성공만 통과시키고 나머지는 전부 throw.
 ///
-/// `ok` 가 bool 이 아니거나, 성공인데 `post_id`/`updated_at` 이 비어 있거나,
-/// `removed_image_refs` 가 문자열 목록이 아니면 계약 밖 응답이다(fail-closed —
-/// removed 목록을 신뢰할 수 없으면 삭제 대상도 확정할 수 없다).
+/// **성공 봉투는 strict 검증한다** — 성공 판정은 파괴적 후속 동작(제거된
+/// 기존 이미지의 Storage 삭제)의 근거이므로, 정본 필드가 하나라도 빠지거나
+/// 형이 다르면 성공으로 처리하지 않는다(fail-closed):
+///   ok=true · post_id 비어있지 않은 문자열 · updated_at 비어있지 않은 문자열 ·
+///   removed_image_refs **필수** List<String>(빈 배열 정상, null·비목록·혼합
+///   타입 거부) · contract_version **정수 1**.
+///
+/// 공용 규칙(작성·수정 동일): **실패 봉투는 contract_version 을 게이트하지
+/// 않는다** — 실패에서 정본은 `code` 매핑(사용자 안내)이고, 버전까지
+/// 게이트하면 실제 오류 코드의 안내가 공통 문구로 가려질 뿐 안전성이 늘지
+/// 않는다. 성공만 strict 한 이유는 성공이 데이터(삭제 목록·충돌 토큰)를
+/// 신뢰해 행동하는 유일한 분기이기 때문이다. (create 봉투도 같은 규칙 —
+/// 실패는 code 매핑, 성공은 행동 근거 필드(post_id) 검증. create 성공에는
+/// 삭제 같은 파괴적 후속 동작이 없어 PR #38 동결 검증 범위를 유지한다.)
 BoardPostUpdateResult parseBoardPostUpdateEnvelope(Object? raw) {
   if (raw is! Map) throw kBoardPostUpdateMalformed;
   final Object? ok = raw['ok'];
   if (ok is! bool) throw kBoardPostUpdateMalformed;
   if (!ok) throw boardPostUpdateError(raw['code']);
+  final Object? version = raw['contract_version'];
+  if (version is! int || version != 1) throw kBoardPostUpdateMalformed;
   final Object? postId = raw['post_id'];
   if (postId is! String || postId.trim().isEmpty) {
     throw kBoardPostUpdateMalformed;
@@ -113,18 +126,13 @@ BoardPostUpdateResult parseBoardPostUpdateEnvelope(Object? raw) {
     throw kBoardPostUpdateMalformed;
   }
   final Object? removed = raw['removed_image_refs'];
-  final List<String> removedRefs;
-  if (removed == null) {
-    removedRefs = const <String>[];
-  } else if (removed is List && removed.every((Object? e) => e is String)) {
-    removedRefs = removed.cast<String>();
-  } else {
+  if (removed is! List || removed.any((Object? e) => e is! String)) {
     throw kBoardPostUpdateMalformed;
   }
   return BoardPostUpdateResult(
     postId: postId,
     updatedAt: updatedAt,
-    removedImageRefs: removedRefs,
+    removedImageRefs: removed.cast<String>(),
   );
 }
 
