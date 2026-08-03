@@ -3,25 +3,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 
-/// 계정 탈퇴(P1-10) — 서버 self RPC 계약(SQL 161, 2026-07-21 staging 배포·검증)에 1:1.
+/// 계정 탈퇴(P1-10) — 서버 self RPC **v2 계약**(계약 수렴)에 1:1.
 ///
 /// ★ raw `account_deletion_request(p_user_id,…)` 는 호출자–p_user_id 일치 검사가 없어
 ///   service_role 전용으로 유지된다(타인 job 조작 방지). 앱은 사용자 ID 를 서버가
-///   auth.uid() 로만 도출하는 **self RPC 4종**을 호출한다 — p_user_id 전송 없음:
-///   - account_deletion_request_self(p_cancelable_minutes, p_dry_run) → {ok, existing,
-///     job_id, state, cancelable_until, dry_run}
+///   auth.uid() 로만 도출하는 **self RPC** 를 호출한다 — p_user_id 전송 없음.
+///   구 self RPC 2종(account_deletion_request_self / _consented)은 앱 권한이
+///   REVOKE 됐고 v2 로 대체됐다. v2 는 **파라미터가 없다**(취소창 30분은 서버
+///   고정 — p_cancelable_minutes/p_dry_run 을 보내지 않는다):
+///   - account_deletion_request_self_v2() → {ok, existing,
+///     job_id, state, cancelable_until}
 ///     | {ok:false, code:FORFEIT_CONSENT_REQUIRED, balance_cents}
-///   - account_deletion_request_self_consented(p_cancelable_minutes, p_dry_run,
+///   - account_deletion_request_self_consented_v2(
 ///     p_acknowledged_balance_cents) → 위와 동일 성공형
 ///     | {ok:false, code:FORFEIT_CONSENT_STALE, acknowledged_balance_cents,
-///        current_balance_cents}   ← 운영 함수 exact 계약
+///        current_balance_cents}   ← 운영 함수 exact 계약(코드 불변)
 ///   - account_deletion_cancel_self() → {ok} | {ok:false, code:NOT_FOUND|NOT_CANCELABLE|
 ///     CANCEL_WINDOW_PASSED}
 ///   - account_deletion_status_self() → {ok, exists, state, cancelable_until,
 ///     write_blocked, can_cancel}
-/// ★ 실제 요청은 반드시 `p_dry_run=false` 명시 — 서버 기본값에 의존하지 않는다.
-/// ★ 42501 은 이제 정상 경로에서 나오지 않아야 하나(셀프 RPC 배포됨), 미적용 환경
-///   방어로 [AccountDeletionUnavailable] 분기(웹 폴백)를 유지한다.
+/// ★ 42501/42883/PGRST202 는 정상 경로에서 나오지 않아야 하나(v2 배포됨),
+///   미적용 환경 방어로 [AccountDeletionUnavailable] 분기(웹 폴백)를 유지한다.
 ///
 /// ── 잔액 보유 계정(Build 12 실기기 FAIL — 학생/멘토 공통) ─────────────────
 /// 잔액이 남은 계정에서 일반 self RPC 는 예외가 아니라 **정상 반환값**으로
@@ -181,12 +183,8 @@ class SupabaseAccountDeletionBackend implements AccountDeletionBackend {
 /// Supabase 구현.
 class SupabaseAccountDeletionRepository implements AccountDeletionPort {
   const SupabaseAccountDeletionRepository({
-    this.cancelableMinutes = 30,
     AccountDeletionBackend? backend,
   }) : _backendOverride = backend;
-
-  /// 취소 가능 창(분) — 서버 기본과 동일 값을 명시 전달.
-  final int cancelableMinutes;
 
   final AccountDeletionBackend? _backendOverride;
 
@@ -197,14 +195,12 @@ class SupabaseAccountDeletionRepository implements AccountDeletionPort {
   Future<DeletionRequestOutcome> requestDeletion() async {
     final Object? data;
     try {
-      // self RPC — 사용자 ID 는 서버가 auth.uid() 로 도출(p_user_id 전송 금지).
+      // self RPC v2 — 사용자 ID 는 서버가 auth.uid() 로 도출(p_user_id 전송
+      // 금지). ★ 파라미터 없음: 취소창(30분)은 서버 고정, dry_run 개념 폐기 —
+      // p_cancelable_minutes/p_dry_run 을 보내면 함수 해석이 실패한다(PGRST202).
       data = await _backend.rpc(
-        'account_deletion_request_self',
-        <String, dynamic>{
-          'p_cancelable_minutes': cancelableMinutes,
-          // ★ dry_run 기본값에 의존하지 않고 실요청을 명시한다.
-          'p_dry_run': false,
-        },
+        'account_deletion_request_self_v2',
+        const <String, dynamic>{},
       );
     } catch (e) {
       throw _mapError(e);
@@ -219,11 +215,10 @@ class SupabaseAccountDeletionRepository implements AccountDeletionPort {
     final Object? data;
     try {
       data = await _backend.rpc(
-        'account_deletion_request_self_consented',
+        'account_deletion_request_self_consented_v2',
         <String, dynamic>{
-          'p_cancelable_minutes': cancelableMinutes,
-          'p_dry_run': false,
           // ★ 서버가 준 값을 그대로 되돌려준다 — 재계산·반올림·보정 금지.
+          //   v2 파라미터는 이것 하나뿐(취소창은 서버 고정 30분).
           'p_acknowledged_balance_cents': acknowledgedBalanceCents,
         },
       );

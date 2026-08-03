@@ -17,7 +17,8 @@ import '../format/cash_format.dart';
 /// 회원 탈퇴(P1-10) — 위험 확인 → 서버 RPC 요청 → 로그아웃.
 ///
 /// 흐름(서버 계약 정본):
-/// - 요청: account_deletion_request_self(dry_run=false 명시). 이미 job 이 있으면
+/// - 요청: account_deletion_request_self_v2(파라미터 없음 — 취소창 30분은
+///   서버 고정, dry_run 개념 폐기). 이미 job 이 있으면
 ///   멱등 응답(existing=true) — 이중 탭·재요청 안전.
 /// - 성공 후: 토큰 revoke → 세션 폐기 → 로그인 화면(AuthService.signOut 이
 ///   revoke-before-signout 순서를 보장한다).
@@ -35,7 +36,7 @@ import '../format/cash_format.dart';
 ///   2) 소멸 시점·복구 불가·취소 가능 기간을 고지
 ///   3) 일반 확인과 **별도의** 잔액 소멸 동의 체크박스
 ///   4) 금액을 다시 적은 확인 다이얼로그
-///   5) 동의 후에만 account_deletion_request_self_consented 호출
+///   5) 동의 후에만 account_deletion_request_self_consented_v2 호출
 /// 동의 금액이 낡으면(`FORFEIT_CONSENT_STALE`) 서버가 거절하고, 화면은 성공
 /// 안내도 로그아웃도 하지 않는다(fail-closed) — 서버가 준 `current_balance_cents`
 /// 로 금액을 갱신하고 동의를 다시 받는다.

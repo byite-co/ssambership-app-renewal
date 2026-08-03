@@ -137,7 +137,7 @@ DeletionAccepted _accepted({
 
 void main() {
   group('SupabaseAccountDeletionRepository (RPC 계약)', () {
-    test('요청: self RPC + p_dry_run=false 명시 + p_user_id 미전송(서버 auth.uid 정본)',
+    test('요청: self RPC v2 — 파라미터 0개(취소창 서버 고정·dry_run 폐기·p_user_id 미전송)',
         () async {
       final _FakeBackend backend = _FakeBackend(result: <String, dynamic>{
         'ok': true,
@@ -152,13 +152,10 @@ void main() {
       final DeletionRequestOutcome o = await repo.requestDeletion();
 
       final (String fn, Map<String, dynamic> params) = backend.calls.single;
-      expect(fn, 'account_deletion_request_self');
-      expect(params['p_dry_run'], isFalse, reason: '서버 기본값 의존 금지');
-      expect(params['p_cancelable_minutes'], 30);
-      expect(params.containsKey('p_user_id'), isFalse,
-          reason: '타인 ID 전송 경로 원천 제거 — 서버 auth.uid() 단독');
-      expect(params.containsKey('p_acknowledged_balance_cents'), isFalse,
-          reason: '잔액 0 계정은 동의 인자 없이 일반 RPC 로 끝난다');
+      expect(fn, 'account_deletion_request_self_v2');
+      expect(params, isEmpty,
+          reason: 'v2 계약: p_cancelable_minutes/p_dry_run/p_user_id 전송 금지 — '
+              '취소창 30분은 서버 고정');
       final DeletionRequestResult r = (o as DeletionAccepted).result;
       expect(r.existing, isFalse);
       expect(r.isPending, isTrue);
@@ -271,7 +268,7 @@ void main() {
 
       expect(o, isA<DeletionForfeitConsentRequired>());
       expect((o as DeletionForfeitConsentRequired).balanceCents, 4500000);
-      expect(backend.calls.single.$1, 'account_deletion_request_self');
+      expect(backend.calls.single.$1, 'account_deletion_request_self_v2');
     });
 
     test('FORFEIT_CONSENT_REQUIRED 는 throw 하지 않는다(AppError·웹 폴백 변환 금지)',
@@ -313,7 +310,7 @@ void main() {
       );
     });
 
-    test('동의 RPC: 함수명·p_dry_run=false·ack 금액 exact·p_user_id 없음', () async {
+    test('동의 RPC v2: 함수명·ack 금액 단일 파라미터·p_user_id/dry_run 없음', () async {
       final _FakeBackend backend = _FakeBackend(result: <String, dynamic>{
         'ok': true,
         'existing': false,
@@ -326,12 +323,11 @@ void main() {
           .requestDeletionWithForfeitConsent(acknowledgedBalanceCents: 4500000);
 
       final (String fn, Map<String, dynamic> params) = backend.calls.single;
-      expect(fn, 'account_deletion_request_self_consented');
-      expect(params['p_dry_run'], isFalse);
-      expect(params['p_cancelable_minutes'], 30);
+      expect(fn, 'account_deletion_request_self_consented_v2');
       expect(params['p_acknowledged_balance_cents'], 4500000,
           reason: '서버가 준 금액을 가공 없이 그대로 되돌려준다');
-      expect(params.containsKey('p_user_id'), isFalse);
+      expect(params.keys.toList(), <String>['p_acknowledged_balance_cents'],
+          reason: 'v2 계약: 동의 금액 외 파라미터 전송 금지(취소창은 서버 고정)');
       expect((o as DeletionAccepted).result.isPending, isTrue);
     });
 
@@ -1029,7 +1025,7 @@ void main() {
   /// fake 는 **RPC 트랜스포트**뿐이다. 응답 payload 는 운영 함수 exact 형태를 쓰고,
   /// 파싱은 실제 SupabaseAccountDeletionRepository 가 한다.
   group('AccountDeleteScreen × 운영 exact 응답(FORFEIT_CONSENT_STALE)', () {
-    const String kConsentFn = 'account_deletion_request_self_consented';
+    const String kConsentFn = 'account_deletion_request_self_consented_v2';
 
     Map<String, dynamic> consentRequired(int cents) => <String, dynamic>{
           'ok': false,
@@ -1094,7 +1090,7 @@ void main() {
         (WidgetTester tester) async {
       final List<String> journal = <String>[];
       final _FakeBackend backend = _FakeBackend();
-      backend.queueByFn['account_deletion_request_self'] = <Object?>[
+      backend.queueByFn['account_deletion_request_self_v2'] = <Object?>[
         consentRequired(4500000),
       ];
       backend.queueByFn[kConsentFn] = <Object?>[
@@ -1140,7 +1136,7 @@ void main() {
         (WidgetTester tester) async {
       final List<String> journal = <String>[];
       final _FakeBackend backend = _FakeBackend();
-      backend.queueByFn['account_deletion_request_self'] = <Object?>[
+      backend.queueByFn['account_deletion_request_self_v2'] = <Object?>[
         consentRequired(4500000),
       ];
       backend.queueByFn[kConsentFn] = <Object?>[
@@ -1162,7 +1158,7 @@ void main() {
     testWidgets('잔액 0 계정은 동의 단계 없이 일반 RPC 로 접수', (WidgetTester tester) async {
       final List<String> journal = <String>[];
       final _FakeBackend backend = _FakeBackend();
-      backend.queueByFn['account_deletion_request_self'] = <Object?>[accepted()];
+      backend.queueByFn['account_deletion_request_self_v2'] = <Object?>[accepted()];
 
       await pumpScreen(tester, backend: backend, journal: journal);
       await toConsentStage(tester);
