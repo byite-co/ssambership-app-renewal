@@ -1,5 +1,13 @@
 # SHORTFORM_ASSESSMENT — 숏폼 출시 소요 산정 & 웹 대비 현황
 
+> **SUPERSEDED: 이 문서는 2026-07-02 시점의 조사·산정 스냅샷이다.**
+> 전 기능 계약 수렴(2026-08) 이후 일부 항목이 변경됐다 — 예: 숏폼 조회수는
+> 이제 `shortform_view_record_v2`(impression당 event key 멱등)로 집계하고,
+> 숏폼 글 신고 `target_type` 정본은 `shortform_post`(구 모호 `shortform` 폐기)다.
+> 신고·차단 현행 정본은 `docs/S3E_QUESTION_ROOM_SAFETY_CONTRACT.md`,
+> 수렴 결과는 `docs/audit/full_contract_convergence_result_20260804.md` 를 따른다.
+> 이 문서는 실행 지시나 현재 blocker 판정에 사용하지 않는다(역사 스냅샷).
+>
 > 조사·산정 문서. **코드 변경 없음.** 근거는 앱/웹 코드에서 직접 읽은 것만(웹은 읽기 참고).
 > 작성 기준일: 2026-07-02.
 
@@ -25,7 +33,7 @@
 | **스크랩(D8)** | ⚠️ 앱은 `type:'scrap'`을 insert하지만 **웹은 'like'만 씀** → DB CHECK에 막힐 수 있음 | 앱 `toggleShortformReaction(type:'scrap')` ↔ 웹 `communityShortformMutations.ts`는 like 전용. **DB `shortform_reactions.type` 허용값 확인필요** |
 | 조회수 증가(D7) | ❌ 표시만, 증가 RPC 미호출 | 앱은 `view_count` 표시만. (웹은 `increment_shortform_post_view` 호출) |
 | 댓글(작성/열람) | ✅ 됨 | `shortform_detail_screen.dart` `addComment`/`comments` |
-| 신고 | ✅ 됨 | `report(targetType:'shortform')` |
+| 신고 | ✅ 됨 | `report(targetType:'shortform_post')` — 수렴 후 정본(구 모호 `'shortform'` 폐기) |
 | **작성(업로드)** | ❌ 없음(**설계상 웹 전용**) | `ui/widgets/community_write_notice.dart` (작성은 웹) |
 
 ### 영상 데이터는 어디서 오나

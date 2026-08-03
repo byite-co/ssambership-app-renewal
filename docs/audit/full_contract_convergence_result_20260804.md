@@ -62,28 +62,53 @@ DB·웹 정본은 `ssambership_web/docs/audit/full_contract_convergence_result_2
 - 신규 테스트 7 + 수정 테스트 다수
 - versionCode 15 (pubspec + build_version_test)
 
-## G. 잔여 blocker
+## G. 잔여 운영 단계 (코드 아님)
 
-- **BLOCKED_ENV — release AAB 빌드**: 이 세션에 Android SDK(`ANDROID_HOME` 미설정·sdkmanager 없음)와 **업로드 keystore**(`android/key.properties` — 오너 보유 비밀, gitignore 차단)가 모두 없다. release-signed AAB 는 오너의 keystore 환경(Build 13 AAB 를 만든 곳)에서만 생성 가능. **코드는 릴리즈 준비 완료**(analyze 0·전체 테스트 pass·버전 15·버전 계약 테스트 green). 빌드 명령: `flutter clean && flutter pub get && flutter analyze && flutter test && flutter build appbundle --release`(keystore 보유 환경).
-- **NOT_RUN_DEVICE**: 실기기 통합(Realtime 라이브 수신·딥링크 실이동·push 정책)은 위젯/유닛 테스트까지 수행, 실기기 미보유로 미실행.
+코드 구현·DB 수렴·정적/계약 검증은 완료됐다. **실환경 브라우저 E2E, 실기기 QA,
+release AAB 생성, PR 병합 및 production rollout 은 아직 수행되지 않았다.**
+
+- **BLOCKED_ENV — release AAB 빌드**: 이 세션에 Android SDK(`ANDROID_HOME` 미설정·sdkmanager 없음)와 **업로드 keystore**(`android/key.properties` — 오너 보유 비밀, gitignore 차단)가 모두 없다. release-signed AAB 는 오너의 keystore 환경에서만 생성 가능. 소스는 준비됐으나 **AAB 는 생성되지 않았고 서명 검증도 되지 않았다**. 빌드 명령: `flutter clean && flutter pub get && flutter analyze && flutter test && flutter build appbundle --release`(keystore 보유 환경).
+- **NOT_RUN_DEVICE**: 실기기 통합(Realtime 라이브 수신·딥링크 실이동·push 정책)은 위젯/유닛 테스트까지 수행, 실기기 미보유로 runtime 미실행.
 - **BLOCKED_ENV — 앱 E2E(staging 라이브)**: staging Supabase egress 정책 차단(웹 보고서 §G 동일).
 
 ## H. 최종 판정 (앱 범위)
 
+의미론: `PASS` 는 코드/정적/자동화 테스트 통과를 뜻하며, 실환경 E2E·실기기·AAB 는
+별도 플래그로 분리한다(runtime 미실행을 PASS 로 표기하지 않는다).
+
 ```
-SOURCE_CONVERGENCE: PASS
-APP_CONTRACTS: PASS
-SECURITY_P0: PASS (users 직접쓰기 0 — manifest 소스잠금)
-FUNCTIONAL_P1: PASS
-REALTIME_IN_APP_NOTIFICATIONS: PASS (analyze·test)
-ACCOUNT_DELETION_REAL_RUN_ENABLED: NO
-OS_PUSH_POLICY: EXCLUDED_APP_F0 (Firebase 0)
-CONTRACT_MANIFEST_CI: PASS
-FLUTTER_ANALYZE: PASS (0 error / 0 warning; .env baseline 제외)
+SOURCE_CODE_CONVERGENCE: PASS
+DOCUMENTATION_CONVERGENCE: PASS
+APP_CONTRACTS_STATIC: PASS
+SECURITY_P0_STATIC_AND_DB: PASS (users 직접쓰기 0 — manifest 소스잠금)
+FUNCTIONAL_P1_AUTOMATED: PASS
+
+FLUTTER_ANALYZE: PASS (0 error / 0 warning; .env asset 경고는 master baseline — 수렴 도입분 0)
 FLUTTER_TEST: PASS (1292/1292 + dart-define 모드)
+CONTRACT_MANIFEST_CI: PASS
 APP_VERSION: 0.1.0+15 (1회 증가)
-RELEASE_AAB_READY: YES (코드) / BUILD: BLOCKED_ENV (SDK·keystore 부재)
+
+STAGING_BROWSER_E2E: BLOCKED_ENV
+IQ_REALTIME_CODE: PASS
+IQ_REALTIME_AUTOMATED_TESTS: PASS
+IQ_REALTIME_RUNTIME: NOT_RUN_DEVICE
+REALTIME_IN_APP_NOTIFICATIONS_CODE: PASS
+REALTIME_IN_APP_NOTIFICATIONS_AUTOMATED_TESTS: PASS
+REALTIME_IN_APP_NOTIFICATIONS_RUNTIME: NOT_RUN_DEVICE
+DEEP_LINK_RUNTIME: NOT_RUN_DEVICE
+
+ACCOUNT_DELETION_REAL_RUN_ENABLED: NO
+ACCOUNT_DELETION_REAL_RUN_VERIFIED: NO
+OS_PUSH_POLICY: EXCLUDED_APP_F0 (Firebase 0)
+
+RELEASE_SOURCE_READY: YES
+RELEASE_AAB_BUILT: NO
+RELEASE_AAB_BUILD_STATUS: BLOCKED_ENV
+RELEASE_SIGNING_VERIFIED: NO
+
 PLAY_UPLOADED: NO
 DEVICE_QA: NOT_RUN_DEVICE
-READY_FOR_PRODUCTION: NO (실기기 QA·keystore AAB·Play 업로드 잔존)
+PRODUCTION_DEPLOYED: NO
+READY_FOR_REVIEW: YES
+READY_FOR_PRODUCTION: NO (실환경 E2E·실기기 QA·keystore AAB·Play 업로드·production rollout 잔존)
 ```
