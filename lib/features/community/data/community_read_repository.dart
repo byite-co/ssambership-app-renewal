@@ -58,10 +58,17 @@ class CommunityReadRepository {
   /// 게시판 글 목록(공개=published, 최신순). category 지정 시 그 분류만.
   /// [limit] 지정 시 [offset]부터 그만큼만(페이징). null 이면 전체(하위 호환).
   /// ★ 반환 페이지의 nextOffset/rawCount 로만 페이징을 전진할 것(items.length 금지).
+  ///
+  /// 정본 소스는 뷰 `api_web_v1.community_posts_v1` 다(계약 수렴 — anon 허용,
+  /// deleted_at IS NULL + (published OR 본인 행)은 서버가 강제). 컬럼명은
+  /// 베이스 테이블과 다르다: 본문 `body`, 이미지 `image_refs`.
   Future<CommunityPage<BoardPost>> boards(
       {String? category, int? limit, int offset = 0}) async {
-    dynamic q =
-        _client.from('community_posts').select('*').eq('status', 'published');
+    dynamic q = _client
+        .schema('api_web_v1')
+        .from('community_posts_v1')
+        .select('*')
+        .eq('status', 'published');
     if (category != null && category.isNotEmpty) {
       q = q.eq('category', category);
     }
@@ -154,12 +161,15 @@ class CommunityReadRepository {
   }
 
   /// 내 활동: 내가 쓴 글 + 좋아요/스크랩한 글(읽기). 반응은 게시판 글 기준.
+  /// 게시판 읽기는 전부 뷰(community_posts_v1) 경유 — 본인 행은 뷰가
+  /// status 무관 허용하므로 초안도 내 활동에 보인다(서버 판정 정본).
   Future<MyActivity> myActivity() async {
     final String? uid = _uid;
     if (uid == null) return const MyActivity();
 
     final List<Map<String, dynamic>> mineRows = await _client
-        .from('community_posts')
+        .schema('api_web_v1')
+        .from('community_posts_v1')
         .select('*')
         .eq('author_id', uid)
         .order('created_at', ascending: false);
@@ -176,10 +186,29 @@ class CommunityReadRepository {
   Future<List<BoardPost>> _postsByIds(Set<String> ids) async {
     if (ids.isEmpty) return <BoardPost>[];
     final List<Map<String, dynamic>> rows = await _client
-        .from('community_posts')
+        .schema('api_web_v1')
+        .from('community_posts_v1')
         .select('*')
         .inFilter('id', ids.toList())
         .order('created_at', ascending: false);
     return rows.map(BoardPost.fromMap).toList();
+  }
+
+  /// 게시판 글 1건(알림 딥링크 → 상세 진입용). 없거나 접근 밖이면 null.
+  Future<BoardPost?> boardPostById(String postId) async {
+    final List<BoardPost> rows = await _postsByIds(<String>{postId});
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// 숏폼 1건(알림 딥링크 → 상세 진입용). 없으면 null. 숏폼 읽기는 계속
+  /// 베이스 `shortform_posts`(published 공개 열람) 다.
+  Future<ShortformPost?> shortformById(String id) async {
+    final Map<String, dynamic>? row = await _client
+        .from('shortform_posts')
+        .select('*')
+        .eq('id', id)
+        .eq('status', 'published')
+        .maybeSingle();
+    return row == null ? null : ShortformPost.fromMap(row);
   }
 }

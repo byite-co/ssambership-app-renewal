@@ -5,6 +5,14 @@ import 'package:ssambership_app/features/community/data/community_read_repositor
 import 'package:ssambership_app/features/community/data/community_write_repository.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
 
+/// "결과 미지정" 과 "명시적 null 결과" 를 구분하는 const 센티넬 —
+/// `softDeleteResult ?? default` 로는 null 봉투 케이스를 만들 수 없기 때문.
+class _Unset {
+  const _Unset();
+}
+
+const _Unset _kUnset = _Unset();
+
 /// 실제 DB·네트워크 대신 주입할 가짜 레포. 고정 데이터만 반환(Supabase 미접촉).
 class FakeCommunityRead extends CommunityReadRepository {
   const FakeCommunityRead({
@@ -101,6 +109,17 @@ class FakeCommunityWrite extends CommunityWriteRepository {
 
   /// createPost 로 들어온 멱등키 이력(재시도 시 같은 키가 유지되는지 검증용).
   final List<String> postIdempotencyKeys = <String>[];
+
+  /// 숏폼 조회 기록 v2 로 들어온 (postId, eventKey) 이력 — 키 안정성 검증용.
+  final List<String> shortformViewKeys = <String>[];
+  String? lastShortformViewPostId;
+
+  /// 숏폼 댓글 본인 삭제 호출 기록.
+  int deleteCommentCalls = 0;
+  String? lastDeletedCommentId;
+
+  /// true 면 deleteMyShortformComment 가 호출 기록 후 throw.
+  bool failDeleteComment = false;
 
   /// uploadPostImage 로 들어온 이미지 이력(업로드 횟수·중복 방지 검증용).
   final List<PickedImage> uploadedImages = <PickedImage>[];
@@ -233,6 +252,22 @@ class FakeCommunityWrite extends CommunityWriteRepository {
   }
 
   @override
+  Future<void> recordShortformView({
+    required String postId,
+    required String eventKey,
+  }) async {
+    lastShortformViewPostId = postId;
+    shortformViewKeys.add(eventKey);
+  }
+
+  @override
+  Future<void> deleteMyShortformComment(String commentId) async {
+    deleteCommentCalls++;
+    lastDeletedCommentId = commentId;
+    if (failDeleteComment) throw const AppError('댓글 삭제에 실패했어요.');
+  }
+
+  @override
   Future<void> report({
     required String targetType,
     required String targetId,
@@ -272,6 +307,12 @@ class RecordingCommentsGateway extends CommentsGateway {
   String? lastInsertTable;
   Map<String, dynamic>? lastInsertValues;
 
+  /// softDeleteShortformComment 가 돌려줄 jsonb(성공/실패 봉투). 미지정(_kUnset)
+  /// 이면 기본 성공 봉투를, 명시 설정 시 그 값(널 포함)을 그대로 돌려준다.
+  Object? softDeleteResult = _kUnset;
+  Object? softDeleteError;
+  final List<String> softDeletedCommentIds = <String>[];
+
   @override
   String? get currentUserId => userId;
 
@@ -304,6 +345,22 @@ class RecordingCommentsGateway extends CommentsGateway {
       'id': 'new-comment',
       'created_at': '2026-07-21T00:00:00Z',
     };
+  }
+
+  @override
+  Future<Object?> softDeleteShortformComment(String commentId) async {
+    softDeletedCommentIds.add(commentId);
+    final Object? err = softDeleteError;
+    if (err != null) throw err;
+    if (identical(softDeleteResult, _kUnset)) {
+      return <String, dynamic>{
+        'ok': true,
+        'contract_version': 1,
+        'comment_id': commentId,
+        'idempotent_hit': false,
+      };
+    }
+    return softDeleteResult; // 명시적으로 넘긴 값(널 포함)을 그대로 반환.
   }
 }
 
@@ -360,12 +417,18 @@ ShortformPost sampleShortform({
   );
 }
 
-CommunityComment sampleComment({String body = '좋은 글이에요.', String? parentId}) {
+CommunityComment sampleComment({
+  String id = 'c1',
+  String body = '좋은 글이에요.',
+  String? parentId,
+  String? authorId,
+}) {
   return CommunityComment(
-    id: 'c1',
+    id: id,
     body: body,
     parentId: parentId,
     authorLabel: '익명2',
+    authorId: authorId,
     createdAt: DateTime(2026, 6, 29),
   );
 }

@@ -183,14 +183,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 
-  /// 댓글 신고 → content_reports(target_type='comment' — 정본 comments 행.
-  /// v16 정본 전환: 게시판 댓글의 신고 대상 테이블은 comments).
+  /// 댓글 신고 → content_reports(target_type='board_comment' — 정본 comments
+  /// 행. 서버 allowlist 정본: 구 'comment' 는 거부돼 접수가 실패했다 — live
+  /// bug 수정).
   Future<void> _reportComment(String commentId) async {
     final String? reason = await showReportSheet(context);
     if (reason == null) return;
     try {
       await widget.write.report(
-        targetType: 'comment',
+        targetType: 'board_comment',
         targetId: commentId,
         reason: reason,
       );

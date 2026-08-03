@@ -16,12 +16,13 @@ void main() {
     });
   });
 
-  test('BoardPost.fromMap: content 우선 본문, 카운트 파싱, 제목 폴백', () {
+  test('BoardPost.fromMap: 뷰 정본 body 우선(content 는 legacy 폴백), 카운트·제목 폴백',
+      () {
     final BoardPost p = BoardPost.fromMap(<String, dynamic>{
       'id': 'b1',
       'title': '',
-      'content': '본문',
-      'body': 'ignored',
+      'body': '본문', // 뷰(community_posts_v1) 정본 컬럼
+      'content': 'legacy-ignored',
       'category': 'study',
       'like_count': 3,
       'comment_count': 7,
@@ -31,10 +32,38 @@ void main() {
       'created_at': '2026-06-28T00:00:00Z',
     });
     expect(p.title, '(제목 없음)'); // 빈 제목 폴백
-    expect(p.body, '본문'); // content 우선
+    expect(p.body, '본문'); // body 우선(뷰 계약)
     expect(p.likeCount, 3);
     expect(p.commentCount, 7);
     expect(p.authorName, '익명1');
+  });
+
+  test('BoardPost.fromMap: body 가 비면 legacy content 폴백', () {
+    final BoardPost p = BoardPost.fromMap(<String, dynamic>{
+      'id': 'b1',
+      'title': 't',
+      'content': 'legacy',
+      'created_at': '2026-06-28T00:00:00Z',
+    });
+    expect(p.body, 'legacy');
+  });
+
+  test('BoardPost.fromMap: 이미지는 image_refs 정본(legacy image_urls 폴백)', () {
+    final BoardPost fromView = BoardPost.fromMap(<String, dynamic>{
+      'id': 'b1',
+      'title': 't',
+      'image_refs': <String>['community-post-images/u/1.png'],
+      'created_at': '2026-06-28T00:00:00Z',
+    });
+    expect(fromView.imageRefs, <String>['community-post-images/u/1.png']);
+
+    final BoardPost legacy = BoardPost.fromMap(<String, dynamic>{
+      'id': 'b1',
+      'title': 't',
+      'image_urls': <String>['community-post-images/u/2.png'],
+      'created_at': '2026-06-28T00:00:00Z',
+    });
+    expect(legacy.imageRefs, <String>['community-post-images/u/2.png']);
   });
 
   test('ShortformPost.fromMap: 썸네일/조회수/좋아요 파싱', () {

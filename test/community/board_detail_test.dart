@@ -73,7 +73,7 @@ void main() {
     expect(write.lastReportTargetType, 'community_post'); // 글 신고 대상 유지
   });
 
-  testWidgets('댓글 신고 → 대상 테이블은 정본 comments(target_type=comment)',
+  testWidgets('댓글 신고 → target_type=board_comment(서버 allowlist 정본)',
       (WidgetTester tester) async {
     _bigSurface(tester);
     final FakeCommunityWrite write = FakeCommunityWrite();
@@ -89,7 +89,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(write.reportCalls, 1);
-    expect(write.lastReportTargetType, 'comment'); // ★ v16 정본 전환
+    // ★ 구 'comment' 는 서버 allowlist 가 거부하던 live bug — exact 문자열 고정.
+    expect(write.lastReportTargetType, 'board_comment');
     expect(write.lastReportTargetId, 'c1');
   });
 

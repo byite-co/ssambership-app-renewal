@@ -97,14 +97,16 @@ class BoardPost {
 
   factory BoardPost.fromMap(Map<String, dynamic> m) {
     final Object? updatedAt = m['updated_at'];
-    final Object? imageUrls = m['image_urls'];
+    // 뷰(community_posts_v1) 정본 컬럼은 image_refs — 베이스 행(legacy)의
+    // image_urls 는 폴백으로만 읽는다.
+    final Object? imageUrls = m['image_refs'] ?? m['image_urls'];
     return BoardPost(
       id: m['id'] as String,
       title: (m['title'] as String?)?.trim().isNotEmpty == true
           ? (m['title'] as String).trim()
           : '(제목 없음)',
-      // 스키마상 body/content 둘 다 존재 — 게시판은 legacy content 우선(기존 계약 유지).
-      body: _pickText(m, const <String>['content', 'body']),
+      // 뷰 정본 컬럼은 body — legacy 베이스 행의 content 는 폴백으로만 읽는다.
+      body: _pickText(m, const <String>['body', 'content']),
       category: m['category'] as String?,
       authorLabel: m['author_label'] as String?,
       authorRole: m['author_role'] as String?,
@@ -191,6 +193,7 @@ class CommunityComment {
     required this.body,
     this.parentId,
     this.authorLabel,
+    this.authorId,
     required this.createdAt,
   });
 
@@ -202,6 +205,11 @@ class CommunityComment {
   final String? parentId;
 
   final String? authorLabel;
+
+  /// 작성자 user id(내부 전용 — 화면 비노출). 내 댓글 삭제 어포던스 게이트에만
+  /// 쓴다 — 보안 정본은 서버(community_comment_soft_delete_self 의 소유 검사)다.
+  final String? authorId;
+
   final DateTime createdAt;
 
   String get authorName => communityAuthorName(authorLabel, null);
@@ -214,6 +222,7 @@ class CommunityComment {
       body: _pickText(m, const <String>['content', 'body']) ?? '',
       parentId: m['parent_id'] as String?,
       authorLabel: m['author_label'] as String?,
+      authorId: m['author_id'] as String?,
       createdAt: parseTime(m['created_at']),
     );
   }

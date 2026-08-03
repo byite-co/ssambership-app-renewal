@@ -6,6 +6,8 @@ import '../../../../design/shape_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../../../design/widgets/app_badge.dart';
+import '../../data/board_post_create_gateway.dart'
+    show newBoardPostIdempotencyKey;
 import '../../data/community_models.dart';
 import '../../data/community_read_repository.dart';
 import '../../data/community_write_repository.dart';
@@ -63,11 +65,29 @@ enum _ShortformMediaPhase {
   invalidReference,
 }
 
+/// 내 댓글 삭제 어포던스 게이트(순수 — 테스트 대상). 작성자 id 와 현재 uid 가
+/// 둘 다 비어 있지 않고 일치할 때만 삭제를 노출한다. **편의 게이트일 뿐**
+/// 보안 정본은 서버(community_comment_soft_delete_self 의 소유 검사)다.
+bool canDeleteOwnShortformComment({
+  required String? commentAuthorId,
+  required String? currentUserId,
+}) {
+  final String a = commentAuthorId?.trim() ?? '';
+  final String u = currentUserId?.trim() ?? '';
+  if (a.isEmpty || u.isEmpty) return false;
+  return a == u;
+}
+
 /// 상태를 공개해 테스트가 [retryMedia] 로 로드 세대(viewLoadGeneration) 폐기
 /// 계약을 검증할 수 있게 한다(ShortformFeedViewState 공개와 같은 규약).
 class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
+
+  /// 조회 기록 v2 의 이벤트 키 — **화면 노출(초기 진입) 1회당 1개**(UUID v4).
+  /// late final 필드라 리빌드·setState 에도 재생성되지 않는다. 실패해도 새
+  /// 키로 재시도하지 않는다(멱등 계약 — 중복 가산 0). 테스트 검증용 공개.
+  late final String viewEventKey = newBoardPostIdempotencyKey();
 
   bool _liked = false;
   bool _scrapped = false;
@@ -93,8 +113,11 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         widget.read.comments(CommunityPostType.shortform, widget.post.id);
     _loadReactionState();
     _loadMedia();
-    // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
-    widget.write.incrementShortformView(widget.post.id);
+    // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
+    widget.write.recordShortformView(
+      postId: widget.post.id,
+      eventKey: viewEventKey,
+    );
   }
 
   /// 저장값을 리졸버로 해석해 재생을 준비한다. ★ build 중 진입 금지 —
@@ -241,8 +264,10 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
     final String? reason = await showReportSheet(context);
     if (reason == null) return;
     try {
+      // 서버 allowlist 정본 target_type — 숏폼 '글'은 'shortform_post'
+      // (구 'shortform' 은 모호해 폐기).
       await widget.write.report(
-        targetType: 'shortform',
+        targetType: 'shortform_post',
         targetId: widget.post.id,
         reason: reason,
       );
@@ -290,6 +315,40 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         _comments =
             widget.read.comments(CommunityPostType.shortform, widget.post.id);
       });
+    }
+  }
+
+  /// 내 댓글 삭제(본인 소프트삭제 RPC) — 확인 다이얼로그 후 진행, 성공 시
+  /// 서버 재조회로 목록에서 사라진다(로컬 선반영 없음 — 서버 판정 정본).
+  Future<void> _deleteMyComment(String commentId) async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('댓글을 삭제할까요?'),
+        content: const Text('삭제한 댓글은 되돌릴 수 없어요.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.write.deleteMyShortformComment(commentId);
+      if (!mounted) return;
+      _snack('댓글을 삭제했어요.');
+      setState(() {
+        _comments =
+            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+      });
+    } catch (e) {
+      _snack('댓글 삭제에 실패했어요. ${friendlyError(e)}');
     }
   }
 
@@ -528,6 +587,14 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
                   comment: comments[i],
                   onReport: () => _reportComment(comments[i].id),
                   onBlock: () => _blockCommentAuthor(comments[i].id),
+                  // 삭제는 **내 댓글에만** 노출(타인 댓글 삭제 UI 미노출 —
+                  // 서버도 COMMENT_NOT_OWNED 로 거부).
+                  onDelete: canDeleteOwnShortformComment(
+                    commentAuthorId: comments[i].authorId,
+                    currentUserId: widget.write.currentUserId,
+                  )
+                      ? () => _deleteMyComment(comments[i].id)
+                      : null,
                 ),
               ],
           ],

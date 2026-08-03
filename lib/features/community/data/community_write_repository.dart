@@ -100,13 +100,23 @@ class CommunityWriteRepository {
     }
   }
 
-  /// 숏폼 조회수 +1(상세 진입 시). 기존 RPC 사용. ★ RPC 부재/실패 시 조용히 무시.
-  Future<void> incrementShortformView(String postId) async {
+  /// 숏폼 조회 기록 v2(상세 진입 시) — (post, event_key) 멱등.
+  ///
+  /// ★ 구 `increment_shortform_post_view` 는 앱 권한이 REVOKE 됐다 — 호출
+  ///   코드를 남기지 않는다. [eventKey] 는 **화면 노출 1회당 1개**(UUID v4,
+  ///   화면 initState 에서 생성)를 재사용한다: 실패해도 새 키로 재시도하지
+  ///   않는다(조회수는 비핵심 — 실패는 조용히 무시, 중복 가산 0).
+  Future<void> recordShortformView({
+    required String postId,
+    required String eventKey,
+  }) async {
     try {
-      await _client.rpc('increment_shortform_post_view',
-          params: <String, dynamic>{'p_post_id': postId});
+      await _client.rpc('shortform_view_record_v2', params: <String, dynamic>{
+        'p_post_id': postId,
+        'p_event_key': eventKey,
+      });
     } catch (_) {
-      // 조용한 폴백.
+      // 조용한 폴백(조회 자체엔 영향 없음).
     }
   }
 
@@ -161,6 +171,62 @@ class CommunityWriteRepository {
       'content': content,
       if (parentId != null) 'parent_id': parentId,
     };
+  }
+
+  /// 숏폼 댓글 **본인** 소프트삭제 — 서버 RPC 단일 경로.
+  ///
+  /// 서버 계약(5): community_comment_soft_delete_self(p_comment_id uuid)
+  ///   성공: {ok:true, contract_version:1, comment_id, idempotent_hit}
+  ///   실패 코드: COMMENT_NOT_FOUND · COMMENT_TYPE_NOT_SUPPORTED ·
+  ///     COMMENT_NOT_OWNED · COMMENT_MODERATED · ACCOUNT_* (봉투 code 또는
+  ///     raise exception 어느 형태로 와도 한글 문구로 변환한다).
+  /// 멱등 히트(idempotent_hit)는 정상 성공으로 취급한다(이중 탭 안전).
+  Future<void> deleteMyShortformComment(String commentId) async {
+    final Object? data;
+    try {
+      data = await _gateway.softDeleteShortformComment(commentId);
+    } catch (e) {
+      final AppError? friendly = shortformCommentDeleteError(e.toString());
+      if (friendly != null) throw friendly;
+      rethrow;
+    }
+    if (data is Map && data['ok'] == true) {
+      if (data['contract_version'] != 1) {
+        throw const AppError('댓글 삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.');
+      }
+      return; // 성공(멱등 히트 포함).
+    }
+    // 실패 봉투({ok:false, code}) 또는 계약 밖 응답 — 성공 위장 금지.
+    final Object? code = data is Map ? data['code'] : null;
+    throw shortformCommentDeleteError(code is String ? code : '') ??
+        const AppError('댓글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+
+  /// 숏폼 댓글 삭제 서버 오류 코드 → 사용자용 한글 문구(코드·원문 비노출).
+  /// 매핑 대상이 아니면 null(호출부가 공통 문구/원 예외로 폴백).
+  static AppError? shortformCommentDeleteError(String raw) {
+    if (raw.contains('COMMENT_NOT_FOUND')) {
+      return const AppError('댓글을 찾을 수 없어요. 이미 삭제됐을 수 있어요.');
+    }
+    if (raw.contains('COMMENT_TYPE_NOT_SUPPORTED')) {
+      return const AppError('이 댓글은 앱에서 삭제할 수 없어요.');
+    }
+    if (raw.contains('COMMENT_NOT_OWNED')) {
+      return const AppError('내가 쓴 댓글만 삭제할 수 있어요.');
+    }
+    if (raw.contains('COMMENT_MODERATED')) {
+      return const AppError('운영팀이 처리한 댓글은 삭제할 수 없어요.');
+    }
+    if (raw.contains('ACCOUNT_BANNED') || raw.contains('ACCOUNT_SUSPENDED')) {
+      return const AppError('계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.');
+    }
+    if (raw.contains('ACCOUNT_DELETION_IN_PROGRESS')) {
+      return const AppError('탈퇴 처리 중에는 이 기능을 사용할 수 없어요.');
+    }
+    if (raw.contains('ACCOUNT_NOT_ACTIVE')) {
+      return const AppError('현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
+    }
+    return null;
   }
 
   /// 정본 comments 서버 트리거 오류 → 사용자용 한글 문구(코드·원문 비노출).
@@ -270,9 +336,12 @@ class CommunityWriteRepository {
     );
   }
 
+  /// 저장 정본 재조회 — 읽기와 같은 뷰(api_web_v1.community_posts_v1) 경유.
+  /// 본인 행은 status 무관 보이므로 작성·수정 직후 재조회가 항상 성립한다.
   Future<List<Map<String, dynamic>>> _fetchPostById(String postId) async {
     final List<dynamic> rows = await _client
-        .from('community_posts')
+        .schema('api_web_v1')
+        .from('community_posts_v1')
         .select('*')
         .eq('id', postId)
         .limit(1);

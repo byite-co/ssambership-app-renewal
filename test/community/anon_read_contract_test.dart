@@ -33,8 +33,11 @@ void main() {
     late String body;
     setUpAll(() => body = _method(_source(), 'Future<CommunityPage<BoardPost>> boards('));
 
-    test('정본 테이블은 community_posts', () {
-      expect(body.contains("from('community_posts')"), isTrue);
+    test('정본 소스는 api_web_v1.community_posts_v1 뷰(anon 허용)', () {
+      expect(body.contains(".schema('api_web_v1')"), isTrue);
+      expect(body.contains("from('community_posts_v1')"), isTrue);
+      // 베이스 테이블 직접 조회로 회귀하지 않는다.
+      expect(body.contains("from('community_posts')"), isFalse);
     });
 
     test("select('*') 를 좁히지 않는다", () {
@@ -255,10 +258,16 @@ void main() {
             reason: '${f.path} 가 authorId 를 문자열에 보간한다');
       }
       // ShortformPost 는 여전히 author_id 를 승격하지 않는다(수정 기능 없음).
+      // ★ ShortformPost **클래스 본문만** 검사한다 — 파일 뒤쪽 CommunityComment 는
+      //   본인 댓글 소프트삭제 소유권 게이트(§F/§10.6)를 위해 authorId 를 내부 필드로
+      //   승격했고(리뷰 승인 계약), 그 필드는 위 소스 잠금 루프가 UI 미노출을 보증한다.
       final String models = File(modelsPath).readAsStringSync();
       final int idx = models.indexOf('class ShortformPost');
       expect(idx, greaterThan(0));
-      expect(models.substring(idx).contains('authorId'), isFalse,
+      final int nextClass = models.indexOf('\nclass ', idx + 1);
+      final String shortformBody =
+          nextClass > idx ? models.substring(idx, nextClass) : models.substring(idx);
+      expect(shortformBody.contains('authorId'), isFalse,
           reason: 'ShortformPost 에 authorId 가 생겼다');
     });
 
