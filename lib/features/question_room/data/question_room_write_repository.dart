@@ -110,6 +110,15 @@ class QuestionRoomWriteRepository {
   /// 앱은 별도 status UPDATE 를 하지 않는다.
   /// 반환 메시지는 서버 id + 로컬 필드로 구성한 낙관적 표현 — 실측 행은
   /// 새로고침/Realtime 재조회로 수렴한다.
+  ///
+  /// ★ 시각 계약: 이 RPC 는 `{ok, message_id, answered_transition}` 만 돌려주고
+  ///   `created_at` 은 주지 않는다(서버 계약 §1.3). 그래서 낙관적 행의 시각은
+  ///   기기 시각으로 채우는데, [QuestionMessage.createdAt] 은 모델 전체가
+  ///   `parseTime`(=`toLocal()`) 로 만드는 **로컬 시각**이 정본이다.
+  ///   여기서 `toUtc()` 를 쓰면 말풍선이 UTC 시각(KST-9h)으로 보이고 정렬도
+  ///   9시간 앞으로 튄다 — 그래서 로컬 `DateTime.now()` 를 쓴다.
+  ///   DB 에 저장되는 값이 아니라 화면 표시용 임시값이며, 서버 행이 도착하면
+  ///   `ThreadMessagesController.upsertFromServer` 가 서버 시각으로 교체한다.
   Future<AppendedMessage> appendMessage({
     required String threadId,
     required String body,
@@ -128,14 +137,35 @@ class QuestionRoomWriteRepository {
       throw const AppError('메시지 전송 결과를 확인하지 못했어요. 새로고침해 주세요.');
     }
     return AppendedMessage(
-      message: QuestionMessage(
-        id: data['message_id'] as String,
+      message: optimisticMessage(
+        messageId: data['message_id'] as String,
         threadId: threadId,
         authorId: uid,
-        body: body.trim(),
-        createdAt: DateTime.now().toUtc(),
+        body: body,
       ),
       answeredTransition: (data['answered_transition'] as bool?) ?? false,
+    );
+  }
+
+  /// append RPC 응답 + 로컬 입력으로 만드는 낙관적 메시지 행.
+  ///
+  /// ★ `created_at` 은 **로컬 시각**이다 — [QuestionMessage.createdAt] 은 모델
+  ///   전체가 `parseTime`(=`toLocal()`)로 만드는 로컬 축이라, 여기서 `toUtc()`
+  ///   를 쓰면 말풍선이 UTC 시각으로 보이고 정렬도 어긋난다(S3-E). DB 저장값이
+  ///   아니라 서버 행이 도착할 때까지의 표시용 임시값이다.
+  static QuestionMessage optimisticMessage({
+    required String messageId,
+    required String threadId,
+    required String authorId,
+    required String body,
+    DateTime? now,
+  }) {
+    return QuestionMessage(
+      id: messageId,
+      threadId: threadId,
+      authorId: authorId,
+      body: body.trim(),
+      createdAt: now ?? DateTime.now(),
     );
   }
 

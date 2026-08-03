@@ -1,8 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/scan/picked_image.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
-import 'board_author_gate.dart';
+import 'board_post_create_gateway.dart';
+import 'board_post_media_gateway.dart';
+import 'board_post_update_gateway.dart';
 import 'comments_gateway.dart';
 import 'community_models.dart';
 
@@ -34,6 +37,11 @@ class CommunityWriteRepository {
     if (id == null) throw const AppError('로그인이 필요해요.');
     return id;
   }
+
+  /// 현재 로그인 사용자 id(비로그인·미연결이면 null).
+  /// ★ 소유권 UI 게이트(내 글에만 수정 노출) 전용 — 화면에 노출하지 않는다.
+  ///   보안 정본은 서버(community_post_update 의 author_id 검사)다.
+  String? get currentUserId => SupabaseInit.clientOrNull?.auth.currentUser?.id;
 
   /// 게시판 글 반응 토글(좋아요/스크랩). on=true면 추가, false면 제거.
   /// like_count 자체는 서버(트리거)가 관리 — 앱은 내 반응 행만 만든다/지운다.
@@ -171,45 +179,104 @@ class CommunityWriteRepository {
     return null;
   }
 
-  /// 게시판 글 작성(본인). ★ 검수 없이 즉시 공개(status='published' — 동업자 확정).
-  /// author_role 정본 = 본인 users 행 role SELECT(BoardAuthorGate) — DB
-  /// DEFAULT('mentor') 의존 금지, 모든 실패 fail-closed(INSERT 0회), 저장 후
-  /// 반환 행 author_id/author_role 재검증까지 통과해야 성공 처리한다.
+  /// 게시판 글 작성(본인) — **서버 RPC 단일 경로**(S3-D).
+  ///
+  /// 운영 DB 는 `community_posts` 에 authenticated SELECT 만 허용한다(INSERT
+  /// 권한·policy 없음). 그래서 직접 INSERT 도, 그 뒤처리용 보상 DELETE 도 이
+  /// 경로에 존재하지 않는다 — 작성 판정·본문 정규화·author_role 도출은 전부
+  /// `api_app_v1.community_post_create` 가 수행한다.
+  ///
+  /// [idempotencyKey] 는 **제출 작업 1건**을 식별한다. 같은 작업의 재시도는
+  /// 같은 키를 보내야 서버가 기존 글로 수렴시킨다(중복 글 방지). 새 키 생성은
+  /// 화면(작성 작업 시작 시점)의 책임이다 — `newBoardPostIdempotencyKey()`.
   Future<BoardPost> createPost({
     required String title,
     required String body,
     required String category,
+    required String idempotencyKey,
+    List<String> imageRefs = kBoardPostCreateEmptyImageRefs,
   }) {
     final SupabaseClient client = _client;
-    return createBoardPostGated(
+    return createBoardPostViaRpc(
       authUserId: client.auth.currentUser?.id,
-      fetchOwnUserRows: (String userId) async {
-        final List<dynamic> rows =
-            await client.from('users').select('id, role').eq('id', userId);
-        return rows.cast<Map<String, dynamic>>();
-      },
-      insert: (Map<String, dynamic> payload) =>
-          client.from('community_posts').insert(payload).select().single(),
       title: title,
       body: body,
       category: category,
-      // 보정2: 반환 정본 불일치 '보상 전용' 내부 삭제 — 공개 API·UI·라우트로
-      // 노출하지 않는다. id+본인 author_id 로 클라이언트 범위를 좁히고,
-      // 실제 권한 판정은 RLS cp_delete_own(author 본인 또는 admin)에 맡긴다.
-      deleteOwnPostForCompensation: (String postId) async {
-        final String? uid = client.auth.currentUser?.id;
-        if (uid == null) throw const AppError('로그인이 필요해요.');
-        // v19 보정2: representation 을 요청해 실제 삭제 행을 확인한다 —
-        // 0행(조건 불일치·RLS 비가시성·기삭제)은 성공이 아니다.
-        final List<dynamic> deleted = await client
-            .from('community_posts')
-            .delete()
-            .eq('id', postId)
-            .eq('author_id', uid)
-            .select('id');
-        verifyCompensationDeleteReturn(deleted, postId);
+      idempotencyKey: idempotencyKey,
+      imageRefs: imageRefs,
+      callRpc: (Map<String, dynamic> params) async {
+        // ★ schema() 를 생략하면 public 으로 나가 함수를 찾지 못한다(PGRST202).
+        final Object? data = await client
+            .schema(kBoardPostCreateSchema)
+            .rpc(kBoardPostCreateFunction, params: params);
+        return data;
       },
+      // 저장 정본 재조회 — 읽기 레포(D-3 계약)를 건드리지 않는 단건 SELECT.
+      fetchPostById: _fetchPostById,
     );
+  }
+
+  /// 게시판 글 수정(본인) — **서버 RPC 단일 경로**(작성과 동일 원칙).
+  ///
+  /// 직접 UPDATE 는 존재하지 않는다 — 소유·역할·계정 상태 판정과 본문
+  /// 정규화·이미지 ref 검증은 전부 `api_app_v1.community_post_update` 가
+  /// 수행한다(서버 소유권 검사가 보안 정본).
+  ///
+  /// [expectedUpdatedAt] 은 수정 시작 시점 행의 `updated_at` **원문**
+  /// (`BoardPost.updatedAtRaw`)이어야 한다 — 서버가 exact 비교로 낙관적 충돌
+  /// (UPDATE_CONFLICT)을 판정한다. [imageRefs] 는 수정 후 글에 남을 전체 ref
+  /// 집합(유지+추가). 빠진 기존 ref 의 Storage 삭제는 서버가 돌려준
+  /// `removed_image_refs` 기준으로 **RPC 성공 후에만** best-effort 수행한다.
+  Future<BoardPost> updatePost({
+    required String postId,
+    required String title,
+    required String body,
+    required String category,
+    required String expectedUpdatedAt,
+    required List<String> imageRefs,
+  }) {
+    final SupabaseClient client = _client;
+    return updateBoardPostViaRpc(
+      authUserId: client.auth.currentUser?.id,
+      postId: postId,
+      title: title,
+      body: body,
+      category: category,
+      expectedUpdatedAt: expectedUpdatedAt,
+      imageRefs: imageRefs,
+      callRpc: (Map<String, dynamic> params) async {
+        // ★ 작성과 같은 api_app_v1 스키마 — 생략 시 public 으로 나가 PGRST202.
+        final Object? data = await client
+            .schema(kBoardPostCreateSchema)
+            .rpc(kBoardPostUpdateFunction, params: params);
+        return data;
+      },
+      fetchPostById: _fetchPostById,
+      removeImageRefs: (List<String> refs) => removeCommunityPostImageRefs(
+        backend: const SupabaseCommunityPostMediaBackend(),
+        refs: refs,
+      ),
+    );
+  }
+
+  /// 게시글 이미지 1장 업로드 → 서버 정본 ref 반환(작성·수정 공용).
+  /// 검증(5MB·4종 MIME)·경로 규약·버킷은 board_post_media_gateway 가 정본이다.
+  Future<String> uploadPostImage(PickedImage image) {
+    return uploadCommunityPostImage(
+      authUserId: currentUserId,
+      backend: const SupabaseCommunityPostMediaBackend(),
+      image: image,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchPostById(String postId) async {
+    final List<dynamic> rows = await _client
+        .from('community_posts')
+        .select('*')
+        .eq('id', postId)
+        .limit(1);
+    return rows.cast<Map<String, dynamic>>();
   }
 
   /// 신고 접수(content_reports). 외부 연락처 유도 등도 사유로 신고할 수 있다.

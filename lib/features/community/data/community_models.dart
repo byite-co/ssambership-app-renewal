@@ -49,6 +49,11 @@ class CommunityPage<T> {
 }
 
 /// 게시판 글(community_posts). 열람 전용 뷰모델.
+///
+/// [authorId]/[updatedAtRaw]/[imageRefs] 는 내부 처리 전용이다 —
+/// 소유권 UI 게이트(내 글에만 수정 노출)·낙관적 충돌 검사(p_expected_updated_at
+/// 원문 전달)·이미지 유지/제거 편집에만 쓰고 **화면에 UUID·원문 경로를 노출하지
+/// 않는다**(보안 정본은 서버 소유권 검사).
 class BoardPost {
   const BoardPost({
     required this.id,
@@ -57,6 +62,9 @@ class BoardPost {
     this.category,
     this.authorLabel,
     this.authorRole,
+    this.authorId,
+    this.updatedAtRaw,
+    this.imageRefs = const <String>[],
     required this.likeCount,
     required this.commentCount,
     required this.viewCount,
@@ -69,6 +77,17 @@ class BoardPost {
   final String? category;
   final String? authorLabel;
   final String? authorRole;
+
+  /// 작성자 user id(내부 전용 — 화면 비노출). 소유권 UI 게이트에만 쓴다.
+  final String? authorId;
+
+  /// 서버 updated_at **원문 문자열**(내부 전용). 수정 RPC 의
+  /// p_expected_updated_at 으로 재직렬화 없이 그대로 보낸다(exact 충돌 검사).
+  final String? updatedAtRaw;
+
+  /// 서버 정본 이미지 ref(`community-post-images/{uid}/{object}`, 내부 전용).
+  final List<String> imageRefs;
+
   final int likeCount;
   final int commentCount;
   final int viewCount;
@@ -77,6 +96,8 @@ class BoardPost {
   String get authorName => communityAuthorName(authorLabel, authorRole);
 
   factory BoardPost.fromMap(Map<String, dynamic> m) {
+    final Object? updatedAt = m['updated_at'];
+    final Object? imageUrls = m['image_urls'];
     return BoardPost(
       id: m['id'] as String,
       title: (m['title'] as String?)?.trim().isNotEmpty == true
@@ -87,6 +108,13 @@ class BoardPost {
       category: m['category'] as String?,
       authorLabel: m['author_label'] as String?,
       authorRole: m['author_role'] as String?,
+      authorId: m['author_id'] as String?,
+      updatedAtRaw: updatedAt is String ? updatedAt : null,
+      imageRefs: <String>[
+        if (imageUrls is List)
+          for (final Object? v in imageUrls)
+            if (v is String && v.isNotEmpty) v,
+      ],
       likeCount: parseInt(m['like_count']),
       commentCount: parseInt(m['comment_count']),
       viewCount: parseInt(m['view_count']),

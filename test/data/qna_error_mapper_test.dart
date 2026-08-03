@@ -56,6 +56,26 @@ void main() {
       }
     });
 
+    test('ACCOUNT_NOT_ACTIVE 는 명시 문구로 매핑된다(generic fallback 아님)', () {
+      expect(qnaErrorMessage(pg('ACCOUNT_NOT_ACTIVE')),
+          '현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
+      // 기존 계정 제한 문구와 별개의 명시 문구다.
+      expect(qnaErrorMessage(pg('ACCOUNT_NOT_ACTIVE')),
+          isNot(qnaErrorMessage(pg('ACCOUNT_BANNED'))));
+      // AppError 로 변환돼 friendlyError 일반 문구로 뭉개지지 않는다.
+      final Object mapped = mapQnaError(pg('ACCOUNT_NOT_ACTIVE'));
+      expect(mapped, isA<AppError>());
+      expect(friendlyError(mapped), '현재 계정 상태에서는 이 기능을 사용할 수 없어요.');
+    });
+
+    test('기존 계정 제한·차단 문구 회귀 없음', () {
+      expect(qnaErrorMessage(pg('ACCOUNT_BANNED')),
+          '계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.');
+      expect(qnaErrorMessage(pg('ACCOUNT_SUSPENDED')),
+          '계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.');
+      expect(qnaErrorMessage(pg('BLOCKED')), '차단 상태의 상대와는 질문을 주고받을 수 없어요.');
+    });
+
     test('알 수 없는 코드는 null → 호출부가 일반 재시도 문구로 폴백', () {
       expect(qnaErrorMessage(pg('SOME_NEW_CODE')), isNull);
       expect(qnaErrorMessage(Exception('boom')), isNull);

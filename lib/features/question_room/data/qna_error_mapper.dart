@@ -32,6 +32,8 @@ String? qnaErrorMessage(Object e) {
     case 'ACCOUNT_BANNED':
     case 'ACCOUNT_SUSPENDED':
       return '계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.';
+    case 'ACCOUNT_NOT_ACTIVE':
+      return '현재 계정 상태에서는 이 기능을 사용할 수 없어요.';
     // 멘토 자격
     case 'MENTOR_NOT_APPROVED':
       return '멘토 승인 상태가 확인되지 않아 지금은 진행할 수 없어요.';

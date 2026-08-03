@@ -10,6 +10,7 @@ import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
 import '../../data/community_models.dart';
+import '../../data/community_post_image_url_resolver.dart';
 import '../../data/community_read_repository.dart';
 import '../../data/community_write_repository.dart';
 import '../widgets/block_author_action.dart';
@@ -17,21 +18,29 @@ import '../widgets/comment_tile.dart';
 import '../widgets/content_policy_gate.dart';
 import '../widgets/reaction_bar.dart';
 import '../widgets/report_sheet.dart';
+import 'board_write_screen.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
-/// 게시판 상세 — 본문 + 반응(좋아요·스크랩·신고) + 댓글(읽기+작성).
-/// ★ 작성은 '댓글'만 앱에서. 글 본문 편집/작성은 없음(웹).
+/// 게시판 상세 — 본문 + 이미지 + 반응(좋아요·스크랩·신고) + 댓글(읽기+작성).
+/// ★ 글 작성·수정은 학생·멘토 모두 앱에서 가능하다(Build 13) — 직접 table
+///   write 가 아니라 `api_app_v1` RPC(community_post_create/update) 단일
+///   경로다. 수정 진입점은 이 화면의 내 글 전용 메뉴([_editMyPost]).
 class BoardDetailScreen extends StatefulWidget {
-  const BoardDetailScreen({
+  BoardDetailScreen({
     super.key,
     required this.post,
     required this.read,
     required this.write,
-  });
+    CommunityPostImageUrlResolver? imageUrlResolver,
+  }) : imageUrlResolver =
+            imageUrlResolver ?? sharedCommunityPostImageUrlResolver;
 
   final BoardPost post;
   final CommunityReadRepository read;
   final CommunityWriteRepository write;
+
+  /// 첨부 이미지 서명 URL 리졸버(테스트 주입 seam — 기본은 앱 공유 인스턴스).
+  final CommunityPostImageUrlResolver imageUrlResolver;
 
   @override
   State<BoardDetailScreen> createState() => _BoardDetailScreenState();
@@ -139,6 +148,29 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     } catch (e) {
       _snack('신고 접수에 실패했어요. ${friendlyError(e)}');
     }
+  }
+
+  /// 내 글 여부 — 수정 진입점 노출 게이트(내부 비교 전용, UUID 비노출).
+  /// ★ 역할(학생/멘토) 무관 — 자기 글이면 동일하게 노출. 편의 게이트일 뿐
+  ///   보안 정본은 서버(community_post_update 의 author_id 검사)다.
+  bool get _isMyPost {
+    final String? uid = widget.write.currentUserId;
+    final String? authorId = widget.post.authorId;
+    return uid != null && authorId != null && uid == authorId;
+  }
+
+  /// 내 글 수정 — 수정 화면으로. 성공(pop true)하면 상세를 닫아 목록을
+  /// 새로고침시킨다(상세의 글 스냅샷은 이미 낡은 값이라 유지하지 않는다).
+  Future<void> _editMyPost() async {
+    final bool? updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => BoardWriteScreen(
+          write: widget.write,
+          editing: widget.post,
+        ),
+      ),
+    );
+    if (updated == true && mounted) Navigator.of(context).pop(true);
   }
 
   /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
@@ -250,10 +282,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           PopupMenuButton<String>(
             tooltip: '더보기',
             onSelected: (String v) {
+              if (v == 'edit') _editMyPost();
               if (v == 'block') _blockPostAuthor();
             },
-            itemBuilder: (BuildContext ctx) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(value: 'block', child: Text('이 사용자 차단')),
+            itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
+              // 수정은 내 글에만 노출(타인 글 수정 UI 미노출 — 서버도 거부).
+              if (_isMyPost)
+                const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+              const PopupMenuItem<String>(
+                  value: 'block', child: Text('이 사용자 차단')),
             ],
           ),
         ],
@@ -294,6 +331,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       : '(내용 없음)',
                   style: AppType.body,
                 ),
+                // 첨부 이미지 — imageRefs 순서대로. 한 장의 실패가 본문·다른
+                // 이미지 표시를 막지 않는다(장별 독립 해석·플레이스홀더).
+                for (final String ref in p.imageRefs) ...<Widget>[
+                  const SizedBox(height: AppSpacing.s16),
+                  _PostImage(
+                    key: ValueKey<String>('post-image-$ref'),
+                    imageRef: ref,
+                    resolver: widget.imageUrlResolver,
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.s24),
                 ReactionBar(
                   liked: _liked,
@@ -398,6 +445,103 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 게시글 첨부 이미지 1장 — 서명 URL 해석 후 표시.
+///
+/// 실패(해석 실패·로드 실패)는 이 위젯 안의 중립 플레이스홀더로 끝난다 —
+/// 본문·다른 이미지·댓글 표시에 전파되지 않는다. ★ 원문 ref·UID·Storage
+/// 경로·서명 URL 은 어떤 상태에서도 화면에 싣지 않는다.
+class _PostImage extends StatefulWidget {
+  const _PostImage({
+    super.key,
+    required this.imageRef,
+    required this.resolver,
+  });
+
+  final String imageRef;
+  final CommunityPostImageUrlResolver resolver;
+
+  @override
+  State<_PostImage> createState() => _PostImageState();
+}
+
+class _PostImageState extends State<_PostImage> {
+  late Future<Uri?> _uri;
+
+  @override
+  void initState() {
+    super.initState();
+    // 리졸버가 TTL 캐시를 갖는다 — 재진입 시 만료 전 URL 만 재사용되고,
+    // 만료 후엔 이 호출이 새로 발급한다.
+    _uri = widget.resolver.resolve(widget.imageRef);
+  }
+
+  @override
+  void didUpdateWidget(_PostImage old) {
+    super.didUpdateWidget(old);
+    if (old.imageRef != widget.imageRef) {
+      _uri = widget.resolver.resolve(widget.imageRef);
+    }
+  }
+
+  Widget _placeholder({required Widget child}) {
+    return Container(
+      height: 160,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: ColorTokens.elevated,
+        borderRadius: AppShape.inputRadius,
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uri?>(
+      future: _uri,
+      builder: (BuildContext context, AsyncSnapshot<Uri?> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return _placeholder(
+              child: const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ));
+        }
+        final Uri? uri = snap.data;
+        if (uri == null) {
+          // 해석 실패 — 원문 ref·경로 없이 중립 안내만.
+          return _placeholder(
+            child: const Text('이미지를 불러오지 못했어요.', style: AppType.caption),
+          );
+        }
+        return ClipRRect(
+          borderRadius: AppShape.inputRadius,
+          child: Image.network(
+            uri.toString(),
+            fit: BoxFit.fitWidth,
+            width: double.infinity,
+            errorBuilder: (BuildContext c, Object e, StackTrace? s) =>
+                _placeholder(
+              child: const Text('이미지를 불러오지 못했어요.', style: AppType.caption),
+            ),
+            loadingBuilder: (BuildContext c, Widget child,
+                ImageChunkEvent? progress) {
+              if (progress == null) return child;
+              return _placeholder(
+                  child: const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ));
+            },
+          ),
+        );
+      },
     );
   }
 }

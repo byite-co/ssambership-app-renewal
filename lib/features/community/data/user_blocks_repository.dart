@@ -5,6 +5,17 @@ import '../../../core/supabase/supabase_client.dart';
 /// 차단 대상 결과(차단 액션의 결과 코드).
 enum BlockResult { blocked, self, notLoggedIn, failed }
 
+/// insert 실패가 '이미 차단된 상대'인지 판정 — 멱등 성공으로 처리할 신호.
+///
+/// `user_blocks` PK 는 (blocker_id, blocked_id) 라 중복 차단은
+/// unique_violation(23505)으로 떨어진다. 코드로 먼저 판정하고, 문구 매칭은
+/// 드라이버/로케일 차이를 위한 폴백으로만 남긴다.
+bool isAlreadyBlockedError(Object e) {
+  if (e is PostgrestException && e.code == '23505') return true;
+  final String m = e.toString().toLowerCase();
+  return m.contains('duplicate') || m.contains('unique');
+}
+
 /// 차단 목록 표시용 행(id + 표시명). id(UUID)는 화면에 노출하지 않는다.
 class BlockedUser {
   const BlockedUser({required this.userId, required this.displayName});
@@ -92,11 +103,18 @@ class UserBlocksRepository {
     }
   }
 
-  /// 차단 추가(중복은 성공으로 간주).
+  /// 차단 추가(중복은 성공으로 간주 = 멱등).
+  ///
+  /// ★ `user_blocks` PK 는 (blocker_id, blocked_id) 라 이미 차단한 상대를 다시
+  ///   차단하면 unique_violation(23505)이 난다 — 코드로 먼저 판정하고,
+  ///   문구 매칭은 로케일/드라이버 차이를 위한 폴백으로만 남긴다.
+  /// ★ 자기 자신은 DB CHECK(blocker_id <> blocked_id)가 막지만, 호출부에서
+  ///   먼저 걸러 사용자에게 명확한 문구를 보여준다.
   Future<bool> block(String blockedId) async {
     final SupabaseClient? c = _client;
     final String? uid = _uid;
     if (c == null || uid == null) return false;
+    if (blockedId.isEmpty || blockedId == uid) return false;
     try {
       await c.from(_table).insert(<String, dynamic>{
         'blocker_id': uid,
@@ -104,8 +122,7 @@ class UserBlocksRepository {
       });
       return true;
     } catch (e) {
-      final String m = e.toString().toLowerCase();
-      return m.contains('duplicate') || m.contains('unique');
+      return isAlreadyBlockedError(e);
     }
   }
 
