@@ -165,6 +165,19 @@ bool iqCanMentorAnswer(IndividualQuestionStatus s) =>
     s == IndividualQuestionStatus.claimed ||
     s == IndividualQuestionStatus.assigned;
 
+/// 학생이 후속 메시지(iq_append_message)를 보낼 수 있는 상태인지 —
+/// 답변 대기 구간 + 답변 도착(answered). 종결(released·refunded·expired·
+/// canceled)·미지(unknown)는 읽기 전용(서버도 QUESTION_LOCKED /
+/// NOT_ANSWERABLE_STATUS 로 거부한다 — UI 게이트는 편의일 뿐).
+bool iqCanStudentSendMessage(IndividualQuestionStatus s) =>
+    iqAwaitingAnswer(s) || s == IndividualQuestionStatus.answered;
+
+/// 멘토가 추가 답글(iq_append_message)을 보낼 수 있는 상태인지 — 첫 답변
+/// (answer_individual_question, claimed/assigned 원자 전이) 이후의 answered
+/// 구간. 첫 답변 전에는 기존 답변 컴포저가 담당한다.
+bool iqCanMentorSendFollowUp(IndividualQuestionStatus s) =>
+    s == IndividualQuestionStatus.answered;
+
 /// 스레드 메시지 작성자 방향. 확정할 수 없으면 [unknown] — 추측하지 않는다.
 enum IqMessageAuthor { student, mentor, unknown }
 

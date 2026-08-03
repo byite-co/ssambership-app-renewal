@@ -21,6 +21,7 @@ import '../../scan_annotation/annotation_target.dart';
 import '../../scan_annotation/scan_annotation_screen.dart';
 import '../data/individual_question_repository.dart';
 import '../data/iq_attachments_repository.dart';
+import '../data/iq_error_mapper.dart';
 import '../data/models/individual_question_models.dart';
 import '../../../shared/errors/friendly_error.dart';
 
@@ -373,7 +374,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
             '아래에서 다시 시도할 수 있어요.');
       }
     } catch (e) {
-      _snack(iqFailureMessage(e));
+      _snack(iqActionFailureText(e));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
