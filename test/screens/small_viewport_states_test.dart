@@ -257,4 +257,7 @@ class _FakeNotifications implements NotificationsRepository {
 
   @override
   Future<int> markAllRead() async => 0;
+
+  @override
+  Future<int> unreadCount() async => 0;
 }
