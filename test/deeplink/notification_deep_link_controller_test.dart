@@ -186,6 +186,151 @@ void main() {
     });
   });
 
+  group('라우팅 테이블(resolveNotificationDeepLink) — type+id → route', () {
+    const String roomUuid = '11111111-2222-4333-8444-555555555555';
+    const String threadUuid = '21111111-2222-4333-8444-555555555555';
+    const String questionUuid = '31111111-2222-4333-8444-555555555555';
+    const String mentorUuid = '41111111-2222-4333-8444-555555555555';
+    const String postUuid = '51111111-2222-4333-8444-555555555555';
+    const String shortformUuid = '61111111-2222-4333-8444-555555555555';
+
+    test('question_answered + 유효 room/thread UUID → 방 상세 route', () {
+      final NotificationDeepLinkRoute? r = resolveNotificationDeepLink(
+        target(roomId: roomUuid, threadId: threadUuid),
+      );
+      expect(r, isA<NotificationRoomRoute>());
+      final NotificationRoomRoute room = r! as NotificationRoomRoute;
+      expect(room.roomId, roomUuid);
+      expect(room.threadId, threadUuid);
+    });
+
+    test('UUID 형식 불량 id → 상세 대신 탭 폴백(임의 문자열 조회 금지)', () {
+      expect(
+        resolveNotificationDeepLink(target(roomId: 'r-1; drop table')),
+        isA<NotificationTabRoute>()
+            .having((NotificationTabRoute t) => t.tabIndex, 'tab',
+                AppTab.questionRoom),
+      );
+    });
+
+    test('iq_* + 유효 question UUID → IQ 상세 route', () {
+      final NotificationDeepLinkRoute? r = resolveNotificationDeepLink(target(
+        type: NotificationEventType.individualQuestionAnswered,
+        questionId: questionUuid,
+      ));
+      expect(r, isA<NotificationIqRoute>());
+      expect((r! as NotificationIqRoute).questionId, questionUuid);
+    });
+
+    test('구독·멘토 공지류 + metadata id → 멘토/게시판/숏폼 상세 route', () {
+      expect(
+        resolveNotificationDeepLink(NotificationDeepLinkTarget(
+          type: NotificationEventType.mentorSubscriptionPriceChanged,
+          mentorId: mentorUuid,
+        )),
+        isA<NotificationMentorRoute>().having(
+            (NotificationMentorRoute r) => r.mentorId, 'mentorId', mentorUuid),
+      );
+      expect(
+        resolveNotificationDeepLink(NotificationDeepLinkTarget(
+          type: NotificationEventType.subscriptionExpired,
+          postId: postUuid,
+        )),
+        isA<NotificationBoardPostRoute>().having(
+            (NotificationBoardPostRoute r) => r.postId, 'postId', postUuid),
+      );
+      expect(
+        resolveNotificationDeepLink(NotificationDeepLinkTarget(
+          type: NotificationEventType.subscriptionExpired,
+          shortformId: shortformUuid,
+        )),
+        isA<NotificationShortformRoute>().having(
+            (NotificationShortformRoute r) => r.shortformId, 'shortformId',
+            shortformUuid),
+      );
+      // id 없으면 종전과 같은 마이페이지 탭.
+      expect(
+        resolveNotificationDeepLink(target(
+            type: NotificationEventType.subscriptionExpired, eventId: 'n-9')),
+        isA<NotificationTabRoute>().having(
+            (NotificationTabRoute t) => t.tabIndex, 'tab', AppTab.myPage),
+      );
+    });
+
+    test('맞춤의뢰(stay)·unknown → route 없음(제외 유지)', () {
+      expect(
+        resolveNotificationDeepLink(target(
+            type: NotificationEventType.newOrderMessage,
+            questionId: questionUuid)),
+        isNull,
+      );
+      expect(
+        resolveNotificationDeepLink(
+            target(type: NotificationEventType.unknown, roomId: roomUuid)),
+        isNull,
+      );
+    });
+
+    test('openDetail 배선 시 상세 route 는 openDetail 로, 탭 route 는 navigate 로',
+        () {
+      final List<int> tabs = <int>[];
+      final List<NotificationDeepLinkRoute> details =
+          <NotificationDeepLinkRoute>[];
+      final NotificationDeepLinkController c = NotificationDeepLinkController(
+        navigate: tabs.add,
+        openDetail: details.add,
+      )..onSignedIn('u-1');
+
+      c.handleTap(target(roomId: roomUuid, eventId: 'n-1'));
+      c.handleTap(target(
+          type: NotificationEventType.subscriptionExpired, eventId: 'n-2'));
+
+      expect(details.length, 1);
+      expect(details.single, isA<NotificationRoomRoute>());
+      expect(tabs, <int>[AppTab.myPage]);
+    });
+
+    test('openDetail 미배선이면 상세 route 도 탭 폴백(기존 계약 호환)', () {
+      final List<int> tabs = <int>[];
+      final NotificationDeepLinkController c =
+          NotificationDeepLinkController(navigate: tabs.add)
+            ..onSignedIn('u-1');
+      c.handleTap(target(roomId: roomUuid, eventId: 'n-1'));
+      c.handleTap(target(
+        type: NotificationEventType.individualQuestionAnswered,
+        questionId: questionUuid,
+        eventId: 'n-2',
+      ));
+      expect(tabs, <int>[AppTab.questionRoom, AppTab.individualQuestion]);
+    });
+
+    test('notificationRouteFallbackTab — route 종류별 탭', () {
+      expect(
+        notificationRouteFallbackTab(
+            const NotificationRoomRoute(roomId: roomUuid)),
+        AppTab.questionRoom,
+      );
+      expect(
+        notificationRouteFallbackTab(const NotificationIqRoute(questionUuid)),
+        AppTab.individualQuestion,
+      );
+      expect(
+        notificationRouteFallbackTab(
+            const NotificationBoardPostRoute(postUuid)),
+        AppTab.community,
+      );
+      expect(
+        notificationRouteFallbackTab(
+            const NotificationShortformRoute(shortformUuid)),
+        AppTab.community,
+      );
+      expect(
+        notificationRouteFallbackTab(const NotificationMentorRoute(mentorUuid)),
+        AppTab.mentors,
+      );
+    });
+  });
+
   group('외부 경로 차단', () {
     test('payload 의 link/url 필드는 무시된다 — 탭 이동 외 어떤 실행도 없다', () {
       // 파싱 단계: link/url 은 PushPayload 에 보관 자리조차 없다.

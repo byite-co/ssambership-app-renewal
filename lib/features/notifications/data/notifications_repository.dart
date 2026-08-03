@@ -47,6 +47,10 @@ abstract class NotificationsRepository {
 
   /// 서버 RPC 로 본인 미읽음 전부 읽음 처리. 갱신 건수를 돌려준다(실패 시 throw).
   Future<int> markAllRead();
+
+  /// 서버 정본 미읽음 개수(`notification_unread_count_self`) — 배지의 유일한
+  /// 소스. 서버가 앱 제외 타입(kGatedNotificationTypeCodes)을 이미 뺀 값이다.
+  Future<int> unreadCount();
 }
 
 /// 원본 행(요청분 pageSize+1) → 페이지 조립(순수 로직 — 테스트 대상).
@@ -79,6 +83,27 @@ NotificationsPage assembleNotificationsPage(
 String notificationsAfterFilter(NotificationCursor after) =>
     'created_at.lt.${after.createdAtRaw},'
     'and(created_at.eq.${after.createdAtRaw},id.lt.${after.id})';
+
+/// `notification_unread_count_self` 봉투 파싱(순수 — 테스트 대상).
+/// {ok:true, count int>=0, contract_version:1} 만 개수로 인정, 그 외 null
+/// (호출부가 throw — 계약 밖 응답을 개수로 위장하지 않는다).
+int? parseUnreadCountEnvelope(Object? res) {
+  if (res is! Map || res['ok'] != true || res['contract_version'] != 1) {
+    return null;
+  }
+  final Object? count = res['count'];
+  if (count is int && count >= 0) return count;
+  if (count is num && count >= 0 && count == count.roundToDouble()) {
+    return count.toInt();
+  }
+  return null;
+}
+
+/// `mark_notification_read` 성공 봉투 판정(순수 — 테스트 대상).
+/// {ok:true, contract_version:1} 만 성공 — idempotent_hit 는 값과 무관하게
+/// 성공이다(멱등: 이미 읽은 알림을 다시 눌러도 성공).
+bool isMarkNotificationReadSuccess(Object? res) =>
+    res is Map && res['ok'] == true && res['contract_version'] == 1;
 
 /// Supabase 구현. RLS('본인 알림만')에 의존한다.
 class SupabaseNotificationsRepository implements NotificationsRepository {
@@ -120,30 +145,18 @@ class SupabaseNotificationsRepository implements NotificationsRepository {
     return assembleNotificationsPage(rows, pageSize);
   }
 
-  /// 현재 사용자 id. 읽음 처리의 본인 한정 필터에 쓴다(RLS 를 최종 방어로
-  /// 두되 앱 계층에서도 본인 행만 대상 — user_id 미러 컬럼 기준 조회 허용).
-  String? get _uid => _client.auth.currentUser?.id;
-
   @override
   Future<void> markRead(String id) async {
-    final String? uid = _uid;
-    if (uid == null) {
-      throw const AppError('로그인이 필요해요.');
-    }
-    // 갱신된 행을 되돌려 받아 실제 성공(본인 행 존재)을 확인한다 —
-    // 호출부는 성공 이후에만 UI 를 읽음으로 바꾼다.
-    final List<Map<String, dynamic>> rows = await _client
-        .from('notifications')
-        .update(<String, dynamic>{
-          'is_read': true,
-          // 레거시 read 컬럼도 함께 갱신(웹 구버전 호환).
-          'read': true,
-          'read_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .eq('id', id)
-        .eq('user_id', uid)
-        .select('id');
-    if (rows.isEmpty) {
+    // 계약 수렴: 단건 읽음은 직접 UPDATE 대신 서버 RPC 단일 경로.
+    // 서버 계약(10): mark_notification_read(p_notification_id uuid)
+    //   → {ok, contract_version:1, idempotent_hit} — 멱등(이중 탭 안전).
+    final dynamic res = await _client.rpc(
+      'mark_notification_read',
+      params: <String, dynamic>{'p_notification_id': id},
+    );
+    if (!isMarkNotificationReadSuccess(res)) {
+      // 계약 밖 응답·실패 봉투 — 성공으로 위장하지 않는다(호출부는 성공
+      // 이후에만 UI 를 읽음으로 바꾼다).
       throw const AppError('읽음 처리에 실패했어요.');
     }
   }
@@ -155,5 +168,18 @@ class SupabaseNotificationsRepository implements NotificationsRepository {
     if (res is int) return res;
     if (res is num) return res.toInt();
     return 0;
+  }
+
+  @override
+  Future<int> unreadCount() async {
+    // 서버 계약(9): notification_unread_count_self()
+    //   → {ok:true, count int, contract_version:1}. strict 파싱 —
+    // 계약 밖 응답을 개수로 위장하지 않는다(배지는 서버 값만 신뢰).
+    final dynamic res = await _client.rpc('notification_unread_count_self');
+    final int? count = parseUnreadCountEnvelope(res);
+    if (count == null) {
+      throw const AppError('알림 개수를 확인하지 못했어요.');
+    }
+    return count;
   }
 }

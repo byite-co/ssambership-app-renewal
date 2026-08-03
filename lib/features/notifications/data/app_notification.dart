@@ -40,6 +40,9 @@ class AppNotification {
     this.roomId,
     this.threadId,
     this.questionId,
+    this.postId,
+    this.shortformId,
+    this.mentorId,
   });
 
   final String id;
@@ -63,6 +66,15 @@ class AppNotification {
   /// metadata.question_id — 개별질문 정밀 딥링크 후속용.
   final String? questionId;
 
+  /// metadata.post_id — 게시판 상세 딥링크용.
+  final String? postId;
+
+  /// metadata.shortform_id — 숏폼 상세 딥링크용.
+  final String? shortformId;
+
+  /// metadata.mentor_id — 멘토 상세 딥링크용.
+  final String? mentorId;
+
   /// 표시 분류(필터 칩·배지) — 타입에서 파생.
   NotificationKind get kind => notificationKindOf(eventType);
 
@@ -76,6 +88,9 @@ class AppNotification {
         roomId: roomId,
         threadId: threadId,
         questionId: questionId,
+        postId: postId,
+        shortformId: shortformId,
+        mentorId: mentorId,
       );
 
   /// 서버 행 → 모델. 누락 필드에 관대(크래시 금지): 모르는 타입은 unknown,
@@ -99,6 +114,9 @@ class AppNotification {
       roomId: _nonEmptyString(metadata['room_id']),
       threadId: _nonEmptyString(metadata['thread_id']),
       questionId: _nonEmptyString(metadata['question_id']),
+      postId: _nonEmptyString(metadata['post_id']),
+      shortformId: _nonEmptyString(metadata['shortform_id']),
+      mentorId: _nonEmptyString(metadata['mentor_id']),
     );
   }
 }
