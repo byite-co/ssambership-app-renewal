@@ -43,7 +43,7 @@ class MentorsScreen extends StatefulWidget {
 }
 
 class _MentorsScreenState extends State<MentorsScreen> {
-  late Future<List<MentorListItem>> _future;
+  late Future<MentorDirectoryResult> _future;
 
   String _query = '';
   String? _subjectKey; // canonical key(= MentorSubject.key). null = 전체
@@ -204,10 +204,10 @@ class _MentorsScreenState extends State<MentorsScreen> {
   }
 
   Widget _body() {
-    return FutureBuilder<List<MentorListItem>>(
+    return FutureBuilder<MentorDirectoryResult>(
       future: _future,
       builder:
-          (BuildContext context, AsyncSnapshot<List<MentorListItem>> snap) {
+          (BuildContext context, AsyncSnapshot<MentorDirectoryResult> snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -215,7 +215,10 @@ class _MentorsScreenState extends State<MentorsScreen> {
           return _ErrorView(
               message: '멘토 목록을 불러오지 못했어요.\n${friendlyError(snap.error!)}');
         }
-        final List<MentorListItem> all = snap.data ?? <MentorListItem>[];
+        final MentorDirectoryResult result = snap.data ??
+            const MentorDirectoryResult(
+                items: <MentorListItem>[], incomplete: false);
+        final List<MentorListItem> all = result.items;
         if (all.isEmpty) {
           return const EmptyState(
             icon: Icons.school_outlined,
@@ -259,6 +262,14 @@ class _MentorsScreenState extends State<MentorsScreen> {
 
         return Column(
           children: <Widget>[
+            // 안전 상한 도달 — 침묵 절단 대신 '일부만 표시 중'을 명시한다.
+            if (result.incomplete)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(
+                    AppSpacing.screenH, 0, AppSpacing.screenH, 6),
+                child: Text('멘토가 많아 목록 일부만 불러왔어요. 검색으로 원하는 멘토를 찾아보세요.',
+                    style: AppType.caption),
+              ),
             if (subjects.isNotEmpty)
               Padding(
                 // 좌우 여백은 ChipScroll 내부(스크롤 영역)로 넘겨 끝 칩이 잘리지 않게 한다.

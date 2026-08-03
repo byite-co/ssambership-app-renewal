@@ -30,22 +30,35 @@ void main() {
     });
   });
 
-  group('MentorPublic.displayName (학생이 보는 멘토 이름)', () {
-    test('nickname 우선 → full_name → "멘토" 폴백', () {
+  group('MentorPublic.displayName (학생이 보는 멘토 이름 — 디렉터리 뷰 계약)', () {
+    test('nickname(트림) → 없으면 "멘토" 폴백 (full_name 폴백 폐기)', () {
       expect(
-        MentorPublic.fromMap(
-            <String, dynamic>{'id': 'm1', 'nickname': '쌤'}).displayName,
+        MentorPublic.fromMap(<String, dynamic>{
+          'mentor_id': 'm1',
+          'nickname': '쌤',
+        }).displayName,
         '쌤',
       );
       expect(
         MentorPublic.fromMap(<String, dynamic>{
-          'id': 'm1',
-          'full_name': '김선생',
+          'mentor_id': 'm1',
+          'nickname': '   ',
         }).displayName,
-        '김선생',
+        '멘토',
       );
       expect(
-        MentorPublic.fromMap(<String, dynamic>{'id': 'm1'}).displayName,
+        MentorPublic.fromMap(<String, dynamic>{'mentor_id': 'm1'}).displayName,
+        '멘토',
+      );
+    });
+
+    test('full_name 키는 읽지 않는다(뷰에 존재하지 않는 계약)', () {
+      // 레거시 행이 섞여 와도 full_name 은 표시명에 승격되지 않는다.
+      expect(
+        MentorPublic.fromMap(<String, dynamic>{
+          'mentor_id': 'm1',
+          'full_name': '김선생',
+        }).displayName,
         '멘토',
       );
     });

@@ -29,7 +29,8 @@ class _FakeDirectory extends MentorDirectoryRepository {
   final List<MentorListItem> items;
 
   @override
-  Future<List<MentorListItem>> listComplete() async => items;
+  Future<MentorDirectoryResult> listComplete() async =>
+      MentorDirectoryResult(items: items, incomplete: false);
 }
 
 class _FakeFavorites extends MentorFavoritesRepository {
