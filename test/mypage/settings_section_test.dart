@@ -100,7 +100,7 @@ void main() {
     expect(find.text('이용약관'), findsOneWidget);
     expect(find.text('개인정보 처리방침'), findsOneWidget);
     expect(find.text('앱 버전'), findsOneWidget);
-    expect(find.text('0.1.0'), findsOneWidget); // AppConstants.appVersion
+    expect(find.text('1.0.0'), findsOneWidget); // AppConstants.appVersion
   });
 
   testWidgets('로드된 값으로 마스터+그룹 5개 토글이 렌더된다(qna만 off)',
