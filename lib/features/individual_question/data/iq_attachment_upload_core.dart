@@ -282,8 +282,12 @@ IqAttachment? canonicalRegisteredAttachment(
     id: id,
     storagePath: objectPath,
     messageId: r['message_id'] is String ? r['message_id'] as String : null,
+    authorId: r['author_id'] is String ? r['author_id'] as String : null,
     fileName: r['file_name'] is String ? r['file_name'] as String : null,
     mimeType: r['mime_type'] is String ? r['mime_type'] as String : null,
+    createdAt: r['created_at'] is String
+        ? DateTime.tryParse(r['created_at'] as String)?.toLocal()
+        : null,
   );
 }
 

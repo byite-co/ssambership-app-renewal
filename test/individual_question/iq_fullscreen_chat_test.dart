@@ -52,9 +52,12 @@ IqMessage _msg(String id, String authorId, String body) => IqMessage(
       createdAt: DateTime(2026, 7, 2),
     );
 
+/// 학생 작성 이미지(author_id 정본) — 최초 질문 말풍선 귀속 검증용.
+/// 작성자 미기록 레거시는 중립 그룹으로 빠진다(iq_media_attribution_test).
 const IqAttachment _image = IqAttachment(
   id: 'a1',
   storagePath: 'q1/1-000001.png',
+  authorId: kStudentId,
   fileName: '문제.png',
   mimeType: 'image/png',
 );

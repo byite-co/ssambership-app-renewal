@@ -165,6 +165,14 @@ bool iqCanMentorAnswer(IndividualQuestionStatus s) =>
     s == IndividualQuestionStatus.claimed ||
     s == IndividualQuestionStatus.assigned;
 
+/// 멘토가 학생 이미지에 첨삭할 수 있는 상태인지 — 첫 답변 전(claimed/assigned)과
+/// 답변 도착 후 학생이 해결 완료하기 전(answered)까지. 종결(released·refunded·
+/// expired·canceled)·답변자 미정(escrowed·open)·미지(unknown)는 읽기 전용.
+/// ★ 첨삭 결과 전송은 메시지 경로를 따른다: 첫 답변 전이면 답변 등록과 함께,
+///   answered 구간이면 iq_append_message 추가 답글과 함께 연결된다.
+bool iqCanMentorAnnotate(IndividualQuestionStatus s) =>
+    iqCanMentorAnswer(s) || s == IndividualQuestionStatus.answered;
+
 /// 학생이 후속 메시지(iq_append_message)를 보낼 수 있는 상태인지 —
 /// 답변 대기 구간 + 답변 도착(answered). 종결(released·refunded·expired·
 /// canceled)·미지(unknown)는 읽기 전용(서버도 QUESTION_LOCKED /
@@ -454,29 +462,43 @@ class IqMessage {
   }
 }
 
-/// 첨부(조회 전용 — 앱은 첨부 행을 만들지 않는다. 업로드는 웹에서).
+/// 첨부(individual_question_attachments 행).
+///
+/// [messageId] 는 이 첨부가 연결된 대화 메시지, [authorId] 는 서버 RPC 가
+/// `auth.uid()` 로 기록한 업로더(20260803 계약 이전 행은 null). 화면 귀속은
+/// 이 두 값으로만 판정한다 — 파일명·시간 근접·정렬 순서로 추측하지 않는다.
 class IqAttachment {
   const IqAttachment({
     required this.id,
     required this.storagePath,
     this.messageId,
+    this.authorId,
     this.fileName,
     this.mimeType,
+    this.createdAt,
   });
 
   final String id;
   final String storagePath;
   final String? messageId;
+
+  /// 업로더 uid(서버 `auth.uid()` 기록). 레거시 행은 null — 추측 금지.
+  final String? authorId;
   final String? fileName;
   final String? mimeType;
+
+  /// 작성 시각 — 그룹 내 안정 정렬용(파일명 정렬 금지).
+  final DateTime? createdAt;
 
   factory IqAttachment.fromMap(Map<String, dynamic> map) {
     return IqAttachment(
       id: map['id'] as String,
       storagePath: (map['storage_path'] as String?) ?? '',
       messageId: map['message_id'] as String?,
+      authorId: map['author_id'] as String?,
       fileName: map['file_name'] as String?,
       mimeType: map['mime_type'] as String?,
+      createdAt: _parseTime(map['created_at']),
     );
   }
 }

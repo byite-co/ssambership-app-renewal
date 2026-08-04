@@ -135,8 +135,8 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
       SupabaseClient client, String questionId, String path) async {
     final List<dynamic> rows = await client
         .from('individual_question_attachments')
-        .select(
-            'id, question_id, storage_path, message_id, file_name, mime_type')
+        .select('id, question_id, storage_path, message_id, author_id, '
+            'file_name, mime_type, created_at')
         .eq('question_id', questionId)
         .eq('storage_path', path)
         .limit(1);

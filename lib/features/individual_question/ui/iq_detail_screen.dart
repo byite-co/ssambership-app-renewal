@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
+import '../../../core/scan/image_downscaler.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/conversation_ui/conversation_bubble.dart';
 import '../../../design/spacing_tokens.dart';
@@ -18,9 +19,11 @@ import '../../../core/scan/picked_image.dart';
 import '../../../core/scan/scan_source_picker.dart';
 import '../../question_room/data/mentor_lookup_repository.dart';
 import '../../question_room/ui/widgets/scan_source_sheet.dart';
+import '../../scan_annotation/annotation_target.dart';
 import '../../scan_annotation/scan_annotation_screen.dart';
 import '../data/individual_question_repository.dart';
 import '../data/iq_annotation_repository.dart';
+import '../data/iq_attachment_grouping.dart';
 import '../data/iq_attachment_policy.dart';
 import '../data/iq_attachment_saver.dart';
 import '../data/iq_attachment_upload_core.dart';
@@ -35,8 +38,12 @@ import '../../../shared/errors/app_error.dart';
 import '../../../shared/errors/friendly_error.dart';
 
 /// 상세 화면 데이터 묶음(질문 + 메시지 + 첨부 + 멘토 표시명).
+///
+/// 첨부는 [groups] 로 **한 번만** 귀속 그룹화된다(매 build 검색 금지) —
+/// message_id 연결 그룹 / 최초 질문(학생 작성·미연결) / 멘토 작성·미연결 /
+/// 작성자 미확인 레거시(중립).
 class IqDetailData {
-  const IqDetailData({
+  IqDetailData({
     required this.question,
     required this.messages,
     required this.attachments,
@@ -49,18 +56,30 @@ class IqDetailData {
 
   /// 학생 화면용 멘토 표시명(공개 RPC). 없으면 '멘토'.
   final String? mentorName;
+
+  /// 첨부 귀속 그룹(1회 계산·이후 재사용).
+  late final IqAttachmentGroups groups = IqAttachmentGroups.build(
+    attachments: attachments,
+    messages: messages,
+    studentId: question.studentId,
+    mentorId: question.mentorId,
+  );
 }
 
 /// 개별질문 상세 — 학생·멘토 공용. **화면 전체가 대화방이다**(vc11 정본 UX).
 ///
 /// 구조: [컴팩트 헤더] → [Expanded 대화 타임라인] → [하단 고정 액션/작성 영역].
-/// 최초 질문(제목·본문·첨부)이 타임라인의 첫 학생 항목으로 들어가고, 이후
-/// IqMessage 가 작성순으로 이어진다. 카드 스택(질문 카드·첨부 카드·작은 대화
-/// 카드)은 쓰지 않는다 — 계약은 test/individual_question/iq_fullscreen_chat_test.dart.
+/// 최초 질문(제목·본문·학생 첨부)이 타임라인의 첫 학생 항목으로 들어가고, 이후
+/// IqMessage 가 작성순으로 이어진다. **각 메시지의 첨부는 그 메시지 말풍선에
+/// 붙는다**(message_id 귀속 — 전체 첨부를 질문 말풍선에 합치지 않는다).
+/// 계약: test/individual_question/iq_fullscreen_chat_test.dart ·
+///       iq_media_attribution_test.dart.
 ///
 /// 역할·상태별 액션은 하단 영역에 고정된다:
 /// - 학생: 답변 도착 → [해결 완료(정산)] / 답변 전 → [질문 취소(환불)]
-/// - 멘토: 답변중(수락·지정) → 답변 작성
+/// - 멘토: 답변중(수락·지정) → 답변 작성 / 답변 도착 → 추가 답글
+/// 신규 첨부는 대기열에 쌓였다가 **메시지 생성 후 반환된 message_id 로 등록**된다
+/// (§2-2 — 최근접 조회·낙관적 임시 id·선등록 금지).
 /// 변경이 있었으면 pop(true) 로 알린다(호출부 새로고침).
 class IqDetailScreen extends StatefulWidget {
   const IqDetailScreen({
@@ -70,6 +89,7 @@ class IqDetailScreen extends StatefulWidget {
     this.roleOverride,
     this.annotationsOverride,
     this.annotateLauncherOverride,
+    this.pendingAnnotateOverride,
     this.urlResolverOverride,
     this.repositoryOverride,
     this.attachmentsOverride,
@@ -96,14 +116,18 @@ class IqDetailScreen extends StatefulWidget {
   final IqAnnotationRepository? annotationsOverride;
 
   /// 테스트용 첨삭 화면 진입 오버라이드(S18) — 실 화면 push 회피.
-  /// true 반환 = 새 첨부 전송됨(목록 새로고침).
-  final Future<bool?> Function(IqAnnotateRequest request)?
+  /// 완료 결과(문서+평탄화 PNG)를 돌려주면 대기 첨부로 추가된다. null = 취소.
+  final Future<AnnotationResult?> Function(IqAnnotateRequest request)?
       annotateLauncherOverride;
+
+  /// 테스트용 '전송 전 필기' 화면 오버라이드 — 대기 첨부(로컬 이미지)에 주석.
+  final Future<AnnotationResult?> Function(
+      PickedImage background, InkDocument? initial)? pendingAnnotateOverride;
 
   /// 테스트용 서명 URL 리졸버 주입(P3-6). null 이면 Supabase 기본.
   final IqAttachmentUrlResolver? urlResolverOverride;
 
-  /// 테스트용 레포 주입(환불/정산 계약 검증). null 이면 Supabase 기본.
+  /// 테스트용 레포 주입(환불/정산/메시지 계약 검증). null 이면 Supabase 기본.
   final IndividualQuestionRepository? repositoryOverride;
 
   /// 테스트용 첨부 업로드 포트 주입(§6). null 이면 Supabase 기본.
@@ -159,7 +183,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   /// 당사자 공용 대화 컴포저(iq_append_message — 학생 후속·멘토 추가 답글).
   /// 본문이 비면 전송 버튼을 비활성화한다(첨부만 보내는 전송은 없다 — 첨부는
-  /// 독립 등록이고 answered 전이를 만들지 않는다).
+  /// 메시지 생성 후 그 message_id 로 등록된다).
   final TextEditingController _chatController = TextEditingController();
   bool _chatCanSend = false;
 
@@ -179,7 +203,9 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   /// 스크롤 위치를 지키느라 건드리지 않는다(§7 예측 가능성).
   bool _scrollToLatestOnData = true;
 
-  /// §6: 멘토 답변 첨부 대기열(업로드 실패분 재시도용 상태 포함).
+  /// §6·§2-2: 첨부 대기열 — 선택·첨삭 결과가 여기 쌓였다가 메시지 전송 시
+  /// 반환된 message_id 로 업로드·등록된다. 실패분은 messageId·고아 경로를
+  /// 보존한 채 남아 재시도한다(메시지 재생성 0·중복 객체 0).
   final List<_PendingIqUpload> _pendingUploads = <_PendingIqUpload>[];
 
   /// 서명 URL 리졸버(P3-6) — 화면 인스턴스 단위 캐시. 사용자 id 를 캐시 키에
@@ -210,6 +236,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       _realtime?.dispose();
       _realtime = null;
       _messages.resetTo(const <IqMessage>[], notify: false);
+      _pendingUploads.clear();
       _startRealtime();
       _refresh(scrollToLatest: true);
     }
@@ -251,7 +278,8 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         if (mounted) _refresh();
       },
       // 첨부 행 생성 → 첨부 목록 서버 재조회(실시간 payload 를 정본으로 쓰지
-      // 않는다 — 서명 URL·정렬은 재조회가 담당).
+      // 않는다 — 서명 URL·귀속 그룹·정렬은 재조회가 담당. 재조회는 그룹을
+      // 통째로 다시 만들므로 중복 표시 0).
       onAttachmentInsert: () {
         if (mounted) _refresh();
       },
@@ -403,9 +431,13 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     });
   }
 
-  /// 멘토 '첨삭하기'(S18) — 원본 바이트 + 기존 ink.json 을 준비해 첨삭 화면으로.
-  /// 같은 원본의 기존 첨삭이 있으면 이어 그리기/새로 시작을 먼저 고른다.
-  /// 완료 시 새 첨부가 하나 더 생긴다(원본 불변·덮어쓰기 금지, §11 기본안).
+  /// 멘토 '첨삭하기'(S18·§4-3) — 원본 바이트 + 기존 ink.json 을 준비해 첨삭
+  /// 화면으로. 같은 원본의 기존 첨삭이 있으면 이어 그리기/새로 시작을 고른다.
+  ///
+  /// 완료 결과는 **즉시 등록하지 않는다** — ink.json 만 원본 첨부 id 경로에
+  /// 저장(이어 그리기 유지)하고, 평탄화 PNG 는 멘토 작성 영역의 대기 첨부로
+  /// 들어간다. 답변/추가 답글 전송 시 그 멘토 message_id 로 등록된다
+  /// (원본 불변·미연결 첨부 생성 0).
   Future<void> _annotateAttachment(IqAttachment attachment) async {
     if (_busy || !mounted) return;
     setState(() => _busy = true);
@@ -425,7 +457,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
           builder: (BuildContext ctx) => AlertDialog(
             title: const Text('이전 첨삭이 있어요'),
             content: const Text('이 이미지에 남겨 둔 첨삭을 불러와 이어 그릴 수 있어요.\n'
-                '완료하면 원본은 그대로 두고 새 첨삭본이 추가돼요.'),
+                '완료하면 원본은 그대로 두고 새 첨삭본이 만들어져요.'),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -447,13 +479,34 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         background: background,
         initial: initial,
       );
-      final bool? sent = await (widget.annotateLauncherOverride ??
+      final AnnotationResult? result = await (widget.annotateLauncherOverride ??
           _pushAnnotationScreen)(request);
-      if (sent == true && mounted) {
-        _changed = true;
-        _refresh();
-        _snack('첨삭본을 새 첨부로 등록했어요. 원본은 그대로 있어요.');
+      if (result == null || !mounted) return; // 취소/빈 주석 — 변화 없음.
+
+      // 이어 그리기 원본(ink.json) upsert — 첨부 행 없음·원본 불변.
+      await annotations.saveDocument(
+        questionId: widget.questionId,
+        sourceAttachmentId: attachment.id,
+        document: result.document,
+      );
+
+      // 평탄화 PNG → 대기 첨부(§6-4 크기 규약 통과). 전송 시 멘토 메시지에 연결.
+      final String source = attachment.fileName ?? 'annotation';
+      final int dot = source.lastIndexOf('.');
+      final String base = dot <= 0 ? source : source.substring(0, dot);
+      final PickedImage flattened = await downscaleIfOversized(PickedImage(
+        bytes: result.flattenedPng,
+        fileName: '$base-ink.png',
+        mimeType: 'image/png',
+      ));
+      final String? invalid = validateIqAttachmentFile(flattened);
+      if (invalid != null) {
+        _snack(invalid);
+        return;
       }
+      if (!mounted) return;
+      setState(() => _pendingUploads.add(_PendingIqUpload(flattened)));
+      _snack('첨삭본을 첨부 대기 목록에 추가했어요. 답글을 보내면 함께 등록돼요.');
     } catch (e) {
       _snack('첨삭을 시작하지 못했어요. ${friendlyError(e)}');
     } finally {
@@ -462,27 +515,76 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   }
 
   /// 실제 첨삭 화면 push(테스트에서는 launcher 오버라이드로 대체).
-  /// 기본 펜은 빨강 프리셋(§6-2).
-  Future<bool?> _pushAnnotationScreen(IqAnnotateRequest request) {
-    final IqAnnotationRepository annotations =
-        widget.annotationsOverride ?? IqAnnotationRepository.supabase();
-    return Navigator.of(context).push<bool>(
+  /// 기본 펜은 빨강 프리셋(§6-2). 완료 결과는 로컬 캡처로만 받는다(즉시 전송 0).
+  Future<AnnotationResult?> _pushAnnotationScreen(
+      IqAnnotateRequest request) async {
+    final LocalAnnotationTarget target = LocalAnnotationTarget();
+    final bool? done = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (BuildContext context) => ScanAnnotationScreen(
           background: request.background,
           initial: request.initial,
           title: '첨삭하기',
           initialPenColor: Colors.red,
-          target: IqAnnotationTarget(
-            repository: annotations,
-            questionId: request.questionId,
-            sourceAttachmentId: request.sourceAttachmentId,
-          ),
+          target: target,
         ),
       ),
     );
+    return done == true ? target.result : null;
   }
 
+  /// 전송 전 필기(학생·멘토 공용) — 대기 첨부(로컬 이미지)에 주석을 달고
+  /// 평탄화본으로 교체한다(업로드 전 단계 — iq_create_screen 과 동일 규약).
+  /// 재진입 시 보관해 둔 원본+스트로크로 이어 그린다.
+  Future<void> _annotatePending(_PendingIqUpload p) async {
+    if (_busy || p.uploading || !mounted) return;
+    final PickedImage background = p.original ?? p.file;
+    final AnnotationResult? result = await (widget.pendingAnnotateOverride ??
+        _pushPendingAnnotationScreen)(background, p.inkDocument);
+    if (result == null || !mounted) return;
+
+    final int dot = background.fileName.lastIndexOf('.');
+    final String base = dot <= 0
+        ? background.fileName
+        : background.fileName.substring(0, dot);
+    final PickedImage flattened = await downscaleIfOversized(PickedImage(
+      bytes: result.flattenedPng,
+      fileName: '$base-ink.png',
+      mimeType: 'image/png',
+    ));
+    final String? invalid = validateIqAttachmentFile(flattened);
+    if (invalid != null) {
+      _snack(invalid);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      p.file = flattened; // 평탄화본이 슬롯 대체(원본은 이어 그리기용 보관).
+      p.original = background;
+      p.inkDocument = result.document;
+    });
+  }
+
+  Future<AnnotationResult?> _pushPendingAnnotationScreen(
+      PickedImage background, InkDocument? initial) async {
+    final LocalAnnotationTarget target = LocalAnnotationTarget();
+    final bool? done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => ScanAnnotationScreen(
+          background: background.bytes,
+          initial: initial,
+          target: target,
+          title: '필기하기',
+        ),
+      ),
+    );
+    return done == true ? target.result : null;
+  }
+
+  /// 멘토 첫 답변 — `iq_append_message` 로 본문 등록과 answered 전이를
+  /// **원자적으로** 완료하고, 반환된 message_id 로 대기 첨부를 등록한다(§2-2).
+  /// 첨부 일부가 실패해도 메시지를 다시 만들지 않는다 — 실패분은 같은
+  /// message_id·같은 고아 경로로 재시도한다.
   Future<void> _submitAnswer() async {
     final String body = _answerController.text.trim();
     if (body.isEmpty) {
@@ -497,10 +599,128 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (!ok || !mounted) return;
     // 방금 등록한 내 답변은 타임라인 끝에 붙는다 — 이때만 끝으로 내려보낸다.
     await _runAction(scrollToLatest: true, () async {
-      await _repo.answer(widget.questionId, body);
+      final IqAppendResult r =
+          await _repo.appendMessage(widget.questionId, body);
       _answerController.clear();
-      _snack('답변을 등록했어요.');
+      final int failed = await _flushPendingUploads(r.messageId);
+      _snack(failed == 0
+          ? '답변을 등록했어요.'
+          : '답변을 등록했어요. 첨부 $failed건은 등록하지 못했어요 — 아래에서 다시 시도해 주세요.');
     });
+  }
+
+  /// 후속 메시지 전송(학생·멘토 공용, iq_append_message) — 성공 후 반환된
+  /// message_id 로 대기 첨부를 등록하고 서버 재조회가 정본(로컬 선반영 없음).
+  /// 실시간 INSERT 가 먼저 와도 재조회와 id 로 수렴한다(중복 행 0).
+  Future<void> _sendChatMessage() async {
+    final String body = _chatController.text.trim();
+    if (body.isEmpty || _busy) return;
+    await _runAction(scrollToLatest: true, () async {
+      final IqAppendResult r =
+          await _repo.appendMessage(widget.questionId, body);
+      _chatController.clear();
+      final int failed = await _flushPendingUploads(r.messageId);
+      if (failed > 0) {
+        _snack('첨부 $failed건은 등록하지 못했어요 — 아래에서 다시 시도해 주세요.');
+      }
+    });
+  }
+
+  /// 대기 첨부 전체를 [messageId] 로 업로드·등록한다. 반환 = 실패 건수.
+  /// 이미 특정 메시지에 묶인 실패분(재시도 대기)은 그 message_id 를 유지한다 —
+  /// 새 메시지로 옮겨 붙이지 않는다(귀속 불변).
+  Future<int> _flushPendingUploads(String messageId) async {
+    final List<_PendingIqUpload> targets =
+        List<_PendingIqUpload>.of(_pendingUploads);
+    int failed = 0;
+    for (final _PendingIqUpload p in targets) {
+      p.messageId ??= messageId;
+      await _uploadPending(widget.questionId, p);
+      if (_pendingUploads.contains(p)) failed++; // 성공 시 목록에서 제거된다.
+    }
+    return failed;
+  }
+
+  /// §6·§2-2: 첨부 선택(카메라/갤러리/파일) → 정책 검증 → **대기열 추가**.
+  /// 업로드는 하지 않는다 — 메시지 전송이 반환한 message_id 로만 등록한다
+  /// (message_id = null 선등록 금지). 취소(null)는 조용히 종료.
+  Future<void> _pickPendingAttachment() async {
+    final ScanSource? source = await showScanSourceSheet(context);
+    if (source == null || !mounted) return; // 선택 취소 안전
+    final PickedImage? picked;
+    try {
+      picked = await _sourcePicker.pick(source);
+    } catch (_) {
+      _snack('파일을 불러오지 못했어요. 다시 시도해 주세요.');
+      return;
+    }
+    if (picked == null || !mounted) return; // 선택 취소 안전
+    final String? invalid = validateIqAttachmentFile(picked);
+    if (invalid != null) {
+      _snack(invalid); // 서버 계약 밖 — 대기열 추가 0
+      return;
+    }
+    final _PendingIqUpload pending = _PendingIqUpload(picked);
+    setState(() => _pendingUploads.add(pending));
+  }
+
+  /// 단건 업로드(항목별 single-flight — 재시도 중복 0). 메시지에 묶인 뒤에만
+  /// 호출된다([_PendingIqUpload.messageId] 필수 — 미연결 등록 금지).
+  Future<void> _uploadPending(String questionId, _PendingIqUpload p) async {
+    if (p.uploading) return;
+    final String? messageId = p.messageId;
+    if (messageId == null) return; // 메시지 생성 전 — 등록 경로 없음(방어).
+    setState(() {
+      p.uploading = true;
+      p.error = null;
+    });
+    try {
+      await _attachments.upload(
+        questionId: questionId,
+        image: p.file,
+        // §2-2: 메시지 생성이 돌려준 id 정본 — 최근접 조회·임시 id 금지.
+        messageId: messageId,
+        // 직전 시도에서 고아로 남은 경로가 있으면 재업로드 없이 등록만 재시도.
+        existingObjectPath: p.retryObjectPath,
+      );
+      if (!mounted) return;
+      setState(() => _pendingUploads.remove(p));
+      _changed = true;
+      _refresh(); // 첨부 목록 서버 재조회
+    } on IqAttachmentRegisterFailure catch (f) {
+      if (!mounted) return;
+      setState(() {
+        // 보상삭제 성공 → 처음부터(null), 실패(고아) → 같은 경로 재사용.
+        p.retryObjectPath = f.retryObjectPath;
+        p.error = f.message;
+      });
+    } on IqAttachmentAmbiguousResult catch (a) {
+      if (!mounted) return;
+      setState(() {
+        // AMBIGUOUS_SERVER_RESULT — 자동삭제 0·성공 표시 0·임시 삽입 0.
+        // 재시도는 같은 경로로 SELECT 선행 수렴을 다시 밟는다(RPC 선행 금지).
+        p.retryObjectPath = a.retryObjectPath;
+        p.error = a.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => p.error = friendlyError(e));
+    } finally {
+      if (mounted) setState(() => p.uploading = false);
+    }
+  }
+
+  /// §6: 당사자 저장 — RLS 다운로드 + SAF 저장 대화상자(권한 요청 없음).
+  Future<void> _saveAttachment(IqAttachment a) async {
+    try {
+      final bool saved = await _fileSaver.save(
+        storagePath: a.storagePath,
+        fileName: a.fileName ?? 'attachment',
+      );
+      if (saved) _snack('파일을 저장했어요.');
+    } catch (_) {
+      _snack('파일 저장에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
   }
 
   @override
@@ -508,7 +728,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (!didPop) Navigator.of(context).pop(_changed);
+        if (didPop) return;
+        // 첨부 대기열은 화면 수명 로컬 상태다 — 나가면 사라진다. 특히 메시지는
+        // 이미 전송됐는데 첨부만 실패해 재시도 대기 중인 항목이 있으면, 조용히
+        // 유실되지 않게 확인을 받는다(§4-3 재시도 계약의 UX 이면).
+        if (_pendingUploads.isEmpty) {
+          Navigator.of(context).pop(_changed);
+          return;
+        }
+        _confirmLeaveWithPending();
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('개별질문')),
@@ -536,6 +764,17 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         ),
       ),
     );
+  }
+
+  /// 대기 첨부가 있는 채로 나가려 할 때의 확인 — 전송된 메시지는 유지되고
+  /// 보내지 않은/실패한 첨부만 사라진다는 사실을 명시한다.
+  Future<void> _confirmLeaveWithPending() async {
+    final bool ok = await _confirm(
+      '보내지 않은 첨부가 있어요',
+      '화면을 나가면 대기 중인 첨부는 사라져요.\n이미 보낸 메시지는 그대로 남아요.',
+      '나가기',
+    );
+    if (ok && mounted) Navigator.of(context).pop(_changed);
   }
 
   AppRole get _role => widget.roleOverride ?? AuthService.instance.currentRole;
@@ -590,14 +829,26 @@ class _IqDetailScreenState extends State<IqDetailScreen>
           child: ListenableBuilder(
             listenable: _messages,
             builder: (BuildContext context, Widget? _) {
+              final IqAttachmentGroups groups = data.groups;
               return ListView(
                 controller: _timelineScroll,
                 padding: const EdgeInsets.fromLTRB(
                     AppSpacing.screenH, 12, AppSpacing.screenH, 12),
                 children: <Widget>[
                   _questionBubble(data),
+                  // 작성자 미확인 레거시 첨부 — 중립 그룹(학생·멘토 어느 쪽에도
+                  // 귀속하지 않는다 — §2-1 백필·추측 금지).
+                  if (groups.legacyUnknown.isNotEmpty)
+                    _legacyUnknownBubble(groups.legacyUnknown),
                   for (final IqMessage m in _messages.items)
-                    _iqMessageBubble(q, m),
+                    _iqMessageBubble(data, m),
+                  // 멘토 작성·미연결 첨부(구버전 앱 등록분) — 멘토 방향 그룹.
+                  if (groups.unlinkedMentor.isNotEmpty)
+                    _unlinkedMentorBubble(data, groups.unlinkedMentor),
+                  // message_id 는 있으나 현재 목록에서 메시지를 확인하지 못한
+                  // 첨부 — fail-closed 중립(재조회로 확인되면 메시지 그룹 수렴).
+                  if (groups.unresolvedMessage.isNotEmpty)
+                    _unresolvedMessageBubble(groups.unresolvedMessage),
                 ],
               );
             },
@@ -659,18 +910,28 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     );
   }
 
-  /// 원본 질문 = 타임라인의 첫 대화 항목. 제목·본문·작성시각·첨부가 한 말풍선
-  /// 그룹이다(별도 질문 카드·첨부 섹션 금지).
+  /// 멘토가 이 첨부에 첨삭할 수 있는가 — 담당 멘토 + 활성 상태(assigned/
+  /// claimed/answered) + **학생 작성 첨부**만(§4-1). 작성자 미확인 레거시는
+  /// 추측으로 열지 않는다. (이미지 여부는 첨부 그룹 위젯이 항목별로 거른다.)
+  bool _canAnnotateGroup(IndividualQuestion q, IqMessageAuthor groupAuthor) =>
+      _role == AppRole.mentor &&
+      !_busy &&
+      iqCanMentorAnnotate(q.status) &&
+      groupAuthor == IqMessageAuthor.student;
+
+  /// 원본 질문 = 타임라인의 첫 대화 항목. 제목·본문·작성시각·**학생 첨부**가 한
+  /// 말풍선 그룹이다(별도 질문 카드·첨부 섹션 금지).
   ///
   /// 작성자는 질문 행의 student_id 로 판정한다 — 빈 값은 절대 매칭하지 않고
   /// '작성자 미확인' 중립으로 남긴다(메시지와 같은 규칙). 좌우 거울상·강조는
   /// 뷰어 uid 가 있을 때만.
   ///
-  /// 첨부는 원본과 이후 첨삭본을 한 그룹으로 붙인다 — 첨부 행에는 작성자도
-  /// 메시지 연결도 없으므로(서버 연동 후속, iq_annotation_repository 참조)
-  /// 귀속을 지어내지 않고 카드 시절과 같은 묶음을 유지한다.
+  /// 첨부는 귀속 그룹의 [IqAttachmentGroups.initialQuestion](학생 작성·미연결)
+  /// 만 붙는다 — 멘토 첨부·메시지 연결 첨부·작성자 미확인 레거시는 각자의
+  /// 위치에서 렌더된다(전체 합치기 금지).
   Widget _questionBubble(IqDetailData data) {
     final IndividualQuestion q = data.question;
+    final List<IqAttachment> attachments = data.groups.initialQuestion;
     final IqMessageAuthor author = iqMessageAuthorOf(
       authorId: q.studentId,
       studentId: q.studentId,
@@ -678,7 +939,6 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     );
     final bool? mine =
         iqMessageIsMine(authorId: q.studentId, viewerId: _viewerId);
-    final bool isMentor = _role == AppRole.mentor;
 
     return ConversationBubble(
       body: q.body,
@@ -688,22 +948,18 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       authorLabel: iqMessageAuthorLabel(author),
       timeLabel:
           q.createdAt == null ? null : Formatters.relativeKorean(q.createdAt!),
-      attachments: data.attachments.isEmpty
+      attachments: attachments.isEmpty
           ? const <Widget>[]
           : <Widget>[
               _IqAttachmentGroup(
-                // 레포 정렬은 최신순(created_at desc) — 표시는 원본이 먼저
-                // 오는 작성순으로 뒤집는다(첨삭본이 원본 뒤에 붙는다).
-                attachments: data.attachments.reversed.toList(growable: false),
+                attachments: attachments,
                 urlResolver: _urlResolver,
-                // 첨삭 진입은 멘토만(§3). 학생의 전송 전 필기는 작성 화면 쪽.
-                // ★ 상태 게이트: 답변을 쓸 수 있는 구간(assigned/claimed)에서만
-                //   첨삭한다. 종결(released·refunded·expired·canceled)과 답변
-                //   완료(answered), 답변자 미정(escrowed·open), 미지(unknown)는
-                //   읽기 전용이다. 첨부 조회·저장은 상태와 무관하게 유지한다.
-                onAnnotate: isMentor && !_busy && iqCanMentorAnswer(q.status)
-                    ? _annotateAttachment
-                    : null,
+                // 첨삭 진입은 멘토만(§3) — 학생 작성 첨부 + 활성 상태
+                // (assigned/claimed/**answered** — 해결 완료 전까지, §4-1).
+                onAnnotate:
+                    _canAnnotateGroup(q, IqMessageAuthor.student)
+                        ? _annotateAttachment
+                        : null,
                 // §6: 당사자 저장(다운로드) — RLS 가 당사자 외 접근을 차단한다.
                 onSave: _saveAttachment,
               ),
@@ -711,12 +967,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     );
   }
 
-  /// 메시지 1건 → 대화 말풍선.
+  /// 메시지 1건 → 대화 말풍선 + **그 메시지에 연결된 첨부**(message_id 귀속).
   ///
   /// 작성자 방향(학생/멘토)은 질문 행의 당사자 id 로 판정한다 — 뷰어 신원이
   /// 없어도 성립한다. 좌우 거울상은 뷰어 uid 가 있을 때만 적용하고, 모르면
-  /// 좌측 중립으로 둔다(내 메시지로 오인시키지 않는다).
-  Widget _iqMessageBubble(IndividualQuestion q, IqMessage m) {
+  /// 좌측 중립으로 둔다(내 메시지로 오인시키지 않는다). 첨부 방향·라벨은
+  /// 메시지 작성자를 그대로 따른다(§2-1).
+  Widget _iqMessageBubble(IqDetailData data, IqMessage m) {
+    final IndividualQuestion q = data.question;
+    final List<IqAttachment> attachments = data.groups.forMessage(m.id);
     final IqMessageAuthor author = iqMessageAuthorOf(
       authorId: m.authorId,
       studentId: q.studentId,
@@ -732,6 +991,78 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       authorLabel: iqMessageAuthorLabel(author),
       timeLabel:
           m.createdAt == null ? null : Formatters.relativeKorean(m.createdAt!),
+      attachments: attachments.isEmpty
+          ? const <Widget>[]
+          : <Widget>[
+              _IqAttachmentGroup(
+                attachments: attachments,
+                urlResolver: _urlResolver,
+                // 학생 메시지의 이미지에만 멘토 첨삭 진입(§4-1).
+                onAnnotate: _canAnnotateGroup(q, author)
+                    ? _annotateAttachment
+                    : null,
+                onSave: _saveAttachment,
+              ),
+            ],
+    );
+  }
+
+  /// 작성자 미확인 레거시 첨부 — 중립 그룹(§2-1). 학생·멘토 말풍선에 넣지
+  /// 않고, 첨삭 진입도 열지 않는다(작성자 추측 금지). 조회·저장은 유지.
+  Widget _legacyUnknownBubble(List<IqAttachment> attachments) {
+    return ConversationBubble(
+      body: '',
+      align: ConversationAlign.start,
+      tone: ConversationTone.neutral,
+      authorLabel: '이전 첨부 · 작성자 미확인',
+      attachments: <Widget>[
+        _IqAttachmentGroup(
+          attachments: attachments,
+          urlResolver: _urlResolver,
+          onSave: _saveAttachment,
+        ),
+      ],
+    );
+  }
+
+  /// 연결 메시지 미확인 첨부 — fail-closed 중립 그룹. 업로더 기록으로
+  /// 재분류하지 않는다(재조회 후 귀속이 이동해 보이는 것을 막는다).
+  /// 첨삭 진입도 열지 않는다. 조회·저장은 유지.
+  Widget _unresolvedMessageBubble(List<IqAttachment> attachments) {
+    return ConversationBubble(
+      body: '',
+      align: ConversationAlign.start,
+      tone: ConversationTone.neutral,
+      authorLabel: '첨부 · 연결 메시지 미확인',
+      attachments: <Widget>[
+        _IqAttachmentGroup(
+          attachments: attachments,
+          urlResolver: _urlResolver,
+          onSave: _saveAttachment,
+        ),
+      ],
+    );
+  }
+
+  /// 멘토 작성·미연결 첨부(구버전 앱이 message_id 없이 등록한 첨부·첨삭본) —
+  /// 멘토 방향·멘토 라벨 그룹으로 표시한다(학생 말풍선 합치기 금지).
+  Widget _unlinkedMentorBubble(IqDetailData data, List<IqAttachment> group) {
+    final String? mentorId = data.question.mentorId;
+    final bool? mine = mentorId == null
+        ? null
+        : iqMessageIsMine(authorId: mentorId, viewerId: _viewerId);
+    return ConversationBubble(
+      body: '',
+      align: mine == true ? ConversationAlign.end : ConversationAlign.start,
+      tone: mine == true ? ConversationTone.accent : ConversationTone.neutral,
+      authorLabel: iqMessageAuthorLabel(IqMessageAuthor.mentor),
+      attachments: <Widget>[
+        _IqAttachmentGroup(
+          attachments: group,
+          urlResolver: _urlResolver,
+          onSave: _saveAttachment,
+        ),
+      ],
     );
   }
 
@@ -787,7 +1118,9 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       ));
     }
     // §H: 학생 후속 메시지 컴포저(iq_append_message) — 종결 전 구간에만.
+    // 첨부(사진 선택 + 전송 전 필기 §4-2)는 전송 시 학생 message_id 로 연결.
     if (iqCanStudentSendMessage(q.status)) {
+      out.addAll(_pendingUploadRows(q.id));
       out.addAll(_chatComposer(hint: '멘토에게 추가로 궁금한 점을 남겨 보세요.'));
     }
     // 환불·만료·취소 종결 안내 — 하단 영역이 빈 띠로 남지 않게 한다.
@@ -799,13 +1132,18 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   }
 
   /// §H: 당사자 공용 대화 컴포저(iq_append_message). 본문이 비면 전송 비활성 —
-  /// 첨부만 보내는 전송은 없다(첨부는 독립 등록·answered 전이 없음).
+  /// 첨부만 보내는 전송은 없다(첨부는 메시지 생성 후 그 message_id 로 등록).
   List<Widget> _chatComposer({required String hint}) {
     return <Widget>[
       const SizedBox(height: 10),
       Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
+          IconButton(
+            tooltip: '파일 첨부',
+            icon: const Icon(Icons.attach_file),
+            onPressed: _busy ? null : _pickPendingAttachment,
+          ),
           Expanded(
             child: TextField(
               controller: _chatController,
@@ -829,94 +1167,71 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     ];
   }
 
-  /// 후속 메시지 전송 — 성공 후 서버 재조회가 정본(로컬 선반영 없음). 실시간
-  /// INSERT 가 먼저 와도 재조회와 id 로 수렴한다(중복 행 0).
-  Future<void> _sendChatMessage() async {
-    final String body = _chatController.text.trim();
-    if (body.isEmpty || _busy) return;
-    await _runAction(scrollToLatest: true, () async {
-      await _repo.appendMessage(widget.questionId, body);
-      _chatController.clear();
-    });
+  /// 첨부 대기열 행(§6·§2-2) — 파일명·상태·필기/재시도/제거 액션.
+  /// 답변 컴포저와 대화 컴포저가 공유한다(첫 답변 실패분이 answered 전이 후에도
+  /// 남아 같은 message_id 로 재시도할 수 있게).
+  List<Widget> _pendingUploadRows(String questionId) {
+    return <Widget>[
+      for (final _PendingIqUpload p in _pendingUploads) ...<Widget>[
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            Icon(
+              p.error == null ? Icons.attach_file : Icons.error_outline_rounded,
+              size: 18,
+              color:
+                  p.error == null ? ColorTokens.secondary : ColorTokens.danger,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '${p.file.fileName} (${_formatBytes(p.file.bytes.length)})',
+                    style: AppTypography.caption,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (p.error != null)
+                    Text(p.error!,
+                        style: AppTypography.caption
+                            .copyWith(color: ColorTokens.danger)),
+                ],
+              ),
+            ),
+            // 전송 전 필기(§4-2) — 이미지 대기 항목에만. 이미 메시지에 묶인
+            // 실패분(재시도 대기)은 내용 교체 금지 — 같은 파일로만 재시도.
+            if (!p.uploading && p.messageId == null && _isImagePending(p))
+              IconButton(
+                tooltip: '필기하기',
+                icon: const Icon(Icons.draw_rounded, size: 18),
+                onPressed: _busy ? null : () => _annotatePending(p),
+              ),
+            if (p.uploading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (p.error != null)
+              TextButton(
+                onPressed: () => _uploadPending(questionId, p),
+                child: const Text('재시도'),
+              ),
+            if (!p.uploading)
+              IconButton(
+                tooltip: '제거',
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () => setState(() => _pendingUploads.remove(p)),
+              ),
+          ],
+        ),
+      ],
+    ];
   }
 
-  /// §6: 첨부 선택(카메라/갤러리/파일) → 정책 검증 → 즉시 업로드.
-  /// 취소(null)는 조용히 종료, 검증 실패는 업로드 0 으로 안내만.
-  Future<void> _pickAndUploadAttachment(String questionId) async {
-    final ScanSource? source = await showScanSourceSheet(context);
-    if (source == null || !mounted) return; // 선택 취소 안전
-    final PickedImage? picked;
-    try {
-      picked = await _sourcePicker.pick(source);
-    } catch (_) {
-      _snack('파일을 불러오지 못했어요. 다시 시도해 주세요.');
-      return;
-    }
-    if (picked == null || !mounted) return; // 선택 취소 안전
-    final String? invalid = validateIqAttachmentFile(picked);
-    if (invalid != null) {
-      _snack(invalid); // 서버 계약 밖 — 업로드·등록 0
-      return;
-    }
-    final _PendingIqUpload pending = _PendingIqUpload(picked);
-    setState(() => _pendingUploads.add(pending));
-    await _uploadPending(questionId, pending);
-  }
-
-  /// 단건 업로드(항목별 single-flight — 재시도 중복 0).
-  Future<void> _uploadPending(String questionId, _PendingIqUpload p) async {
-    if (p.uploading) return;
-    setState(() {
-      p.uploading = true;
-      p.error = null;
-    });
-    try {
-      await _attachments.upload(
-        questionId: questionId,
-        image: p.file,
-        // 직전 시도에서 고아로 남은 경로가 있으면 재업로드 없이 등록만 재시도.
-        existingObjectPath: p.retryObjectPath,
-      );
-      if (!mounted) return;
-      setState(() => _pendingUploads.remove(p));
-      _changed = true;
-      _snack('첨부를 등록했어요.');
-      _refresh(); // 첨부 목록 서버 재조회
-    } on IqAttachmentRegisterFailure catch (f) {
-      if (!mounted) return;
-      setState(() {
-        // 보상삭제 성공 → 처음부터(null), 실패(고아) → 같은 경로 재사용.
-        p.retryObjectPath = f.retryObjectPath;
-        p.error = f.message;
-      });
-    } on IqAttachmentAmbiguousResult catch (a) {
-      if (!mounted) return;
-      setState(() {
-        // AMBIGUOUS_SERVER_RESULT — 자동삭제 0·성공 표시 0·임시 삽입 0.
-        // 재시도는 같은 경로로 SELECT 선행 수렴을 다시 밟는다(RPC 선행 금지).
-        p.retryObjectPath = a.retryObjectPath;
-        p.error = a.message;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => p.error = friendlyError(e));
-    } finally {
-      if (mounted) setState(() => p.uploading = false);
-    }
-  }
-
-  /// §6: 당사자 저장 — RLS 다운로드 + SAF 저장 대화상자(권한 요청 없음).
-  Future<void> _saveAttachment(IqAttachment a) async {
-    try {
-      final bool saved = await _fileSaver.save(
-        storagePath: a.storagePath,
-        fileName: a.fileName ?? 'attachment',
-      );
-      if (saved) _snack('파일을 저장했어요.');
-    } catch (_) {
-      _snack('파일 저장에 실패했어요. 잠시 후 다시 시도해 주세요.');
-    }
-  }
+  bool _isImagePending(_PendingIqUpload p) =>
+      p.file.mimeType.toLowerCase().startsWith('image/');
 
   List<Widget> _mentorActions(IndividualQuestion q) {
     if (!iqCanMentorAnswer(q.status)) {
@@ -925,8 +1240,12 @@ class _IqDetailScreenState extends State<IqDetailScreen>
           const Text('답변을 등록했어요. 학생이 해결 완료하면 정산 예정으로 잡혀요.',
               style: AppTypography.caption),
           // §H: 첫 답변 이후 추가 답글은 당사자 공용 경로(iq_append_message).
-          if (iqCanMentorSendFollowUp(q.status))
+          // 첨부·첨삭본 대기열도 여기서 이어진다(answered 구간 첨삭 §4-1,
+          // 첫 답변 첨부 실패분 재시도 포함).
+          if (iqCanMentorSendFollowUp(q.status)) ...<Widget>[
+            ..._pendingUploadRows(q.id),
             ..._chatComposer(hint: '학생 질문에 이어서 답글을 남겨 보세요.'),
+          ],
         ];
       }
       if (q.status == IndividualQuestionStatus.released) {
@@ -955,55 +1274,10 @@ class _IqDetailScreenState extends State<IqDetailScreen>
           isDense: true,
         ),
       ),
-      // §6: 답변 첨부(이미지·카메라·파일) — 선택 즉시 업로드,
-      // 실패분은 아래 목록에 남아 재시도(중복 업로드 0).
-      for (final _PendingIqUpload p in _pendingUploads) ...<Widget>[
-        const SizedBox(height: 8),
-        Row(
-          children: <Widget>[
-            Icon(
-              p.error == null ? Icons.attach_file : Icons.error_outline_rounded,
-              size: 18,
-              color:
-                  p.error == null ? ColorTokens.secondary : ColorTokens.danger,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '${p.file.fileName} (${_formatBytes(p.file.bytes.length)})',
-                    style: AppTypography.caption,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (p.error != null)
-                    Text(p.error!,
-                        style: AppTypography.caption
-                            .copyWith(color: ColorTokens.danger)),
-                ],
-              ),
-            ),
-            if (p.uploading)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else if (p.error != null)
-              TextButton(
-                onPressed: () => _uploadPending(q.id, p),
-                child: const Text('재시도'),
-              ),
-            if (!p.uploading)
-              IconButton(
-                tooltip: '제거',
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: () => setState(() => _pendingUploads.remove(p)),
-              ),
-          ],
-        ),
-      ],
+      // §6·§2-2: 답변 첨부(이미지·카메라·파일)와 첨삭본 — 대기열에 쌓였다가
+      // 답변 등록이 돌려준 message_id 로 등록된다. 실패분은 아래 목록에 남아
+      // 같은 message_id·같은 경로로 재시도(중복 업로드 0·메시지 재생성 0).
+      ..._pendingUploadRows(q.id),
       const SizedBox(height: 8),
       Row(
         children: <Widget>[
@@ -1011,7 +1285,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
             child: SecondaryButton(
               label: '파일 첨부',
               icon: Icons.attach_file,
-              onPressed: _busy ? null : () => _pickAndUploadAttachment(q.id),
+              onPressed: _busy ? null : _pickPendingAttachment,
             ),
           ),
           const SizedBox(width: 8),
@@ -1027,13 +1301,23 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   }
 }
 
-/// §6: 멘토 답변 첨부 대기 항목(업로드 상태·재시도 경로).
+/// §6·§2-2: 첨부 대기 항목 — 업로드 상태·재시도 경로·귀속 메시지.
 class _PendingIqUpload {
   _PendingIqUpload(this.file);
 
-  final PickedImage file;
+  /// 업로드할 파일(전송 전 필기 완료 시 평탄화본으로 교체된다).
+  PickedImage file;
+
+  /// 전송 전 필기(§4-2) 이어 그리기용 — 최초 원본과 직전 스트로크.
+  PickedImage? original;
+  InkDocument? inkDocument;
+
   bool uploading = false;
   String? error;
+
+  /// 이 첨부가 귀속된 메시지 id — 메시지 전송(iq_append_message /
+  /// 첫 답변)이 반환한 정본. 실패 재시도에서도 유지된다(재귀속·재생성 금지).
+  String? messageId;
 
   /// 등록 실패 + 보상삭제 실패(고아) 시의 재시도 경로 — 재업로드 생략용.
   String? retryObjectPath;
@@ -1047,10 +1331,10 @@ String _formatBytes(int bytes) {
   return '${bytes}B';
 }
 
-/// 첨부 그룹 — 질문 말풍선(첫 타임라인 항목) 안에 세로로 쌓인다. 이미지는
-/// 서명 URL 로 인라인 표시, 그 외 파일은 이름 행만. 카드 시절의 별도 '첨부'
-/// 섹션을 대체하며, 조회·저장·첨삭 의미와 게이트는 그대로다(§6·S18).
-/// [onAnnotate] 가 있으면(멘토·답변 가능 상태) 이미지마다 '첨삭하기' 노출.
+/// 첨부 그룹 — 귀속된 말풍선(질문·메시지·레거시 중립) 안에 세로로 쌓인다.
+/// 이미지는 서명 URL 로 인라인 표시, 그 외 파일은 이름 행만. 조회·저장·첨삭
+/// 의미와 게이트는 §6·S18 그대로다.
+/// [onAnnotate] 가 있으면(멘토·활성 상태·학생 작성 그룹) 이미지마다 '첨삭하기'.
 /// [onSave] 가 있으면 항목마다 '저장'(당사자 다운로드 → SAF) 노출.
 ///
 /// ★ P3-6: Future 는 storage_path 별로 상태에 메모한다 — build 마다 새
@@ -1197,7 +1481,7 @@ class _IqAttachmentGroupState extends State<_IqAttachmentGroup> {
 /// 첨부 전체화면 뷰어(줌·팬). [onAnnotate] 가 있으면(멘토, S18) '첨삭하기'를
 /// 노출한다 — 뷰어를 닫고 상세 화면의 첨삭 흐름으로 넘긴다.
 /// ★ 질문방 AttachmentViewerScreen 은 roomId/threadId 에 결합돼 있어
-///   재사용하지 않는다(전송은 AnnotationTarget 포트가 담당).
+///   재사용하지 않는다(전송은 대기열 + 메시지 경로가 담당).
 class _IqAttachmentViewer extends StatelessWidget {
   const _IqAttachmentViewer({
     required this.url,
