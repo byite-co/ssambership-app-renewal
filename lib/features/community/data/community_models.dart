@@ -49,6 +49,11 @@ class CommunityPage<T> {
 }
 
 /// 게시판 글(community_posts). 열람 전용 뷰모델.
+///
+/// [authorId]/[updatedAtRaw]/[imageRefs] 는 내부 처리 전용이다 —
+/// 소유권 UI 게이트(내 글에만 수정 노출)·낙관적 충돌 검사(p_expected_updated_at
+/// 원문 전달)·이미지 유지/제거 편집에만 쓰고 **화면에 UUID·원문 경로를 노출하지
+/// 않는다**(보안 정본은 서버 소유권 검사).
 class BoardPost {
   const BoardPost({
     required this.id,
@@ -57,6 +62,9 @@ class BoardPost {
     this.category,
     this.authorLabel,
     this.authorRole,
+    this.authorId,
+    this.updatedAtRaw,
+    this.imageRefs = const <String>[],
     required this.likeCount,
     required this.commentCount,
     required this.viewCount,
@@ -69,6 +77,17 @@ class BoardPost {
   final String? category;
   final String? authorLabel;
   final String? authorRole;
+
+  /// 작성자 user id(내부 전용 — 화면 비노출). 소유권 UI 게이트에만 쓴다.
+  final String? authorId;
+
+  /// 서버 updated_at **원문 문자열**(내부 전용). 수정 RPC 의
+  /// p_expected_updated_at 으로 재직렬화 없이 그대로 보낸다(exact 충돌 검사).
+  final String? updatedAtRaw;
+
+  /// 서버 정본 이미지 ref(`community-post-images/{uid}/{object}`, 내부 전용).
+  final List<String> imageRefs;
+
   final int likeCount;
   final int commentCount;
   final int viewCount;
@@ -77,16 +96,27 @@ class BoardPost {
   String get authorName => communityAuthorName(authorLabel, authorRole);
 
   factory BoardPost.fromMap(Map<String, dynamic> m) {
+    final Object? updatedAt = m['updated_at'];
+    // 뷰(community_posts_v1) 정본 컬럼은 image_refs — 베이스 행(legacy)의
+    // image_urls 는 폴백으로만 읽는다.
+    final Object? imageUrls = m['image_refs'] ?? m['image_urls'];
     return BoardPost(
       id: m['id'] as String,
       title: (m['title'] as String?)?.trim().isNotEmpty == true
           ? (m['title'] as String).trim()
           : '(제목 없음)',
-      // 스키마상 body/content 둘 다 존재 — 게시판은 legacy content 우선(기존 계약 유지).
-      body: _pickText(m, const <String>['content', 'body']),
+      // 뷰 정본 컬럼은 body — legacy 베이스 행의 content 는 폴백으로만 읽는다.
+      body: _pickText(m, const <String>['body', 'content']),
       category: m['category'] as String?,
       authorLabel: m['author_label'] as String?,
       authorRole: m['author_role'] as String?,
+      authorId: m['author_id'] as String?,
+      updatedAtRaw: updatedAt is String ? updatedAt : null,
+      imageRefs: <String>[
+        if (imageUrls is List)
+          for (final Object? v in imageUrls)
+            if (v is String && v.isNotEmpty) v,
+      ],
       likeCount: parseInt(m['like_count']),
       commentCount: parseInt(m['comment_count']),
       viewCount: parseInt(m['view_count']),
@@ -163,6 +193,7 @@ class CommunityComment {
     required this.body,
     this.parentId,
     this.authorLabel,
+    this.authorId,
     required this.createdAt,
   });
 
@@ -174,6 +205,11 @@ class CommunityComment {
   final String? parentId;
 
   final String? authorLabel;
+
+  /// 작성자 user id(내부 전용 — 화면 비노출). 내 댓글 삭제 어포던스 게이트에만
+  /// 쓴다 — 보안 정본은 서버(community_comment_soft_delete_self 의 소유 검사)다.
+  final String? authorId;
+
   final DateTime createdAt;
 
   String get authorName => communityAuthorName(authorLabel, null);
@@ -186,6 +222,7 @@ class CommunityComment {
       body: _pickText(m, const <String>['content', 'body']) ?? '',
       parentId: m['parent_id'] as String?,
       authorLabel: m['author_label'] as String?,
+      authorId: m['author_id'] as String?,
       createdAt: parseTime(m['created_at']),
     );
   }

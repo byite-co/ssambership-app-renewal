@@ -5,9 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/app/app_tabs.dart';
 import 'package:ssambership_app/design/widgets/chip_scroll.dart';
 import 'package:ssambership_app/design/widgets/count_badge.dart';
+import 'package:ssambership_app/core/deeplink/notification_deep_link_controller.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 import 'package:ssambership_app/features/notifications/data/notifications_repository.dart';
 import 'package:ssambership_app/features/notifications/notifications_screen.dart';
+import 'package:ssambership_app/features/notifications/ui/notification_target_opener.dart';
 import 'package:ssambership_app/features/notifications/ui/widgets/notification_card.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
 
@@ -44,6 +46,10 @@ class _FakeRepo implements NotificationsRepository {
     if (failMarkAll) throw const AppError('저장하지 못했어요.');
     return items.where((AppNotification n) => !n.isRead).length;
   }
+
+  @override
+  Future<int> unreadCount() async =>
+      items.where((AppNotification n) => !n.isRead).length;
 }
 
 /// 페이지 시퀀스 fake — fetch 호출 순서대로 미리 준비한 페이지를 돌려준다.
@@ -71,6 +77,9 @@ class _PagedRepo implements NotificationsRepository {
 
   @override
   Future<int> markAllRead() async => 0;
+
+  @override
+  Future<int> unreadCount() async => 0;
 }
 
 /// 수동 완료 fake — 응답 시점을 테스트가 제어한다(낡은 응답 폐기 검증용).
@@ -93,6 +102,9 @@ class _ManualRepo implements NotificationsRepository {
 
   @override
   Future<int> markAllRead() async => 0;
+
+  @override
+  Future<int> unreadCount() async => 0;
 }
 
 AppNotification _n(
@@ -101,6 +113,8 @@ AppNotification _n(
   String body, {
   bool read = false,
   int minute = 0,
+  String? roomId,
+  String? questionId,
 }) =>
     AppNotification(
       id: id,
@@ -108,7 +122,23 @@ AppNotification _n(
       body: body,
       isRead: read,
       createdAt: DateTime(2026, 7, 1, 10, minute),
+      roomId: roomId,
+      questionId: questionId,
     );
+
+/// 상세 열기 기록 fake — 실제 push·조회 없이 route 만 캡처한다.
+class _FakeOpener extends NotificationTargetOpener {
+  _FakeOpener();
+
+  final List<NotificationDeepLinkRoute> routes = <NotificationDeepLinkRoute>[];
+
+  @override
+  Future<bool> open(
+      BuildContext context, NotificationDeepLinkRoute route) async {
+    routes.add(route);
+    return true;
+  }
+}
 
 /// CR·환불·미지 유형 포함 — 이제 전부 표시되어야 한다(P2-15).
 List<AppNotification> _sample() => <AppNotification>[
@@ -191,35 +221,54 @@ void main() {
   });
 
   testWidgets(
-      '딥링크: 질문방→질문방 탭, 구독→마이페이지, 개별질문→개별질문 탭, '
-      '맞춤의뢰·미지→이동 없음(읽음 처리만)', (WidgetTester tester) async {
+      '딥링크: 검증 UUID → 상세 opener, 형식 불량/id 없음 → 탭 폴백, '
+      '맞춤의뢰·미지 → 이동 없음(읽음 처리만)', (WidgetTester tester) async {
     await _tall(tester);
-    final _FakeRepo repo = _FakeRepo(_sample());
+    const String roomUuid = '11111111-2222-4333-8444-555555555555';
+    const String questionUuid = '31111111-2222-4333-8444-555555555555';
+    final _FakeRepo repo = _FakeRepo(<AppNotification>[
+      _n('a', 'question_answered', 'A 질문방 알림', minute: 9, roomId: roomUuid),
+      _n('a2', 'question_answered', 'A2 아이디 없는 질문방', minute: 8),
+      _n('b', 'subscription_expired', 'B 구독 알림', minute: 7),
+      _n('d', 'new_order_message', 'D 맞춤의뢰 알림', minute: 6),
+      _n('f', 'individual_question_answered', 'F 개별질문 알림',
+          minute: 5, questionId: questionUuid),
+      _n('g', 'weird_unknown_type', 'G 미지 알림', minute: 4),
+    ]);
     final List<int> tabs = <int>[];
+    final _FakeOpener opener = _FakeOpener();
     await tester.pumpWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: tabs.add,
+      detailOpener: opener,
     )));
     await tester.pumpAndSettle();
 
+    // 검증된 UUID → 상세 opener 경유(탭 이동 아님).
     await tester.tap(find.text('A 질문방 알림'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('B 구독 알림'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('F 개별질문 알림'));
     await tester.pumpAndSettle();
-    expect(tabs, <int>[
-      AppTab.questionRoom,
-      AppTab.myPage,
-      AppTab.individualQuestion,
-    ]);
+    expect(opener.routes.length, 2);
+    expect(opener.routes[0], isA<NotificationRoomRoute>());
+    expect((opener.routes[0] as NotificationRoomRoute).roomId, roomUuid);
+    expect(opener.routes[1], isA<NotificationIqRoute>());
+    expect(tabs, isEmpty);
+
+    // id 없는 질문방 → 알림 탭 폴백(내용 확인 유도), 구독 → 마이페이지 탭.
+    await tester.tap(find.text('A2 아이디 없는 질문방'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('B 구독 알림'));
+    await tester.pumpAndSettle();
+    expect(tabs, <int>[AppTab.notifications, AppTab.myPage]);
 
     // 맞춤의뢰(stay)·미지(unknown) — 이동하지 않고 읽음 처리만 된다.
     await tester.tap(find.text('D 맞춤의뢰 알림'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('G 미지 알림'));
     await tester.pumpAndSettle();
-    expect(tabs.length, 3); // 추가 이동 없음
+    expect(tabs.length, 2); // 추가 이동 없음
+    expect(opener.routes.length, 2); // 추가 상세 없음
     expect(repo.readCalls, containsAll(<String>['d', 'g']));
   });
 

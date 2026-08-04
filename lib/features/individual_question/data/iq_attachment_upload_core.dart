@@ -64,6 +64,11 @@ typedef IqDefiniteFailureClassifier = bool Function(Object error);
 /// (§4-3 의 유일한 예외). 그 외 오류에서는 언제나 false 여야 한다.
 typedef IqRegisterConflictClassifier = bool Function(Object error);
 
+/// 명시적 등록 거부의 사용자 문구 매핑(계약 7 신규 코드 — STORAGE_*·MIME_*·
+/// SIZE_EXCEEDED·ACCOUNT_*). null = 미지 코드 → 기존 일반 문구 유지.
+/// ★ 화면에 코드·원문을 싣지 않는다(매퍼가 한글 문구만 돌려준다).
+typedef IqRegisterFailureDescriber = String? Function(Object error);
+
 /// 등록 결과를 읽지 못했을 때의 사용자 문구(계약 형태 무관 — 변경 금지).
 const String kIqRegisterResultUnreadable = '첨부 등록 결과를 확인하지 못했어요.';
 
@@ -299,6 +304,10 @@ Future<IqAttachment> uploadIqAttachmentCore({
   /// `40001` 판정. 기본은 '재호출 없음'(fail-closed) — 호출부가 명시할 때만
   /// 1회 재호출이 열린다.
   IqRegisterConflictClassifier isRetriableRegisterConflict = _neverRetriable,
+
+  /// 명시 거부 코드 → 한글 문구(없으면 기존 일반 문구). 흐름·판정은 불변 —
+  /// 문구만 바꾼다.
+  IqRegisterFailureDescriber describeRegisterFailure = _noDescription,
 }) async {
   final String? invalid = validateIqAttachmentFile(file);
   if (invalid != null) throw AppError(invalid); // 업로드 0·등록 0
@@ -362,10 +371,13 @@ Future<IqAttachment> uploadIqAttachmentCore({
       if (registeredAfterDeny != null) return registeredAfterDeny;
       orphaned = true; // 삭제도 실패·미등록 — 성공 표시 금지, 경로 보존.
     }
+    // 계약 7: 명시 거부 코드(STORAGE_*·MIME_*·SIZE_EXCEEDED·ACCOUNT_*)는
+    // 사용자에게 원인 있는 한글 문구로 안내한다(미지 코드는 기존 일반 문구).
+    final String? mapped = describeRegisterFailure(e);
     throw IqAttachmentRegisterFailure(
       message: orphaned
           ? '첨부 등록이 완료되지 않았어요. 다시 시도해 주세요. (미정리 파일 1건: ${file.fileName})'
-          : '첨부 등록에 실패했어요. 다시 시도해 주세요.',
+          : (mapped ?? '첨부 등록에 실패했어요. 다시 시도해 주세요.'),
       orphaned: orphaned,
       retryObjectPath: orphaned ? objectPath : null,
     );
@@ -424,3 +436,5 @@ Future<IqAttachmentRegistration> _registerWithConflictRetry({
 }
 
 bool _neverRetriable(Object _) => false;
+
+String? _noDescription(Object _) => null;

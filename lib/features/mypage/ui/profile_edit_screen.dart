@@ -56,8 +56,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     try {
       await widget.repository.updateProfile(
         nickname: name,
-        // 멘토는 grade_level 을 payload 에서 제외(null → 레포가 patch 에 안 넣음).
-        gradeLevel: _isMentor ? null : (grade.isEmpty ? null : grade),
+        // 멘토는 p_grade_level 을 payload 에서 제외(null → 레포가 파라미터 생략).
+        // 학생이 학년을 비웠으면 ''(빈 문자열) 를 보내 서버가 NULL 로 비운다 —
+        // 생략(유지)과 비우기를 구분하는 서버 계약이다.
+        gradeLevel: _isMentor ? null : grade,
       );
       if (!mounted) return;
       _snack('프로필을 저장했어요.');

@@ -2,7 +2,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
+import 'iq_error_mapper.dart';
 import 'models/individual_question_models.dart';
+
+/// `iq_append_message` 성공 반환({ok, message_id, answered_transition}).
+class IqAppendResult {
+  const IqAppendResult({
+    required this.messageId,
+    required this.answeredTransition,
+  });
+
+  /// 생성된 메시지 행 id(화면 미노출 — dedup·재조회 대조용).
+  final String messageId;
+
+  /// true = 멘토 첫 메시지로 claimed/assigned → answered 전이가 함께 일어남.
+  final bool answeredTransition;
+}
 
 /// 개별질문(IQ) 레포지토리 — 모든 변경은 SECURITY DEFINER 래퍼 RPC 로만.
 ///
@@ -10,6 +25,7 @@ import 'models/individual_question_models.dart';
 /// - 생성: `create_individual_question_as_student` (에스크로 홀드 포함)
 /// - 수락: `claim_individual_question_as_mentor`
 /// - 답변: `answer_individual_question` (메시지 insert + answered 전이 원자화)
+/// - 대화: `iq_append_message` (양 당사자 — 학생 후속·멘토 추가 답글)
 /// - 확정: `release_individual_question` (학생 → 멘토 정산)
 /// - 취소: `refund_individual_question` (예치 캐시 반환)
 /// 조회는 당사자 SELECT RLS(070) + 공개 대기 질문 위생 RPC 로 직접 읽는다.
@@ -185,18 +201,56 @@ class IndividualQuestionRepository {
   }
 
   /// 멘토: 답변 등록(메시지 + answered 전이, 원자적).
+  /// 신규 오류 코드(NOT_ANSWERABLE_STATUS:* 등)는 매퍼가 한글 문구로 변환한다.
   Future<IndividualQuestion> answer(String questionId, String body) async {
-    final dynamic res = await _client.rpc(
-      'answer_individual_question',
-      params: <String, dynamic>{
-        'p_question_id': questionId,
-        'p_body': body,
-      },
-    );
+    final dynamic res;
+    try {
+      res = await _client.rpc(
+        'answer_individual_question',
+        params: <String, dynamic>{
+          'p_question_id': questionId,
+          'p_body': body,
+        },
+      );
+    } catch (e) {
+      throw mapIqError(e);
+    }
     if (res is List && res.isNotEmpty && res.first is Map<String, dynamic>) {
       return IndividualQuestion.fromMap(res.first as Map<String, dynamic>);
     }
     throw const AppError('답변 결과를 확인하지 못했어요.');
+  }
+
+  /// 양 당사자 공용 메시지 전송(`iq_append_message`) — 학생 후속 질문과 멘토
+  /// 추가 답글이 모두 이 경로다(멘토 '첫 답변'만 [answer] 유지 — 원자 전이).
+  ///
+  /// 서버 계약(6): {ok, message_id, answered_transition}. 오류는
+  /// raise exception 'CODE' — [mapIqError] 가 한글 문구로 변환한다.
+  /// 성공 봉투는 strict 검증(fail-closed) — 계약 밖 응답을 성공으로 처리하지
+  /// 않는다. 로컬 선반영 없음(화면은 성공 후 서버 재조회가 정본).
+  Future<IqAppendResult> appendMessage(String questionId, String body) async {
+    final dynamic res;
+    try {
+      res = await _client.rpc(
+        'iq_append_message',
+        params: <String, dynamic>{
+          'p_question_id': questionId,
+          'p_body': body,
+        },
+      );
+    } catch (e) {
+      throw mapIqError(e);
+    }
+    if (res is Map && res['ok'] == true && res['message_id'] is String) {
+      final String id = (res['message_id'] as String).trim();
+      if (id.isNotEmpty) {
+        return IqAppendResult(
+          messageId: id,
+          answeredTransition: res['answered_transition'] == true,
+        );
+      }
+    }
+    throw const AppError('메시지 전송 결과를 확인하지 못했어요. 다시 시도해 주세요.');
   }
 
   /// 학생: 답변 확정 → 멘토 정산(release).

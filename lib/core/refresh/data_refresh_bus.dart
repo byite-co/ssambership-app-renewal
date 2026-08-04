@@ -28,4 +28,13 @@ class DataRefreshBus {
 
   /// 구독 상태에 영향을 주는 mutation 성공 지점에서 호출.
   static void bumpSubscription() => subscriptionGeneration.value++;
+
+  /// 알림 표면 세대 — 탭 재선택·화면 재진입 등 '알림을 다시 보라'는 신호.
+  /// 알림 화면이 살아 있으면(IndexedStack) 첫 페이지 + 서버 미읽음 개수를
+  /// 재조회한다(상시 폴링 없음 — 신호 기반).
+  static final ValueNotifier<int> notificationsGeneration =
+      ValueNotifier<int>(0);
+
+  /// 알림 재조회가 필요한 지점(알림 탭 재선택 등)에서 호출.
+  static void bumpNotifications() => notificationsGeneration.value++;
 }

@@ -38,11 +38,31 @@ void main() {
     // 초깃값: grade_level 미러(grade) 값이 controller 에 들어간다.
     expect(find.widgetWithText(TextField, '고2'), findsOneWidget);
 
-    // 값 변경 후 저장 → payload 의 gradeLevel(=grade_level 컬럼)로 전달.
+    // 값 변경 후 저장 → payload 의 gradeLevel(=p_grade_level)로 전달.
     await tester.enterText(find.widgetWithText(TextField, '고2'), '고3');
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
 
     expect(captured['gradeLevel'], '고3');
+  });
+
+  testWidgets("학생이 학년을 비우고 저장 → ''(비우기) 전송 — 생략(유지)이 아니다",
+      (WidgetTester tester) async {
+    final Map<String, String?> captured = <String, String?>{};
+    await tester.pumpWidget(MaterialApp(
+      home: ProfileEditScreen(
+        profile: const MyProfile(name: '학생', roleLabel: '학생', grade: '고2'),
+        repository: _CapturingRepo(captured),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '고2'), '');
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+
+    // 서버 계약: '' = NULL 로 비우기(학생 전용). null(생략=유지)과 다르다.
+    expect(captured['gradeLevel'], '');
+    expect(captured['nickname'], '학생');
   });
 }

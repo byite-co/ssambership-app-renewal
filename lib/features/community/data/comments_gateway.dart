@@ -49,4 +49,15 @@ class CommentsGateway {
   }) {
     return _client.from(table).insert(values).select().single();
   }
+
+  /// 숏폼 댓글 **본인** 소프트삭제 RPC 호출 — 원 jsonb 를 그대로 돌려준다.
+  /// 봉투 검증·오류 매핑은 레포(CommunityWriteRepository)가 담당한다.
+  /// 서버 계약: community_comment_soft_delete_self(p_comment_id uuid)
+  ///   → {ok, contract_version:1, comment_id, idempotent_hit}
+  Future<Object?> softDeleteShortformComment(String commentId) {
+    return _client.rpc(
+      'community_comment_soft_delete_self',
+      params: <String, dynamic>{'p_comment_id': commentId},
+    );
+  }
 }

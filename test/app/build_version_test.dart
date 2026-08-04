@@ -10,10 +10,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// 여기서 '이번 회차가 어떤 빌드인지'를 고정해 둔다 — 재업로드 시 이 테스트가
 /// 먼저 깨져서 번호 증가를 강제한다.
 ///
-/// vc12: 기존 브랜드 자산(assets/branding/ssambership_logo_1024.png)으로
-/// Android 런처 아이콘만 재생성한 빌드. versionName 은 그대로 0.1.0.
+/// vc14: vc13 과 동일 코드 — Play Console 이 versionCode 13 을 이미 소모한
+/// 상태라("13 버전 코드는 이미 사용되었습니다") 번호만 14 로 올린 재패키징.
+/// vc15: 전 기능 계약 수렴(2026-08-04) — 프로필/멘토/커뮤니티/IQ/알림/계정삭제
+/// 클라이언트 계약 전환 후 릴리즈 후보. versionName 은 그대로 0.1.0.
 void main() {
-  test('pubspec version = 0.1.0+12 (versionName 0.1.0 / versionCode 12)', () {
+  test('pubspec version = 0.1.0+15 (versionName 0.1.0 / versionCode 15)', () {
     final String pubspec = File('pubspec.yaml').readAsStringSync();
     final RegExpMatch? m = RegExp(
       r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$',
@@ -21,8 +23,9 @@ void main() {
     ).firstMatch(pubspec);
 
     expect(m, isNotNull, reason: 'pubspec.yaml 에 version: x.y.z+N 이 없다');
-    expect(m!.group(1), '0.1.0', reason: 'versionName 은 이번 교정에서 바꾸지 않는다');
-    expect(int.parse(m.group(2)!), 12,
-        reason: '빌드 11 은 이미 릴리스 서명으로 산출됐다 — 아이콘 교정 빌드는 12 여야 한다');
+    expect(m!.group(1), '0.1.0', reason: 'versionName 은 이번 통합에서 바꾸지 않는다');
+    expect(int.parse(m.group(2)!), 15,
+        reason: 'versionCode 14 는 이미 소모된 통합 빌드 번호 — 수렴 릴리즈 후보는 '
+            'versionCode 15 이어야 한다(base/기존통합/현재 브랜치 최대값 + 1)');
   });
 }

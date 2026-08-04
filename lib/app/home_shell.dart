@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_service.dart';
+import '../core/refresh/data_refresh_bus.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/mypage/data/mypage_models.dart';
 import '../features/mypage/mypage_screen.dart';
+import '../features/notifications/data/notification_badge_controller.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
@@ -59,11 +61,18 @@ class _HomeShellState extends State<HomeShell> {
     _index = AuthService.instance.isGuest ? 2 : 0;
     // 알림 딥링크 등 앱 내 탭 전환 요청 수신.
     TabNavigator.request.addListener(_onTabRequest);
+    // 로그인 사용자 — 알림 배지 서버 개수 1회 조회(이후는 실시간·화면이 갱신).
+    if (!AuthService.instance.isGuest) {
+      NotificationBadgeController.instance.refresh();
+    }
   }
 
   @override
   void dispose() {
     TabNavigator.request.removeListener(_onTabRequest);
+    // 로그아웃/계정 전환으로 셸이 내려가면 이전 사용자 배지 개수를 폐기한다
+    // (다음 로그인 셸이 서버에서 새로 조회 — 교차 사용자 잔상 0).
+    NotificationBadgeController.instance.clear();
     super.dispose();
   }
 
@@ -85,6 +94,8 @@ class _HomeShellState extends State<HomeShell> {
       context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
+    // 알림 탭 선택(재선택 포함) — 살아 있는 알림 화면에 재조회 신호.
+    if (i == AppTab.notifications) DataRefreshBus.bumpNotifications();
     setState(() => _index = i);
   }
 
@@ -135,11 +146,40 @@ class _HomeShellState extends State<HomeShell> {
         destinations: <NavigationDestination>[
           for (int i = 0; i < _pages.length; i++)
             NavigationDestination(
-              icon: Icon(_icons[i]),
+              // 알림 탭만 서버 미읽음 개수 배지(0/미확인이면 숨김, 100+ → '99+').
+              icon: i == AppTab.notifications
+                  ? _NotificationsTabIcon(icon: _icons[i])
+                  : Icon(_icons[i]),
               label: AppConstants.bottomTabLabels[i],
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 알림 탭 아이콘 + 서버 미읽음 배지.
+///
+/// ★ 배지의 유일한 소스는 서버 개수([NotificationBadgeController] —
+///   notification_unread_count_self)다. 로컬 목록으로 개수를 계산하지 않는다.
+///   null(미확인)·0 → 배지 숨김, 100 이상 → '99+'.
+class _NotificationsTabIcon extends StatelessWidget {
+  const _NotificationsTabIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int?>(
+      valueListenable: NotificationBadgeController.instance.count,
+      builder: (BuildContext context, int? count, Widget? _) {
+        final String? label = notificationBadgeLabel(count);
+        return Badge(
+          isLabelVisible: label != null,
+          label: label == null ? null : Text(label),
+          child: Icon(icon),
+        );
+      },
     );
   }
 }

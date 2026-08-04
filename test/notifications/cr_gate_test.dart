@@ -59,6 +59,9 @@ class _GatedKeysetFakeRepo implements NotificationsRepository {
 
   @override
   Future<int> markAllRead() async => 0;
+
+  @override
+  Future<int> unreadCount() async => 0;
 }
 
 void main() {

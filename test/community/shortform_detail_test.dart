@@ -229,6 +229,151 @@ void main() {
     expect(find.text('숏폼 설명'), findsOneWidget);
   });
 
+  group('신고 대상 타입(서버 allowlist 정본 — exact 문자열)', () {
+    testWidgets('숏폼 글 신고는 shortform_post(구 shortform 폐기)',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final FakeCommunityWrite write = FakeCommunityWrite();
+      await tester.pumpWidget(_wrap(_screen(write: write)));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('신고'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('신고 접수'));
+      await tester.pumpAndSettle();
+
+      expect(write.lastReportTargetType, 'shortform_post');
+      expect(write.lastReportTargetId, 's1');
+    });
+  });
+
+  group('조회 기록 v2 — 노출 1회당 이벤트 키 1개', () {
+    testWidgets('initState 1회 기록 + 리빌드에도 같은 키 유지·중복 제출 없음',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final FakeCommunityWrite write = FakeCommunityWrite();
+      // 부모 setState 로 강제 리빌드를 일으켜 키 재생성·재제출이 없는지 본다.
+      late StateSetter rebuild;
+      await tester.pumpWidget(MaterialApp(
+        home: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            rebuild = setState;
+            return _screen(write: write);
+          },
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(write.shortformViewKeys.length, 1, reason: '노출당 정확히 1회 기록');
+      expect(write.lastShortformViewPostId, 's1');
+      final String key = write.shortformViewKeys.single;
+      // UUID v4 형식(멱등 키 계약).
+      expect(
+        RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-'
+                r'[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+            .hasMatch(key),
+        isTrue,
+        reason: 'UUID v4 가 아니다: $key',
+      );
+
+      rebuild(() {});
+      await tester.pumpAndSettle();
+      rebuild(() {});
+      await tester.pumpAndSettle();
+
+      // 리빌드에도 재제출 0 — 화면 상태의 키도 동일하게 유지된다.
+      expect(write.shortformViewKeys, <String>[key]);
+      final ShortformDetailScreenState state =
+          tester.state(find.byType(ShortformDetailScreen));
+      expect(state.viewEventKey, key);
+    });
+  });
+
+  group('내 댓글 삭제(community_comment_soft_delete_self)', () {
+    testWidgets('내 댓글에만 삭제 노출 → 확인 후 레포 호출 + 목록 재조회',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final FakeCommunityWrite write = FakeCommunityWrite(uid: 'me');
+      await tester.pumpWidget(_wrap(_screen(
+        read: FakeCommunityRead(commentsList: <CommunityComment>[
+          sampleComment(id: 'c-mine', authorId: 'me'),
+        ]),
+        write: write,
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('삭제'), findsOneWidget);
+      await tester.tap(find.text('삭제'));
+      await tester.pumpAndSettle();
+
+      // 확인 다이얼로그 — 취소하면 호출 0.
+      expect(find.text('댓글을 삭제할까요?'), findsOneWidget);
+      await tester.tap(find.text('취소'));
+      await tester.pumpAndSettle();
+      expect(write.deleteCommentCalls, 0);
+
+      // 다시 삭제 → 확정.
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('삭제'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('삭제').last);
+      await tester.pumpAndSettle();
+
+      expect(write.deleteCommentCalls, 1);
+      expect(write.lastDeletedCommentId, 'c-mine');
+    });
+
+    testWidgets('타인 댓글·비로그인에는 삭제 미노출(신고·차단만)',
+        (WidgetTester tester) async {
+      _bigSurface(tester);
+      final FakeCommunityWrite write = FakeCommunityWrite(uid: 'me');
+      await tester.pumpWidget(_wrap(_screen(
+        read: FakeCommunityRead(commentsList: <CommunityComment>[
+          sampleComment(id: 'c-other', authorId: 'someone-else'),
+        ]),
+        write: write,
+      )));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('삭제'), findsNothing);
+      expect(find.text('신고'), findsOneWidget);
+    });
+
+    test('노출 게이트(순수) — 둘 다 비어있지 않고 일치할 때만 true', () {
+      expect(
+        canDeleteOwnShortformComment(
+            commentAuthorId: 'u1', currentUserId: 'u1'),
+        isTrue,
+      );
+      expect(
+        canDeleteOwnShortformComment(
+            commentAuthorId: 'u1', currentUserId: 'u2'),
+        isFalse,
+      );
+      expect(
+        canDeleteOwnShortformComment(
+            commentAuthorId: null, currentUserId: 'u1'),
+        isFalse,
+      );
+      expect(
+        canDeleteOwnShortformComment(
+            commentAuthorId: 'u1', currentUserId: null),
+        isFalse,
+      );
+      expect(
+        canDeleteOwnShortformComment(
+            commentAuthorId: '  ', currentUserId: '  '),
+        isFalse,
+        reason: '빈 값끼리의 일치를 소유로 오인하지 않는다',
+      );
+    });
+  });
+
   group('숏폼 댓글 경로(정본 전환 무관 — legacy 유지)', () {
     testWidgets('댓글 신고 대상은 community_comment 그대로', (WidgetTester tester) async {
       _bigSurface(tester);

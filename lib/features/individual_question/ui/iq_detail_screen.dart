@@ -26,6 +26,9 @@ import '../data/iq_attachment_saver.dart';
 import '../data/iq_attachment_upload_core.dart';
 import '../data/iq_attachment_url_resolver.dart';
 import '../data/iq_attachments_repository.dart';
+import '../data/iq_error_mapper.dart';
+import '../data/iq_messages_controller.dart';
+import '../data/iq_realtime.dart';
 import '../data/models/individual_question_models.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/app_error.dart';
@@ -73,6 +76,7 @@ class IqDetailScreen extends StatefulWidget {
     this.sourcePickerOverride,
     this.fileSaverOverride,
     this.currentUserId,
+    this.realtimeFactoryOverride,
   });
 
   final String questionId;
@@ -111,6 +115,10 @@ class IqDetailScreen extends StatefulWidget {
   /// 테스트용 저장 포트 주입(§6 — SAF 저장). null 이면 SAF 구현.
   final IqAttachmentSaverPort? fileSaverOverride;
 
+  /// 테스트용 실시간 포트 팩토리 주입. null 이면 Supabase 구현
+  /// (백엔드 미연결이면 조용히 no-op — 폴백 재조회만 동작).
+  final IqRealtimePort Function(String questionId)? realtimeFactoryOverride;
+
   @override
   State<IqDetailScreen> createState() => _IqDetailScreenState();
 }
@@ -136,7 +144,8 @@ class IqAnnotateRequest {
   final InkDocument? initial;
 }
 
-class _IqDetailScreenState extends State<IqDetailScreen> {
+class _IqDetailScreenState extends State<IqDetailScreen>
+    with WidgetsBindingObserver {
   IndividualQuestionRepository get _repo =>
       widget.repositoryOverride ?? const IndividualQuestionRepository();
   IqAttachmentsPort get _attachments =>
@@ -148,8 +157,22 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   final MentorLookupRepository _mentorLookup = const MentorLookupRepository();
   final TextEditingController _answerController = TextEditingController();
 
+  /// 당사자 공용 대화 컴포저(iq_append_message — 학생 후속·멘토 추가 답글).
+  /// 본문이 비면 전송 버튼을 비활성화한다(첨부만 보내는 전송은 없다 — 첨부는
+  /// 독립 등록이고 answered 전이를 만들지 않는다).
+  final TextEditingController _chatController = TextEditingController();
+  bool _chatCanSend = false;
+
   /// 대화 타임라인 스크롤(수명은 이 State 가 소유·정리한다).
   final ScrollController _timelineScroll = ScrollController();
+
+  /// 대화 메시지 정본 뷰 — 서버 재조회(resetTo)와 실시간 수신(upsert)이 여기로
+  /// 수렴한다(dedup-by-id — 중복 이벤트가 와도 중복 행 0).
+  final IqMessagesController _messages = IqMessagesController();
+
+  /// 실시간 채널(iq_{questionId}) — 보조 채널. 실패해도 화면은 기존 데이터 +
+  /// 전송 후 재조회/수동 새로고침으로 계속 동작한다.
+  IqRealtimePort? _realtime;
 
   /// 최신 대화로 내려보낼 필요가 있을 때만 참 — 최초 진입, 그리고 내가 방금
   /// 답변을 등록한 직후. 그 외 새로고침(첨삭·환불·정산)은 사용자가 보고 있던
@@ -172,16 +195,94 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    _chatController.addListener(_onChatChanged);
+    // §G: 실시간 보조 채널 + 복귀 재조회(실시간이 유일 소스가 되지 않게).
+    _startRealtime();
+    WidgetsBinding.instance.addObserver(this);
+    AuthService.instance.addListener(_onAuthChanged);
+  }
+
+  @override
+  void didUpdateWidget(IqDetailScreen old) {
+    super.didUpdateWidget(old);
+    // 질문 전환 — 이전 질문 채널을 반드시 정리하고 새 질문으로 재구독.
+    if (old.questionId != widget.questionId) {
+      _realtime?.dispose();
+      _realtime = null;
+      _messages.resetTo(const <IqMessage>[], notify: false);
+      _startRealtime();
+      _refresh(scrollToLatest: true);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다.
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  /// 로그아웃/계정 전환 — 이전 사용자 채널을 정리한다(구독 누수·오배달 방지).
+  void _onAuthChanged() {
+    if (AuthService.instance.isSignedIn) return;
+    _realtime?.dispose();
+    _realtime = null;
+  }
+
+  void _onChatChanged() {
+    final bool can = _chatController.text.trim().isNotEmpty;
+    if (can != _chatCanSend && mounted) {
+      setState(() => _chatCanSend = can);
+    }
+  }
+
+  void _startRealtime() {
+    final IqRealtimePort rt = (widget.realtimeFactoryOverride ??
+        SupabaseIqRealtime.new)(widget.questionId);
+    _realtime = rt;
+    rt.start(
+      // 새 메시지 → id 기준 upsert(중복 이벤트가 와도 중복 행 0). 서버 행이
+      // 정본이라 재조회 결과와도 자연 수렴한다.
+      onMessageInsert: (IqMessage m) {
+        if (!mounted) return;
+        _messages.upsertFromServer(m);
+      },
+      // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회.
+      onQuestionUpdate: () {
+        if (mounted) _refresh();
+      },
+      // 첨부 행 생성 → 첨부 목록 서버 재조회(실시간 payload 를 정본으로 쓰지
+      // 않는다 — 서명 URL·정렬은 재조회가 담당).
+      onAttachmentInsert: () {
+        if (mounted) _refresh();
+      },
+      // 재연결 — 끊긴 사이 공백을 전체 재조회로 메운다.
+      onReconnected: () {
+        if (mounted) _refresh();
+      },
+    );
   }
 
   @override
   void dispose() {
+    AuthService.instance.removeListener(_onAuthChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _realtime?.dispose();
+    _messages.dispose();
     _answerController.dispose();
+    _chatController.dispose();
     _timelineScroll.dispose();
     super.dispose();
   }
 
   Future<IqDetailData> _load() async {
+    final IqDetailData data = await _loadRaw();
+    // 서버 목록이 대화 정본 — 실시간 수신분과 id 로 합쳐진 뷰를 갱신한다.
+    // (notify 는 FutureBuilder 리빌드가 대신한다 — build 중 재통지 방지.)
+    _messages.resetTo(data.messages, notify: false);
+    return data;
+  }
+
+  Future<IqDetailData> _loadRaw() async {
     if (widget.loaderOverride != null) return widget.loaderOverride!();
     final IndividualQuestion? q = await _repo.fetch(widget.questionId);
     if (q == null) {
@@ -258,7 +359,8 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
       _changed = true;
       _refresh(scrollToLatest: scrollToLatest); // 내부에서 mounted 를 확인한다.
     } catch (e) {
-      _snack(iqFailureMessage(e));
+      // 구조화 코드(iq_error_mapper) 우선 → 레거시 포함 매칭 폴백. 코드 비노출.
+      _snack(iqActionFailureText(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -483,14 +585,22 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
       children: <Widget>[
         _conversationHeader(data),
         Expanded(
-          child: ListView(
-            controller: _timelineScroll,
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenH, 12, AppSpacing.screenH, 12),
-            children: <Widget>[
-              _questionBubble(data),
-              for (final IqMessage m in data.messages) _iqMessageBubble(q, m),
-            ],
+          // 타임라인은 [_messages](재조회 + 실시간 upsert 수렴 뷰)를 그린다 —
+          // 실시간 수신이 전체 FutureBuilder 재구축 없이 목록만 갱신한다.
+          child: ListenableBuilder(
+            listenable: _messages,
+            builder: (BuildContext context, Widget? _) {
+              return ListView(
+                controller: _timelineScroll,
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenH, 12, AppSpacing.screenH, 12),
+                children: <Widget>[
+                  _questionBubble(data),
+                  for (final IqMessage m in _messages.items)
+                    _iqMessageBubble(q, m),
+                ],
+              );
+            },
           ),
         ),
         if (bottom.isNotEmpty) _bottomArea(bottom),
@@ -676,12 +786,58 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
         style: AppTypography.caption,
       ));
     }
+    // §H: 학생 후속 메시지 컴포저(iq_append_message) — 종결 전 구간에만.
+    if (iqCanStudentSendMessage(q.status)) {
+      out.addAll(_chatComposer(hint: '멘토에게 추가로 궁금한 점을 남겨 보세요.'));
+    }
     // 환불·만료·취소 종결 안내 — 하단 영역이 빈 띠로 남지 않게 한다.
     final String? notice = iqReadOnlyNotice(q.status);
     if (notice != null) {
       out.add(Text(notice, style: AppTypography.caption));
     }
     return out;
+  }
+
+  /// §H: 당사자 공용 대화 컴포저(iq_append_message). 본문이 비면 전송 비활성 —
+  /// 첨부만 보내는 전송은 없다(첨부는 독립 등록·answered 전이 없음).
+  List<Widget> _chatComposer({required String hint}) {
+    return <Widget>[
+      const SizedBox(height: 10),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: <Widget>[
+          Expanded(
+            child: TextField(
+              controller: _chatController,
+              minLines: 1,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: hint,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: '보내기',
+            icon: const Icon(Icons.send_rounded),
+            onPressed: (_busy || !_chatCanSend) ? null : _sendChatMessage,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  /// 후속 메시지 전송 — 성공 후 서버 재조회가 정본(로컬 선반영 없음). 실시간
+  /// INSERT 가 먼저 와도 재조회와 id 로 수렴한다(중복 행 0).
+  Future<void> _sendChatMessage() async {
+    final String body = _chatController.text.trim();
+    if (body.isEmpty || _busy) return;
+    await _runAction(scrollToLatest: true, () async {
+      await _repo.appendMessage(widget.questionId, body);
+      _chatController.clear();
+    });
   }
 
   /// §6: 첨부 선택(카메라/갤러리/파일) → 정책 검증 → 즉시 업로드.
@@ -765,9 +921,12 @@ class _IqDetailScreenState extends State<IqDetailScreen> {
   List<Widget> _mentorActions(IndividualQuestion q) {
     if (!iqCanMentorAnswer(q.status)) {
       if (q.status == IndividualQuestionStatus.answered) {
-        return const <Widget>[
-          Text('답변을 등록했어요. 학생이 해결 완료하면 정산 예정으로 잡혀요.',
+        return <Widget>[
+          const Text('답변을 등록했어요. 학생이 해결 완료하면 정산 예정으로 잡혀요.',
               style: AppTypography.caption),
+          // §H: 첫 답변 이후 추가 답글은 당사자 공용 경로(iq_append_message).
+          if (iqCanMentorSendFollowUp(q.status))
+            ..._chatComposer(hint: '학생 질문에 이어서 답글을 남겨 보세요.'),
         ];
       }
       if (q.status == IndividualQuestionStatus.released) {

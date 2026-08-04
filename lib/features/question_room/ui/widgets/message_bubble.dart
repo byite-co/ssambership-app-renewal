@@ -32,7 +32,10 @@ class MessageBubble extends StatelessWidget {
       body: message.body,
       align: mine ? ConversationAlign.end : ConversationAlign.start,
       tone: mine ? ConversationTone.accent : ConversationTone.neutral,
-      timeLabel: Formatters.hourMinute(message.createdAt),
+      // 표시 직전 로컬 변환(방어). DB 파싱 경로는 이미 로컬(parseTime)이라
+      // toLocal() 이 no-op 이고, UTC 로 들어온 값만 기기 시간대로 맞춰진다.
+      // → 중복 변환 없음. 전역 Formatters 는 건드리지 않는다.
+      timeLabel: Formatters.hourMinute(message.createdAt.toLocal()),
       attachments: attachments,
     );
   }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_tabs.dart';
+import '../../core/deeplink/notification_deep_link_controller.dart';
+import '../../core/refresh/data_refresh_bus.dart';
+import '../../core/supabase/supabase_client.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
@@ -9,7 +12,10 @@ import '../../design/widgets/count_badge.dart';
 import '../../design/widgets/empty_state.dart';
 import '../../shared/errors/friendly_error.dart';
 import 'data/app_notification.dart';
+import 'data/notification_badge_controller.dart';
+import 'data/notifications_realtime.dart';
 import 'data/notifications_repository.dart';
+import 'ui/notification_target_opener.dart';
 import 'ui/widgets/notification_card.dart';
 
 /// 페이지 항목을 기존 목록에 id 중복 없이 이어 붙인다(키셋 경계 중복 방어).
@@ -43,6 +49,9 @@ class NotificationsScreen extends StatefulWidget {
     super.key,
     this.repository,
     this.onDeepLinkTab,
+    this.badge,
+    this.realtimeFactory,
+    this.detailOpener = const NotificationTargetOpener(),
   });
 
   /// 데이터 소스(기본: Supabase). 테스트에서 fake 주입.
@@ -51,11 +60,21 @@ class NotificationsScreen extends StatefulWidget {
   /// 딥링크 탭 이동 훅(기본: TabNavigator.go). 테스트에서 대상 검증용 주입.
   final void Function(int tabIndex)? onDeepLinkTab;
 
+  /// 배지 컨트롤러(기본: 앱 전역 인스턴스). 테스트에서 fake 레포 주입용.
+  final NotificationBadgeController? badge;
+
+  /// 실시간 포트 팩토리(uid → 포트, 기본: Supabase). 테스트에서 fake 주입.
+  final NotificationsRealtimePort Function(String uid)? realtimeFactory;
+
+  /// 상세 목적지 열기(검증 route → 기존 상세 push). 테스트에서 fake 주입.
+  final NotificationTargetOpener detailOpener;
+
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen>
+    with WidgetsBindingObserver {
   static const int _pageSize = 20;
 
   /// 필터 칩 구성('기타' 는 전용 칩 없이 전체에서만 노출).
@@ -82,11 +101,82 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   NotificationKind? _kind; // null = 전체
 
+  /// 실시간 채널(로그인 사용자 전용 — uid 필터). 로그아웃/화면 dispose 정리.
+  NotificationsRealtimePort? _realtime;
+
+  NotificationBadgeController get _badge =>
+      widget.badge ?? NotificationBadgeController.instance;
+
   @override
   void initState() {
     super.initState();
     _repo = widget.repository ?? const SupabaseNotificationsRepository();
     _load();
+    _badge.refresh();
+    _startRealtime();
+    WidgetsBinding.instance.addObserver(this);
+    // 탭 재선택·교차 표면 신호 → 첫 페이지 + 서버 개수 재조회.
+    DataRefreshBus.notificationsGeneration.addListener(_onRefreshSignal);
+  }
+
+  @override
+  void dispose() {
+    DataRefreshBus.notificationsGeneration.removeListener(_onRefreshSignal);
+    WidgetsBinding.instance.removeObserver(this);
+    _realtime?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱 복귀 — 백그라운드 동안의 수신 공백을 첫 페이지 + 개수 재조회로 메운다.
+    if (state == AppLifecycleState.resumed) {
+      _load();
+      _badge.refresh();
+    }
+  }
+
+  void _onRefreshSignal() {
+    if (!mounted) return;
+    _load();
+    _badge.refresh();
+  }
+
+  /// 로그인 사용자에 한해 본인 수신자 필터로 INSERT 구독. 이 화면은 HomeShell
+  /// 수명과 함께 가므로(IndexedStack), 로그아웃 시 셸이 내려가며 dispose 로
+  /// 채널이 정리된다(이전 사용자 캐시는 새 셸에서 새로 조회).
+  void _startRealtime() {
+    final String? uid = SupabaseInit.clientOrNull?.auth.currentUser?.id;
+    if (uid == null) return; // 게스트/미연결 — 구독 없음(폴백 재조회만).
+    final NotificationsRealtimePort rt = (widget.realtimeFactory ??
+        SupabaseNotificationsRealtime.new)(uid);
+    _realtime = rt;
+    rt.start(
+      onInsert: _onRealtimeInsert,
+      onReconnected: () {
+        if (!mounted) return;
+        _load(); // 재연결 — 첫 페이지 재조회로 공백을 메운다.
+        _badge.refresh();
+      },
+    );
+  }
+
+  /// 실시간 INSERT — 화면이 살아 있으면 맨 위에 upsert(dedup by id), 개수는
+  /// 항상 서버 재조회(배지는 서버 값만 신뢰). 앱 제외 타입은 표시하지 않는다.
+  void _onRealtimeInsert(Map<String, dynamic> row) {
+    if (!mounted) return;
+    _badge.refresh();
+    final String rawType =
+        (row['type'] as String?)?.trim().toLowerCase() ?? '';
+    if (kGatedNotificationTypeCodes.contains(rawType)) return; // CR 게이트 OFF.
+    final AppNotification n;
+    try {
+      n = AppNotification.fromMap(row);
+    } catch (_) {
+      return; // 파싱 실패 — 다음 재조회가 보완.
+    }
+    if (!_seenIds.add(n.id)) return; // 중복 이벤트 → 중복 행 0.
+    setState(() => _items.insert(0, n));
   }
 
   /// 첫 로드 + 새로고침(첫 페이지부터 다시). 실패해도 기존 목록은 유지한다.
@@ -154,9 +244,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markRead(AppNotification n) async {
     if (n.isRead) return;
+    // 배지는 낙관 감소(실패 시 롤백) — 목록 자체는 성공 이후에만 읽음으로.
+    _badge.onMarkReadOptimistic();
     try {
-      await _repo.markRead(n.id);
+      await _repo.markRead(n.id); // RPC — 멱등(idempotent_hit 도 성공).
     } catch (e) {
+      _badge.rollbackMarkRead();
       // 실패 시 미읽음 상태 유지(성공 이후에만 UI 반영).
       _showError('읽음 처리에 실패했어요. ${friendlyError(e)}');
       return;
@@ -175,6 +268,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
     _applyRead(_items.map((AppNotification n) => n.id).toSet());
+    // 성공 후 서버 개수 재확인(기대값 0 — 로컬 계산으로 배지를 만들지 않는다).
+    _badge.refresh();
   }
 
   void _applyRead(Set<String> ids) {
@@ -190,18 +285,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _open(AppNotification n) {
     _markRead(n); // 이동 여부와 무관하게 읽음 처리(이미 읽음이면 no-op).
-    final int tab;
-    switch (notificationDestinationOf(n.eventType)) {
-      case NotificationDestination.questionRoomTab:
-        tab = AppTab.questionRoom;
-      case NotificationDestination.individualQuestionTab:
-        tab = AppTab.individualQuestion;
-      case NotificationDestination.myPage:
-        tab = AppTab.myPage;
-      case NotificationDestination.stay:
-        return; // 이동 없음(맞춤의뢰·unknown 등) — 목록에 머문다.
+    // 판정 정본은 resolveNotificationDeepLink — 검증된 UUID 로만 상세를 연다.
+    final NotificationDeepLinkRoute? route = resolveNotificationDeepLink(
+      NotificationDeepLinkTarget(
+        type: n.eventType,
+        roomId: n.roomId,
+        threadId: n.threadId,
+        questionId: n.questionId,
+        postId: n.postId,
+        shortformId: n.shortformId,
+        mentorId: n.mentorId,
+        eventId: n.id,
+      ),
+    );
+    if (route == null) return; // 이동 없음(맞춤의뢰·unknown 등) — 목록에 머문다.
+    if (route is NotificationTabRoute) {
+      (widget.onDeepLinkTab ?? TabNavigator.go)(route.tabIndex);
+      return;
     }
-    (widget.onDeepLinkTab ?? TabNavigator.go)(tab);
+    _openDetail(route);
+  }
+
+  /// 상세 목적지 열기 — 대상 소실/권한 밖이면 중립 폴백(알림 탭 유지 + 안내).
+  Future<void> _openDetail(NotificationDeepLinkRoute route) async {
+    final bool opened = await widget.detailOpener.open(context, route);
+    if (opened) {
+      // 상세에서 돌아오면 최신화(읽음·개수 동기화).
+      if (mounted) {
+        _load();
+        _badge.refresh();
+      }
+      return;
+    }
+    _showError('알림 대상을 열 수 없어요. 삭제됐거나 접근 권한이 없어요.');
   }
 
   void _showError(String msg) {

@@ -7,6 +7,7 @@ import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import 'individual_question_repository.dart';
 import 'iq_attachment_upload_core.dart';
+import 'iq_error_mapper.dart';
 import 'models/individual_question_models.dart';
 
 /// 개별질문 첨부 업로드 포트(S17·세션1 §6). 조회는 기존
@@ -103,6 +104,9 @@ class SupabaseIqAttachmentsRepository implements IqAttachmentsPort {
           _findRegistered(client, questionId, path),
       isDefiniteRegisterFailure: isDefiniteRegisterFailure,
       isRetriableRegisterConflict: isRetriableRegisterConflict,
+      // 계약 7 신규 거부 코드(STORAGE_*·MIME_*·SIZE_EXCEEDED·ACCOUNT_*) →
+      // 한글 문구(iq_error_mapper 정본 — 코드 원문 비노출).
+      describeRegisterFailure: iqErrorMessage,
     );
   }
 

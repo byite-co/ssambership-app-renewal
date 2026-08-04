@@ -6,6 +6,7 @@ import '../../../design/tokens/typography.dart';
 import '../../../design/widgets/chip_scroll.dart';
 import '../../../design/widgets/empty_state.dart';
 import '../data/individual_question_repository.dart';
+import '../data/iq_error_mapper.dart';
 import '../data/models/individual_question_models.dart';
 import 'iq_detail_screen.dart';
 import 'widgets/iq_widgets.dart';
@@ -112,7 +113,7 @@ class _MentorIqListScreenState extends State<MentorIqListScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(iqFailureMessage(e))));
+          .showSnackBar(SnackBar(content: Text(iqActionFailureText(e))));
       _refresh(); // 선착 실패 등 — 목록 최신화.
     } finally {
       if (mounted) setState(() => _claiming = false);

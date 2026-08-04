@@ -22,6 +22,8 @@ class ChatInputBar extends StatelessWidget {
     this.pendingImage,
     this.onRemovePending,
     this.onAnnotate,
+    this.enabled = true,
+    this.disabledNotice,
   });
 
   final TextEditingController controller;
@@ -40,8 +42,34 @@ class ChatInputBar extends StatelessWidget {
   /// 선택 이미지에 '주석 달기'(S15). null 이면 주석 액션을 숨긴다(하위호환).
   final VoidCallback? onAnnotate;
 
+  /// false 면 입력·첨부·전송을 모두 막는다(예: 상대를 차단한 질문방 = 읽기 전용).
+  /// 기존 대화는 계속 보인다 — 이 바만 비활성화된다.
+  final bool enabled;
+
+  /// 비활성 사유 안내(입력창 자리에 표시). [enabled]=false 일 때만 쓰인다.
+  final String? disabledNotice;
+
   @override
   Widget build(BuildContext context) {
+    final String? notice = disabledNotice;
+    if (!enabled && notice != null) {
+      return SafeArea(
+        top: false,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          decoration: const BoxDecoration(
+            color: ColorTokens.surface,
+            border: Border(top: BorderSide(color: ColorTokens.border)),
+          ),
+          child: Text(
+            notice,
+            textAlign: TextAlign.center,
+            style: AppType.caption.copyWith(color: ColorTokens.muted),
+          ),
+        ),
+      );
+    }
     return SafeArea(
       top: false,
       child: Container(
@@ -64,11 +92,12 @@ class ChatInputBar extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.attach_file, color: ColorTokens.muted),
                   tooltip: '사진 첨부',
-                  onPressed: sending ? null : onAttach,
+                  onPressed: (sending || !enabled) ? null : onAttach,
                 ),
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    enabled: enabled,
                     style: AppType.body,
                     minLines: 1,
                     maxLines: 4,
@@ -90,10 +119,12 @@ class ChatInputBar extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     Icons.send_rounded,
-                    color: sending ? ColorTokens.muted : AppAccent.of(context).accent,
+                    color: (sending || !enabled)
+                        ? ColorTokens.muted
+                        : AppAccent.of(context).accent,
                   ),
                   tooltip: sendTooltip,
-                  onPressed: sending ? null : onSend,
+                  onPressed: (sending || !enabled) ? null : onSend,
                 ),
               ],
             ),
