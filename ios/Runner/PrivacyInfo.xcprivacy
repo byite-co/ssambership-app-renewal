@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  앱 수준 개인정보 매니페스트 (Apple Privacy Manifest — 앱 자체 코드 관점).
+  정본 근거: 앱의 실제 코드·데이터 흐름(docs/audit/ios_release_owner_decisions_20260804.md D2 인벤토리).
+  App Store Connect 'App Privacy' 설문은 이 동일 인벤토리로 오너가 작성해 양쪽을 일치시킨다.
+
+  [NSPrivacyCollectedDataTypes] — TN3184 기준, 앱이 사용자로부터 받아 서버로 전송하는 것만 선언
+  (전 항목 Linked=true·Tracking=false·Purpose=AppFunctionality — 분석·광고 SDK 0건 실측):
+  - EmailAddress: 로그인 이메일 (auth_service.signInWithPassword → Supabase Auth)
+  - UserID: Supabase user id + 닉네임(스크린네임 — Apple UserID 정의 포함, Name 별도 수집 없음)
+  - PhotosorVideos: 질문 첨부 사진·카메라 촬영본 (image_picker → Storage 업로드)
+  - OtherUserContent: 질문·답변·댓글·PDF/파일 래스터본·필기(ink.json)·첨삭 PNG
+  - OtherDataTypes: 학년(선택 입력 — profile_edit → user_profile_update_self)
+  선언하지 않는 것(근거): PaymentInfo — 결제수단 입력은 웹 전용, 앱은 원문 미접근.
+  PurchaseHistory — 앱은 서버 보유 구독 상태 조회만(구매 이력·성향 수집 없음).
+  Name — 실명 수집 없음(닉네임은 UserID 범주). 멘토 상세 프로필(대학·학과)은 웹에서만 입력.
+
+  [NSPrivacyAccessedAPITypes] 가 비어 있는 이유 (2026-08-04 실측, Flutter 3.44.6):
+  - 앱 1st-party 코드(lib/**, ios/Runner/*.swift)는 required-reason API 직접 사용 0건.
+  - 엔진·플러그인 사용분은 각자 동봉 매니페스트가 선언 주체(중복 선언 금지):
+    Flutter.framework=FileTimestamp(0A2A.1,C617.1)+SystemBootTime(35F9.1),
+    shared_preferences_foundation=UserDefaults(1C8F.1).
+    pdfx·path_provider_foundation 은 iOS 소스 감사 결과 required-reason API 호출 0건(선언 불필요).
+  - 업로드 후 Apple 이 ITMS-91053 으로 특정 카테고리를 지목하면 지목된 카테고리만
+    Apple 공식 reason 정의에 맞춰 추가한다(예방용 선제 추가 금지 — 런북 §6).
+
+  [NSPrivacyTracking=false] 광고/추적 SDK 없음(Commerce-Zero, ATT 미사용).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>
