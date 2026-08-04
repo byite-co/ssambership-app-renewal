@@ -36,6 +36,44 @@ const Set<String> kAllowedQuerySchemes = <String>{'https'};
 /// 추가할 때만 이 집합과 매니페스트를 함께 갱신한다.
 const Set<String> kAllowedAppReasonCategories = <String>{};
 
+/// 앱이 실제로 수집(사용자 입력·생성물을 서버로 전송)하는 데이터 유형 —
+/// TN3184 기준, 코드 인벤토리(감사 문서 D2)와 1:1. 수집 표면이 바뀌면
+/// 인벤토리·매니페스트·이 집합·App Privacy 설문을 함께 갱신한다.
+const Set<String> kExpectedCollectedDataTypes = <String>{
+  'NSPrivacyCollectedDataTypeEmailAddress', // 로그인 이메일
+  'NSPrivacyCollectedDataTypeUserID', // user id·닉네임(스크린네임)
+  'NSPrivacyCollectedDataTypePhotosorVideos', // 사진·촬영본 업로드
+  'NSPrivacyCollectedDataTypeOtherUserContent', // 질문·답변·댓글·PDF·필기
+  'NSPrivacyCollectedDataTypeOtherDataTypes', // 학년(선택 입력)
+};
+
+/// 근거 없이 선언되면 안 되는 유형(결제 입력은 웹 전용·실명 수집 없음 등).
+const Set<String> kForbiddenCollectedDataTypes = <String>{
+  'NSPrivacyCollectedDataTypePaymentInfo',
+  'NSPrivacyCollectedDataTypePurchaseHistory',
+  'NSPrivacyCollectedDataTypeName',
+  'NSPrivacyCollectedDataTypePreciseLocation',
+  'NSPrivacyCollectedDataTypeCoarseLocation',
+  'NSPrivacyCollectedDataTypeContacts',
+  'NSPrivacyCollectedDataTypeDeviceID',
+  'NSPrivacyCollectedDataTypeAdvertisingData',
+};
+
+/// Apple 이 정의한 수집 목적 전체(형식 상한). 현재 앱은 AppFunctionality 만
+/// 사용한다 — 분석·광고 목적은 해당 SDK 도입 근거 없이는 추가 금지.
+const Set<String> kApplePurposes = <String>{
+  'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+  'NSPrivacyCollectedDataTypePurposeAnalytics',
+  'NSPrivacyCollectedDataTypePurposeProductPersonalization',
+  'NSPrivacyCollectedDataTypePurposeDeveloperAdvertising',
+  'NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising',
+  'NSPrivacyCollectedDataTypePurposeOther',
+};
+
+const Set<String> kAllowedPurposes = <String>{
+  'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+};
+
 /// Apple 이 정의한 required-reason 카테고리 전체(형식 검증용 상한).
 const Set<String> kAppleReasonCategories = <String>{
   'NSPrivacyAccessedAPICategoryFileTimestamp',
@@ -134,10 +172,82 @@ void main() {
           contains('<key>NSPrivacyTrackingDomains</key>\n\t<array/>'));
     });
 
-    test('수집 데이터 유형은 비어 있다(정본은 App Store Connect 설문 — 런북 §8)',
-        () {
-      expect(manifest,
-          contains('<key>NSPrivacyCollectedDataTypes</key>\n\t<array/>'));
+    test('수집 데이터 선언은 코드 인벤토리와 정확히 일치(TN3184 — 런북 §6-1)', () {
+      // NSPrivacyCollectedDataTypes 블록 추출 — 다음 최상위 키(AccessedAPITypes)
+      // 전까지 슬라이스(내부 Purposes <array> 와의 중첩 오매칭 방지).
+      final int start =
+          manifest.indexOf('<key>NSPrivacyCollectedDataTypes</key>');
+      final int end =
+          manifest.indexOf('<key>NSPrivacyAccessedAPITypes</key>');
+      expect(start, greaterThanOrEqualTo(0));
+      expect(end, greaterThan(start),
+          reason: '매니페스트 키 순서 계약: CollectedDataTypes → AccessedAPITypes');
+      final String block = manifest.substring(start, end);
+
+      // dict 단위 파싱.
+      final List<String> dicts = RegExp(r'<dict>(.*?)</dict>', dotAll: true)
+          .allMatches(block)
+          .map((RegExpMatch m) => m.group(1)!)
+          .toList();
+      expect(dicts, isNotEmpty,
+          reason: '앱이 이메일·콘텐츠 등을 실제 수집하므로 빈 배열은 계약 위반'
+              '(과거 빈 배열 상태는 2026-08-04 교정으로 폐기)');
+
+      final List<String> declaredTypes = <String>[];
+      for (final String d in dicts) {
+        // 필수 키 4종.
+        for (final String requiredKey in <String>[
+          '<key>NSPrivacyCollectedDataType</key>',
+          '<key>NSPrivacyCollectedDataTypeLinked</key>',
+          '<key>NSPrivacyCollectedDataTypeTracking</key>',
+          '<key>NSPrivacyCollectedDataTypePurposes</key>',
+        ]) {
+          expect(d, contains(requiredKey),
+              reason: 'TN3184: dictionary 필수 키 누락 — $requiredKey');
+        }
+        final String type = RegExp(
+                r'<key>NSPrivacyCollectedDataType</key>\s*<string>([^<]+)</string>')
+            .firstMatch(d)!
+            .group(1)!;
+        declaredTypes.add(type);
+        // Linked/Tracking 은 plist boolean 태그여야 한다(코드 인벤토리상
+        // 전 항목 계정 연결 수집 → Linked=true, 추적 SDK 0건 → Tracking=false).
+        expect(
+            RegExp(r'<key>NSPrivacyCollectedDataTypeLinked</key>\s*<true/>')
+                .hasMatch(d),
+            isTrue,
+            reason: '$type: Linked 는 <true/> (전 수집이 계정 기반)');
+        expect(
+            RegExp(r'<key>NSPrivacyCollectedDataTypeTracking</key>\s*<false/>')
+                .hasMatch(d),
+            isTrue,
+            reason: '$type: Tracking 은 <false/> — 최상위 NSPrivacyTracking'
+                '=false 와의 모순 금지(추적 도입 시 양쪽·ATT 재검토)');
+        // purposes: 비어 있지 않고, Apple 목록 내이며, 현재는 AppFunctionality 만.
+        final List<String> purposes = RegExp(r'<string>([^<]+)</string>')
+            .allMatches(d)
+            .map((RegExpMatch m) => m.group(1)!)
+            .where((String s) => s.startsWith(
+                'NSPrivacyCollectedDataTypePurpose'))
+            .toList();
+        expect(purposes, isNotEmpty, reason: '$type: purposes 비어 있음');
+        expect(purposes.toSet().difference(kApplePurposes), isEmpty,
+            reason: '$type: Apple 정의 밖 purpose 금지(오타 방지)');
+        expect(purposes.toSet().difference(kAllowedPurposes), isEmpty,
+            reason: '$type: 분석·광고 목적은 해당 SDK 실측 근거와 함께만 추가');
+      }
+
+      // 중복 0 + 기대 집합과 정확히 일치.
+      expect(declaredTypes.length, declaredTypes.toSet().length,
+          reason: '같은 데이터 유형 중복 선언 금지');
+      expect(declaredTypes.toSet(), kExpectedCollectedDataTypes,
+          reason: '선언 집합은 코드 인벤토리(감사 문서 D2)와 1:1 — '
+              '수집 표면 변경 시 인벤토리·설문과 함께 갱신');
+      // 근거 없는 유형 금지(결제수단 입력 웹 전용·실명 수집 없음 등).
+      expect(
+          declaredTypes.toSet().intersection(kForbiddenCollectedDataTypes),
+          isEmpty,
+          reason: '수집 사실이 없는 유형의 "안전상" 선언 금지');
     });
 
     test('required-reason 선언은 앱 수준 allowlist 와 일치(현재: 없음)', () {
