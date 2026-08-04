@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/core/scan/picked_image.dart';
 import 'package:ssambership_app/core/scan/scan_source_picker.dart';
+import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
 import 'package:ssambership_app/features/individual_question/data/iq_attachment_policy.dart';
 import 'package:ssambership_app/features/individual_question/data/iq_attachment_saver.dart';
 import 'package:ssambership_app/features/individual_question/data/iq_attachment_upload_core.dart';
@@ -408,7 +409,7 @@ void main() {
     });
   });
 
-  group('멘토 첨부 UI(iq_detail)', () {
+  group('멘토 첨부 UI(iq_detail) — §2-2 message_id 연결', () {
     IqDetailData data() => IqDetailData(
           question: IndividualQuestion(
             id: 'q-1',
@@ -418,6 +419,7 @@ void main() {
             title: '수열 질문',
             body: '본문',
             priceCents: 500000,
+            claimedMentorId: 'm1',
             createdAt: DateTime(2026, 7, 1),
           ),
           messages: const <IqMessage>[],
@@ -435,12 +437,14 @@ void main() {
       required _FakeSource source,
       required _FakeUploads uploads,
       _FakeSaver? saver,
+      List<(String, String)>? appendLog,
     }) =>
         MaterialApp(
           home: IqDetailScreen(
             questionId: 'q-1',
             loaderOverride: () async => data(),
             roleOverride: AppRole.mentor,
+            repositoryOverride: _AppendRepo(appendLog ?? <(String, String)>[]),
             sourcePickerOverride: source,
             attachmentsOverride: uploads,
             fileSaverOverride: saver ?? _FakeSaver(),
@@ -455,7 +459,18 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('갤러리 선택 → 업로드 1회·성공 시 대기열 제거', (WidgetTester tester) async {
+    /// 답변 본문 입력 + 등록(확인 다이얼로그 포함) — 메시지 생성 경로.
+    Future<void> submitAnswer(WidgetTester tester) async {
+      await tester.enterText(find.byType(TextField).first, '이렇게 풀어요');
+      await tester.ensureVisible(find.text('답변 등록'));
+      await tester.tap(find.text('답변 등록'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('답변 등록').last); // 확인 다이얼로그.
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('갤러리 선택 → 대기열 추가·업로드 0 (message_id 없이 선등록 금지)',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 3200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -466,12 +481,34 @@ void main() {
       await tester.pumpAndSettle();
 
       await pick(tester, '갤러리');
+      expect(uploads.calls, 0); // 선택 시점 업로드 금지 — 대기열만.
+      expect(find.text('풀이.png (64B)'), findsOneWidget);
+    });
+
+    testWidgets('답변 등록 → 메시지 생성 후 반환된 message_id 로 업로드·대기열 제거',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      final _FakeSource source =
+          _FakeSource(_file('풀이.png', 'image/png', _png()));
+      final _FakeUploads uploads = _FakeUploads();
+      final List<(String, String)> log = <(String, String)>[];
+      await tester.pumpWidget(
+          screen(source: source, uploads: uploads, appendLog: log));
+      await tester.pumpAndSettle();
+
+      await pick(tester, '갤러리');
+      await submitAnswer(tester);
+
+      expect(log, <(String, String)>[('q-1', '이렇게 풀어요')]); // 메시지 1회.
       expect(uploads.calls, 1);
+      expect(uploads.lastMessageId, 'srv-msg-1'); // 반환 id 정본 — 조회 금지.
       expect(uploads.lastExistingPath, isNull);
       expect(find.text('풀이.png (64B)'), findsNothing); // 성공 → 대기열 제거
     });
 
-    testWidgets('선택 취소(null) → 업로드 0·안전', (WidgetTester tester) async {
+    testWidgets('선택 취소(null) → 대기열 0·업로드 0·안전', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 3200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -481,9 +518,10 @@ void main() {
       await tester.pumpAndSettle();
       await pick(tester, '촬영');
       expect(uploads.calls, 0);
+      expect(find.textContaining('(64B)'), findsNothing);
     });
 
-    testWidgets('허용 밖 파일(초과 크기) → 업로드 0 + 안내', (WidgetTester tester) async {
+    testWidgets('허용 밖 파일(초과 크기) → 대기열 0 + 안내', (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 3200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -497,7 +535,7 @@ void main() {
       expect(find.textContaining('20MB'), findsOneWidget);
     });
 
-    testWidgets('등록 실패(고아) → 재시도 시 같은 경로 재사용(재업로드 0·중복 0)',
+    testWidgets('등록 실패(고아) → 재시도 시 같은 경로 + 같은 message_id 재사용·메시지 재생성 0',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 3200);
       tester.view.devicePixelRatio = 1.0;
@@ -511,10 +549,14 @@ void main() {
           retryObjectPath: 'q-1/keep-this.png',
         ),
       );
-      await tester.pumpWidget(screen(source: source, uploads: uploads));
+      final List<(String, String)> log = <(String, String)>[];
+      await tester.pumpWidget(
+          screen(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
       await pick(tester, '갤러리');
+      await submitAnswer(tester);
+      expect(log.length, 1); // 메시지 1회 생성.
       expect(uploads.calls, 1);
       expect(find.textContaining('미정리 파일'), findsOneWidget);
 
@@ -522,6 +564,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(uploads.calls, 2);
       expect(uploads.lastExistingPath, 'q-1/keep-this.png'); // 경로 재사용
+      expect(uploads.lastMessageId, 'srv-msg-1'); // 같은 message_id 유지
+      expect(log.length, 1, reason: '첨부 재시도가 메시지를 다시 만들면 안 된다');
     });
 
     testWidgets('AMBIGUOUS_SERVER_RESULT — 성공 표시·임시 삽입 0, 재시도는 같은 경로 전달',
@@ -535,10 +579,13 @@ void main() {
         failFirst: const IqAttachmentAmbiguousResult(
             retryObjectPath: 'q-1/ambiguous.png'),
       );
-      await tester.pumpWidget(screen(source: source, uploads: uploads));
+      final List<(String, String)> log = <(String, String)>[];
+      await tester.pumpWidget(
+          screen(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
       await pick(tester, '갤러리');
+      await submitAnswer(tester);
       expect(uploads.calls, 1);
       // 성공 표시·임시 성공 삽입 없음 — 대기열에 오류 상태로 남는다.
       expect(find.text('첨부를 등록했어요.'), findsNothing);
@@ -549,6 +596,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(uploads.calls, 2);
       expect(uploads.lastExistingPath, 'q-1/ambiguous.png');
+      expect(uploads.lastMessageId, 'srv-msg-1');
+      expect(log.length, 1, reason: '첨부 재시도가 메시지를 다시 만들면 안 된다');
     });
 
     testWidgets('저장 액션 — 당사자 저장 포트 호출(비이미지 행)', (WidgetTester tester) async {
@@ -569,6 +618,22 @@ void main() {
   });
 }
 
+/// iq_append_message fake — 반환된 message_id 가 첨부 연결의 정본임을 검증.
+class _AppendRepo extends IndividualQuestionRepository {
+  const _AppendRepo(this.log);
+
+  final List<(String, String)> log;
+
+  @override
+  Future<IqAppendResult> appendMessage(String questionId, String body) async {
+    log.add((questionId, body));
+    return IqAppendResult(
+      messageId: 'srv-msg-${log.length}',
+      answeredTransition: true,
+    );
+  }
+}
+
 class _FakeSource implements ScanSourcePort {
   _FakeSource(this.result);
   final PickedImage? result;
@@ -586,6 +651,7 @@ class _FakeUploads implements IqAttachmentsPort {
   final Object? failFirst;
   int calls = 0;
   String? lastExistingPath;
+  String? lastMessageId;
 
   @override
   bool get isReady => true;
@@ -599,6 +665,7 @@ class _FakeUploads implements IqAttachmentsPort {
   }) async {
     calls++;
     lastExistingPath = existingObjectPath;
+    lastMessageId = messageId;
     if (calls == 1 && failFirst != null) throw failFirst!;
     return IqAttachment(
       id: 'att-$calls',
