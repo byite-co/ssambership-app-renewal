@@ -20,6 +20,20 @@
 	<!-- image_picker 촬영(S16): 카메라 사용 사유. 없으면 촬영 진입 시 크래시. -->
 	<key>NSCameraUsageDescription</key>
 	<string>문제를 촬영해 질문에 첨부하기 위해 카메라를 사용해요.</string>
+	<!-- web_bridge: iOS canOpenURL 은 여기 선언된 스킴만 조회를 허용한다(미선언 스킴은 항상 false —
+	     Apple UIApplication.canOpenURL 문서). web_bridge._defaultLauncher 가 canLaunchUrl 로
+	     사전 확인하므로 선언이 없으면 약관·개인정보·지원·탈퇴 등 웹 링크 전 경로가 조용히 실패한다.
+	     https 만 선언하는 이유: isAllowedUri 가 https 를 강제해 http 는 canLaunchUrl 에 도달할 수 없다
+	     (test/contracts/ios_release_config_contract_test.dart 가 이 정합을 고정). -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+	</array>
+	<!-- 수출규정(암호화): 앱의 암호화 사용은 ① OS 제공 TLS(HTTPS, Supabase) ② JWT 서명 검증
+	     (supabase→gotrue→dart_jsonwebtoken→pointycastle — 인증·전자서명 용도) 뿐 = 면제 범주.
+	     이 키가 없으면 업로드마다 수출규정 문답이 뜬다. 비면제 암호화 도입 시 재검토(런북 §7). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

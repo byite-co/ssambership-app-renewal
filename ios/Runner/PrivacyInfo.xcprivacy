@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  앱 수준 개인정보 매니페스트 (Apple Privacy Manifest — 앱 자체 코드 관점).
+
+  실측 근거 (2026-08-04, Flutter 3.44.6 기준 — docs/IOS_RELEASE_RUNBOOK.md §6):
+  - NSPrivacyAccessedAPITypes 가 비어 있는 이유: 앱 1st-party 코드(lib/**, ios/Runner/*.swift)는
+    required-reason API 를 직접 사용하지 않는다(전수 grep 실측). 엔진·플러그인 사용분은
+    각자 동봉한 매니페스트가 선언 주체다 — 앱 매니페스트에 중복 선언하지 않는다:
+      * Flutter.framework(3.44.6 엔진): FileTimestamp(0A2A.1, C617.1) + SystemBootTime(35F9.1) 자체 선언.
+      * shared_preferences_foundation(supabase 세션 보존 경로): UserDefaults(1C8F.1) 자체 선언.
+    → 과거 초안 PR #23(C617.1+35F9.1)·PR #29(CA92.1+C617.1)의 앱 수준 선언은 위 실측으로 대체.
+  - 업로드 후 Apple 이 ITMS-91053 으로 특정 카테고리를 지목하면, 지목된 카테고리만
+    Apple 공식 reason 정의에 맞춰 이 배열에 추가한다(예방용 선제 추가 금지).
+  - NSPrivacyCollectedDataTypes: 수집 신고의 정본은 App Store Connect 'App Privacy' 설문이다.
+    설문 확정 전까지 비워 두고, 확정 후 설문과 일치하게만 채운다(추측 금지).
+    (이 앱이 다루는 것: Supabase 계정(이메일/사용자ID)·사용자 콘텐츠(질문·첨부). 추적 목적 아님.)
+  - NSPrivacyTracking=false: 광고/추적 SDK 없음(Commerce-Zero, ATT 미사용).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>
