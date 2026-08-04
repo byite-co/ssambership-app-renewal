@@ -53,6 +53,12 @@ String? iqErrorMessage(Object e) {
       return '지원하지 않는 파일 형식이에요. 다른 파일로 다시 첨부해 주세요.';
     case 'SIZE_EXCEEDED':
       return '파일이 너무 커요. 더 작은 파일로 다시 첨부해 주세요.';
+    // 메시지 연결 검증(서버 가드 — 정상 앱 흐름에서는 도달하지 않는다):
+    // MESSAGE_NOT_IN_QUESTION = 다른 질문 메시지, MESSAGE_AUTHOR_MISMATCH =
+    // 내가 쓰지 않은 메시지(20260804113000 가드). 스테일 화면 재시도 안내.
+    case 'MESSAGE_NOT_IN_QUESTION':
+    case 'MESSAGE_AUTHOR_MISMATCH':
+      return '첨부를 메시지에 연결하지 못했어요. 화면을 새로고침한 뒤 다시 시도해 주세요.';
   }
   return null;
 }

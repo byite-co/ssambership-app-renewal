@@ -51,7 +51,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   # 런처 아이콘 생성(브랜딩) — 소스 PNG 1개에서 Android/iOS 아이콘 생성.
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
 # 앱 로고(확정 브랜드) → Android·iOS 런처 아이콘. 순백 배경(iOS는 alpha 제거).
 flutter_launcher_icons:

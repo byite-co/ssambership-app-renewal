@@ -10,7 +10,9 @@ class AppConstants {
   /// 앱 표시명 (브랜드).
   static const String appDisplayName = '쌤버십';
 
-  /// 확정 앱 로고 에셋(파란 사각 + 졸업모자). 로그인 헤더·스플래시 등 인앱 브랜드 마크.
+  /// 확정 앱 로고 에셋(졸업모자 + 말풍선 심볼, a91de81 승인본). 로그인 헤더·
+  /// 스플래시 등 인앱 브랜드 마크이자 flutter_launcher_icons 원본 — 로고 교체
+  /// 시 `dart run flutter_launcher_icons` 재실행으로 런처 아이콘을 함께 갱신한다.
   static const String brandLogoAsset = 'assets/branding/ssambership_logo_1024.png';
 
   /// 앱 표시 버전(마이페이지 설정 표기용). pubspec version 과 맞춘다.

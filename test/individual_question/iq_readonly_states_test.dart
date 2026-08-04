@@ -20,10 +20,12 @@ IndividualQuestion _q(IndividualQuestionStatus status) => IndividualQuestion(
       createdAt: DateTime(2026, 7, 1),
     );
 
+/// 학생 작성 이미지(author_id 정본 — 첨삭 게이트 검증용).
 const List<IqAttachment> _oneImage = <IqAttachment>[
   IqAttachment(
     id: 'a1',
     storagePath: 'q1/1-000001.png',
+    authorId: 's1',
     fileName: '문제.png',
     mimeType: 'image/png',
   ),
@@ -145,11 +147,12 @@ void main() {
     });
   });
 
-  group('첨삭 진입 상태 게이트 — 답변 가능 구간에서만', () {
-    // 첨삭이 허용되는 유일한 구간(= iqCanMentorAnswer).
+  group('첨삭 진입 상태 게이트 — 활성 구간(assigned/claimed/answered)에서만', () {
+    // §4-1: 첫 답변 전(claimed/assigned)과 답변 도착 후 해결 완료 전(answered).
     for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
       IndividualQuestionStatus.assigned,
       IndividualQuestionStatus.claimed,
+      IndividualQuestionStatus.answered,
     ]) {
       testWidgets('멘토 · $s: 첨삭하기 표시', (WidgetTester tester) async {
         await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
@@ -158,11 +161,10 @@ void main() {
       });
     }
 
-    // 나머지 8개 상태는 전부 읽기 전용.
+    // 종결·답변자 미정·미지 7개 상태는 전부 읽기 전용.
     for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
       IndividualQuestionStatus.escrowed,
       IndividualQuestionStatus.open,
-      IndividualQuestionStatus.answered,
       IndividualQuestionStatus.released,
       IndividualQuestionStatus.refunded,
       IndividualQuestionStatus.expired,
@@ -187,7 +189,7 @@ void main() {
       });
     }
 
-    testWidgets('게이트는 iqCanMentorAnswer 와 같은 구간을 쓴다(정의 이탈 가드)',
+    testWidgets('게이트는 iqCanMentorAnnotate 와 같은 구간을 쓴다(정의 이탈 가드)',
         (WidgetTester tester) async {
       for (final IndividualQuestionStatus s
           in IndividualQuestionStatus.values) {
@@ -195,10 +197,27 @@ void main() {
 
         expect(
           find.text('첨삭하기'),
-          iqCanMentorAnswer(s) ? findsOneWidget : findsNothing,
-          reason: '$s: iqCanMentorAnswer=${iqCanMentorAnswer(s)} 와 어긋난다',
+          iqCanMentorAnnotate(s) ? findsOneWidget : findsNothing,
+          reason: '$s: iqCanMentorAnnotate=${iqCanMentorAnnotate(s)} 와 어긋난다',
         );
       }
+    });
+
+    testWidgets('작성자 미기록 레거시 첨부: 활성 상태에서도 첨삭하기 미노출(추측 금지)',
+        (WidgetTester tester) async {
+      const List<IqAttachment> legacy = <IqAttachment>[
+        IqAttachment(
+          id: 'a1',
+          storagePath: 'q1/1-000001.png',
+          fileName: '문제.png',
+          mimeType: 'image/png',
+        ),
+      ];
+      await _pump(tester, IndividualQuestionStatus.claimed,
+          role: AppRole.mentor, attachments: legacy);
+
+      expect(find.text('첨삭하기'), findsNothing);
+      expect(find.text('저장'), findsOneWidget);
     });
   });
 

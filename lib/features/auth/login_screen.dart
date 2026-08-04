@@ -179,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 }
 
-/// 브랜드 심볼(단 하나) — 확정 앱 로고(파란 사각 + 졸업모자). 과한 장식 금지.
+/// 브랜드 심볼(단 하나) — 확정 앱 로고(졸업모자 + 말풍선). 과한 장식 금지.
 /// 로고 PNG 자체가 둥근 사각·여백을 포함하므로 별도 배경/장식 없이 이미지만 표시.
 class _BrandSymbol extends StatelessWidget {
   const _BrandSymbol();
