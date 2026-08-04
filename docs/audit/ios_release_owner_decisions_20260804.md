@@ -31,11 +31,13 @@ push entitlement 없음(App-F0), `CFBundleURLTypes` 없음, Supabase redirect UR
 
 ```text
 DATA_INVENTORY_COMPLETE: PASS (아래 표 — 전 행 코드 경로 근거)
-APP_STORE_QUESTIONNAIRE_VALUES: 아래 표의 '설문 제안값' 열 (오너 확정 필요)
-NSPRIVACY_COLLECTED_DATA_TYPES: UNRESOLVED — 빈 배열 유지(아래 판정 근거), 오너 설문 확정
-                                + macOS privacy report 후 동기화
+APP_PRIVACY_DATA_INVENTORY: PASS
+NSPRIVACY_COLLECTED_DATA_TYPES: UPDATED (2026-08-04 교정 — TN3184 기준 5종 선언, 아래 기록)
+PRIVACY_MANIFEST_COLLECTION_DECLARATION: PASS_STATIC (macOS privacy report 는 별도 게이트)
+APP_STORE_PRIVACY_QUESTIONNAIRE: OWNER_ACTION_REQUIRED (아래 표의 값으로 작성 — 매니페스트와
+                                 동일 인벤토리를 두 표면에 일치시키는 작업)
 TRACKING: false (광고·추적 SDK 0건 실측 — ATT 불필요)
-OWNER_APPROVED: OWNER_DECISION_REQUIRED
+OWNER_APPROVED: OWNER_DECISION_REQUIRED (설문 제출은 오너)
 ```
 
 ### 데이터 인벤토리 (코드 전수 근거)
@@ -60,16 +62,25 @@ OWNER_APPROVED: OWNER_DECISION_REQUIRED
 **외부 웹에서만 수집**(앱은 조회). 푸시 토큰 수집 코드는 존재하나 **런타임 미연결**
 (Firebase 설정 파일 없음 — App-F0 로 출시 범위 제외).
 
-### NSPrivacyCollectedDataTypes 판정 (빈 배열 유지 근거)
+### NSPrivacyCollectedDataTypes 선언 기록 (2026-08-04 교정 — 초기 '빈 배열 유지' 판정 폐기)
 
-1. Apple 공식 문서(Privacy manifest files): 수집 데이터 기술은 앱에도 기대되나, **심사·공개의
-   구속력 있는 정본은 App Store Connect App Privacy 설문**이며 매니페스트 자동 강제는
-   required-reason API·지정 서드파티 SDK 목록에 적용된다.
-2. 설문이 미작성 상태에서 매니페스트를 먼저 채우면 '설문과 일치' 규칙을 코드가 아닌 추측으로
-   선점하게 된다(예: 닉네임의 User ID vs Name 범주는 오너 설문 답변이 정본) — 금지사항
-   "설문값 추측" 위반. → 설문 확정(OWNER) 후 위 표대로 채우고 계약 테스트를 함께 갱신한다.
-3. 빈 배열은 형식상 유효하며 현재 앱의 required-reason·추적 선언과 모순 없음.
-4. Xcode privacy report 로 병합 결과를 확인하기 전까지 최종 PASS 로 닫지 않는다(BLOCKED_MACOS).
+**교정 근거**: TN3184(Adding data collection details to your privacy manifest)는 데이터를
+수집하는 앱에 유형별 dictionary(Type/Linked/Tracking/Purposes 4키) 선언을 요구한다.
+**앱의 실제 코드·데이터 흐름이 매니페스트의 정본 근거**이며, 설문 미작성은 선언을 비워 둘
+이유가 아니다 — 초기 판정의 "설문 확정 전 선점 금지" 논리는 코드로 확정 가능한 사실(닉네임은
+Apple UserID 정의의 'screen name, handle'에 포함 — Name 아님)까지 미룬 오류였다.
+
+**선언 5종** (전 항목 Linked=true·Tracking=false·Purpose=AppFunctionality — 수집이 전부
+계정 기반이고 분석·광고 SDK 0건이므로): EmailAddress·UserID·PhotosorVideos·
+OtherUserContent·OtherDataTypes. 상세 매핑·코드 근거는 런북 §6-1 표(계약 테스트가 1:1 고정).
+
+**수집 상태 분류(A/B/C/D)**: A=앱이 입력·파일을 받아 서버 전송(이메일·닉네임·질문·댓글·사진·
+PDF·학년), B=앱이 생성·가공해 전송(필기 ink.json·첨삭 PNG·PDF 래스터본), C=서버 보유값 읽기만
+(구독·캐시 상태·멘토 프로필 표시), D=웹 전용 수집(결제수단·멘토 상세 프로필·계정 생성).
+**선언은 A·B만** — C·D 미선언(PaymentInfo·PurchaseHistory·Name 비선언 근거 포함, 런북 §6-1).
+
+**잔여 게이트**: Xcode privacy report 로 앱+SDK 매니페스트 병합 결과 확인(BLOCKED_MACOS),
+App Store Connect 설문 작성(OWNER — 위 표와 동일 값).
 
 ## D3. Export compliance
 
@@ -123,18 +134,21 @@ TESTFLIGHT_UPLOAD_APPROVED: OWNER_DECISION_REQUIRED
 | file_picker 11.0.2 | YES | (required-reason 없음) | — | BLOCKED_MACOS |
 | package_info_plus 9.0.1 | YES | (required-reason 없음) | — | BLOCKED_MACOS |
 | app_links 7.2.0 | YES | (required-reason 없음) | — | BLOCKED_MACOS |
-| path_provider_foundation 2.6.0 | **NO**(패키지 전수 검색 0건) | — | — | BLOCKED_MACOS |
-| pdfx 2.9.2 (ios 네이티브 있음) | **NO** | — | — | BLOCKED_MACOS |
+| path_provider_foundation 2.6.0 | **NO**(패키지 전수 검색 0건) | 소스 감사: required-reason API 호출 **0건**(darwin/ 전수 grep — stat·timestamp·UserDefaults·boottime·diskspace 계열 0) → **선언 불필요, 미동봉이 정당** | — | BLOCKED_MACOS |
+| pdfx 2.9.2 (ios 네이티브 있음) | **NO** | 소스 감사: required-reason API 호출 **0건**(ios/Classes 전수 grep — CGPDF 렌더만) → **선언 불필요, 미동봉이 정당** | — | BLOCKED_MACOS |
 | supabase_flutter 계열 | 순수 Dart(ios 네이티브 없음) | — | — | n/a |
 | scribble | 순수 Dart | — | — | n/a |
 
 ```text
 REQUIRED_REASON_STATIC_INVENTORY: PASS
+REQUIRED_REASON_PLUGIN_SOURCE_AUDIT: PASS (미동봉 2건 소스 감사 — API 사용 0건, 선언 불필요 확정)
 REQUIRED_REASON_ARCHIVE_INVENTORY: BLOCKED_MACOS
 ```
 
-미동봉 2건(path_provider_foundation·pdfx)은 **플러그인 소관** — 앱 매니페스트 선제 대필 금지
-(런북 §6 ITMS-91053 절차로만 대응). macOS archive 시 privacy report 에서 누락 경고 여부 확인.
+미동봉 2건(path_provider_foundation·pdfx)은 iOS 소스 감사로 **required-reason API 미사용을
+확정**했다(ITMS-91053 경고 대기가 아니라 능동 판정) — 매니페스트 미동봉이 정당하며 앱 수준
+대필 불필요. macOS archive 체크리스트: privacy report 에서 ① 앱 매니페스트 1개 ② 엔진·
+shared_preferences 매니페스트 병합 ③ 수집 5종 표시 ④ required-reason 누락 경고 0 을 확인.
 
 ## 부록 B. macOS 게이트 (이 세션: Linux — 실행 불가 명시)
 

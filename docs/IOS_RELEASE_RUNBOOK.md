@@ -131,11 +131,33 @@ flutter build ipa --release   # build/ios/ipa/*.ipa (+ Xcode archive)
 
 | 선언 주체 | 내용 | 근거 |
 |---|---|---|
-| 앱(`ios/Runner/PrivacyInfo.xcprivacy`) | 추적 없음·수집 선언 없음·**required-reason 선언 없음(빈 배열)** | 1st-party 코드(lib/**·Swift 2파일) 전수 스캔 — required-reason API 직접 사용 0건 |
+| 앱(`ios/Runner/PrivacyInfo.xcprivacy`) | 추적 없음·**수집 데이터 5종 선언(§6-1)**·**required-reason 선언 없음(빈 배열)** | 수집: 코드 인벤토리(감사 문서 D2) / required-reason: 1st-party 코드(lib/**·Swift 2파일) 전수 스캔 — 직접 사용 0건 |
 | Flutter 엔진(Flutter.framework 동봉) | FileTimestamp(0A2A.1, C617.1) + SystemBootTime(35F9.1) | 3.44.6 엔진 아티팩트에서 실측 |
 | shared_preferences_foundation(동봉) | UserDefaults(1C8F.1) | pub 캐시 2.5.6 실측 — supabase 세션 보존 경로 |
 | image_picker/url_launcher/file_picker/package_info_plus/app_links(동봉) | required-reason 선언 없음 | pub 캐시 실측 |
 | pdfx | 매니페스트 미동봉(플러그인 갭) | pub 캐시 실측 — 아래 ITMS-91053 절차로 대응 |
+
+### 6-1. 수집 데이터 선언 (`NSPrivacyCollectedDataTypes` — 2026-08-04 교정)
+
+**앱의 실제 코드·데이터 흐름이 privacy manifest 의 정본 근거다.** App Store Connect 설문과
+`PrivacyInfo.xcprivacy` 는 동일 인벤토리(감사 문서 D2)에 맞춰 일치시킨다 — **설문 미작성은
+manifest 수집 선언을 비워 둘 이유가 아니다**(TN3184: 수집하는 앱은 데이터 유형별 dictionary
+필수 — Type/Linked/Tracking/Purposes 4키). 계약 테스트가 아래 표와 매니페스트를 1:1 로 고정한다.
+
+| Apple 데이터 유형 | 실제 앱 데이터 | Linked | Tracking | Purpose | 코드 근거 |
+|---|---|---:|---:|---|---|
+| `…EmailAddress` | 로그인 이메일 | true | false | AppFunctionality | `auth_service.dart signInWithPassword` |
+| `…UserID` | Supabase user id·닉네임(스크린네임 — Apple UserID 정의 포함) | true | false | AppFunctionality | self 계열 RPC·`user_profile_update_self(p_nickname)` |
+| `…PhotosorVideos` | 질문 첨부 사진·카메라 촬영본 | true | false | AppFunctionality | image_picker → Storage 업로드 |
+| `…OtherUserContent` | 질문·답변·댓글·PDF/파일 래스터본·필기·첨삭 | true | false | AppFunctionality | qna/iq/community RPC·`scan_annotation_repository` |
+| `…OtherDataTypes` | 학년(선택 입력) | true | false | AppFunctionality | `profile_edit_screen` → `p_grade_level` |
+
+**선언하지 않는 유형(근거)**: `PaymentInfo` — 결제수단 입력은 웹 전용, 앱은 원문 미접근.
+`PurchaseHistory` — 앱은 서버 보유 구독 상태 조회만. `Name` — 실명 수집 없음(닉네임은 UserID
+범주, 중복 선언 금지). 위치·주소록·기기ID·광고데이터 — 해당 코드·SDK 0건. 멘토 상세
+프로필(대학·학과)은 웹에서만 입력(앱은 표시만) — 미선언.
+
+### 6-2. required-reason API 선언 원칙
 
 - 원칙(Apple 공식): 각 바이너리/SDK 는 자기 사용분을 자기 매니페스트에 선언한다.
   앱 매니페스트에 엔진·플러그인 사용분을 **중복 선언하지 않는다**. 과거 초안의 reason
@@ -169,9 +191,9 @@ flutter build ipa --release   # build/ios/ipa/*.ipa (+ Xcode archive)
 
 1. **Apple Developer Program** 가입(연 $99) → Xcode Team 로그인(서명 Automatic).
 2. **번들 ID 확정(§3)** → App Store Connect 앱 생성(이름 '쌤버십', 기본 언어 ko).
-3. **App Privacy 설문**: 이 설문이 수집 신고의 정본이고, 매니페스트의
-   `NSPrivacyCollectedDataTypes` 는 설문 확정 후 일치하게만 채운다(현재 의도적으로 빈 배열).
-   실제 수집: 계정 정보(이메일/사용자ID)·사용자 콘텐츠(질문·첨부·커뮤니티 글). 추적(ATT) 없음.
+3. **App Privacy 설문**: §6-1 의 동일 인벤토리로 작성한다 — 매니페스트 정적 선언(완료)과
+   설문(오너 작업)은 서로 독립된 항목이 아니라 **같은 사실관계를 두 표면에 일치시키는 작업**이다.
+   실제 수집: 이메일·User ID/닉네임·사용자 콘텐츠(질문·첨부·필기)·학년. 추적(ATT) 없음.
    Play Data safety(`docs/DATA_SAFETY_FORM.md`)와 같은 항목표 기준으로 작성.
 4. **외부 결제·구독 링크(3.1.1)**: 앱은 Commerce-Zero(구매 유도 진입점 0, IAP 미탑재).
    `SUBS_MANAGE_LINK_ENABLED` 는 iOS 스토어 빌드에서 **주입 금지 유지**(§4). 미국 스토어프런트의
@@ -311,8 +333,9 @@ SOURCE_FILE: ios/Runner/PrivacyInfo.xcprivacy
 SOURCE_CHANGE: #23 = FileTimestamp C617.1 + SystemBootTime 35F9.1 ("Flutter 표준 템플릿과 동일").
   #29 = UserDefaults CA92.1 + FileTimestamp C617.1 (supabase 세션·파일 플러그인 근거 주장)
 DECISION: REPLACED (파일 신설·취지 수용, reason 목록은 양쪽 모두 기각하고 실측으로 재구성)
-CURRENT_IMPLEMENTATION: 추적 없음·수집 선언 없음·required-reason 빈 배열(§6 표). 계약 테스트가
-  앱 수준 allowlist(현재 공집합)와 Apple 카테고리 상한·reason 형식을 고정.
+CURRENT_IMPLEMENTATION: 추적 없음·수집 데이터 5종 선언(§6-1 — TN3184 기준, 2026-08-04 교정으로
+  초기 빈 배열 상태 폐기)·required-reason 빈 배열(§6-2). 계약 테스트가 수집 선언을 코드
+  인벤토리와 1:1 고정하고, required-reason allowlist(현재 공집합)·reason 형식을 고정.
 RATIONALE: ① Flutter 3.44.6 앱 템플릿에는 앱 수준 PrivacyInfo 가 없음(#23 의 "표준 템플릿" 근거
   소멸 — 플러그인 템플릿에만 존재). ② 엔진이 FileTimestamp(0A2A.1,C617.1)+SystemBootTime(35F9.1)
   을 Flutter.framework 매니페스트로 자체 선언(실측) — #23 목록은 전부 중복. ③ UserDefaults 는
