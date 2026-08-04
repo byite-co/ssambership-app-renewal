@@ -215,6 +215,9 @@ macOS 확보 시 첫 작업 = §5 절차 완주(스모크 → no-codesign → ar
 
 ## 11. 오너 체크리스트 (코드 밖 결정·작업)
 
+> 각 결정의 상세 근거·데이터 인벤토리·암호화 인벤토리·required-reason 정적 인벤토리는
+> **`docs/audit/ios_release_owner_decisions_20260804.md`** (D1~D5 + 부록)에 있다.
+
 - [ ] 번들 ID 확정: `com.ssambership.app` 유지 vs `com.ssambership.edu` 정렬 (§3 — 첫 업로드 전)
 - [ ] 마케팅 버전: 첫 공개 출시를 `0.1.0` 으로 갈지 `1.0.0` 상향할지 (§7)
 - [ ] Apple Developer Program 가입 + Xcode 서명 팀 구성 (§8-1)
