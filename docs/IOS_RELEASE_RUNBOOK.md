@@ -210,22 +210,82 @@ manifest 수집 선언을 비워 둘 이유가 아니다**(TN3184: 수집하는 
    지원 URL(`/support`), 개인정보처리방침 URL(`/legal/privacy`).
 8. **TestFlight 내부 테스트** 1회 이상 후 심사 제출.
 
-## 9. 검증 상태 (2026-08-04 수렴 세션 실측 — Linux)
+## 9. 검증 상태
+
+### 9-1. Linux 수렴 세션 정적 실측 (2026-08-04)
 
 ```text
 IOS_STATIC_CONFIGURATION: PASS   (plist·매니페스트 python plistlib 파싱 + 계약 테스트)
 FLUTTER_ANALYZE: PASS            (에러 0·경고 0 — info 75건은 CI 게이트 비차단)
 FLUTTER_TEST: PASS               (전 스위트 + iOS 계약 테스트)
 PRIVACY_MANIFEST_STATIC: PASS
-PRIVACY_REPORT_RUNTIME: BLOCKED_MACOS   (Xcode Generate Privacy Report 필요)
-IOS_NO_CODESIGN_BUILD: BLOCKED_MACOS    (flutter build ios --release --no-codesign)
-IOS_SIMULATOR_RUNTIME: NOT_RUN_DEVICE   (§5-1 웹 링크 스모크 포함)
-IOS_ARCHIVE: BLOCKED_MACOS
-IOS_SIGNING_VERIFIED: NO
-APP_STORE_UPLOAD: NO
 ```
 
-macOS 확보 시 첫 작업 = §5 절차 완주(스모크 → no-codesign → archive → Privacy Report).
+### 9-2. 사용자 macOS·실기기 실측 (2026-08-04, head `233c3e0`)
+
+구 `BLOCKED_MACOS` 판정을 대체하는 실측 결과. ★ **Runner.app 인벤토리와 Xcode
+Archive 인벤토리는 별개다** — 아래 PASS 는 `build/ios/iphoneos/Runner.app`
+(no-codesign 산출물) 기준이고, Archive/업로드 단계 검증은 여전히 미실행이다.
+
+```text
+FLUTTER_TEST: 1316/1316 PASS
+IOS_NO_CODESIGN_BUILD: PASS               (build/ios/iphoneos/Runner.app, 약 32.4MB)
+IOS_RUNNER_APP_CREATED: PASS
+APP_ROOT_PRIVACY_MANIFEST: PASS           (앱 루트 PrivacyInfo.xcprivacy 존재)
+PRIVACY_PLIST_LINT: PASS_13_OF_13         (매니페스트 총 13개 전부 lint OK)
+REQUIRED_REASON_BUILT_APP_INVENTORY: PASS (Runner.app 기준 — Archive 인벤토리 아님)
+
+APP_PRIVACY (앱 루트 매니페스트 실측):
+  NSPrivacyTracking: false · NSPrivacyTrackingDomains: 없음
+  NSPrivacyCollectedDataTypes: 5종 · NSPrivacyAccessedAPITypes(앱 루트): 없음
+
+SDK required-reason 자체 선언 실측:
+  Flutter.framework — FileTimestamp(0A2A.1·C617.1) + SystemBootTime(35F9.1)
+  SDWebImage — FileTimestamp(C617.1)
+  shared_preferences_foundation — UserDefaults(1C8F.1)
+
+IOS_SIGNED_DEVICE_BUILD: PASS
+IOS_DEVICE_INSTALL: PASS
+IOS_APP_LAUNCH: PASS                      (LAUNCH_CRASH: NO)
+SUPABASE_INIT: PASS
+VERSION_POLICY_FETCH: PASS
+```
+
+비차단 경고(실행 차단 없음 — 출시 blocker 로 올리지 않는다):
+
+```text
+video_player_avfoundation AVKeyValueStatus deprecated
+FlutterView focusItemsInRect caching warning
+CA Event app launch measurement warning
+```
+
+AppIcon: 이 브랜치의 실기기 빌드에는 **구형 생성 아이콘**이 들어간다 —
+승인 로고 재생성은 별도 PR #44 가 담당한다(이 PR 에 아이콘을 섞지 않는다).
+
+```text
+IOS_APPICON_CURRENT_PR43_ONLY: OLD_GENERATED_ASSET
+IOS_APPICON_FIX_SOURCE: PR #44
+FINAL_IOS_BUILD_REQUIRES_PR43_AND_PR44_MERGED_MASTER: YES
+```
+
+### 9-3. 미실행 잔여 (실기기 서명·설치 성공으로 자동 PASS 하지 않는다)
+
+```text
+IOS_ARCHIVE: NOT_RUN
+REQUIRED_REASON_ARCHIVE_INVENTORY: NOT_RUN   (Archive 산출물 기준 재확인 필요)
+IOS_PRIVACY_REPORT: NOT_RUN                  (Xcode Generate Privacy Report)
+FULL_LOGIN_FLOW_SMOKE: NOT_CONFIRMED
+WEB_LINK_RUNTIME_SMOKE: NOT_CONFIRMED
+PHOTO_CAMERA_FILE_PDF_SMOKE: NOT_CONFIRMED
+IQ_MEDIA_END_TO_END_DEVICE_SMOKE: NOT_CONFIRMED
+APP_STORE_UPLOAD: NO
+TESTFLIGHT_UPLOAD: NO
+```
+
+★ 실기기 서명이 됐다는 사실이 회사 Developer Program 팀 구성·ASC 앱 생성의
+완료를 뜻하지 않는다 — §8·§11 오너 결정·작업은 전부 미완 유지.
+
+다음 작업 = §5 잔여 완주(전체 스모크 → archive → Privacy Report → 인벤토리 재확인).
 
 ## 10. Rollback
 
