@@ -728,7 +728,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (!didPop) Navigator.of(context).pop(_changed);
+        if (didPop) return;
+        // 첨부 대기열은 화면 수명 로컬 상태다 — 나가면 사라진다. 특히 메시지는
+        // 이미 전송됐는데 첨부만 실패해 재시도 대기 중인 항목이 있으면, 조용히
+        // 유실되지 않게 확인을 받는다(§4-3 재시도 계약의 UX 이면).
+        if (_pendingUploads.isEmpty) {
+          Navigator.of(context).pop(_changed);
+          return;
+        }
+        _confirmLeaveWithPending();
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('개별질문')),
@@ -756,6 +764,17 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         ),
       ),
     );
+  }
+
+  /// 대기 첨부가 있는 채로 나가려 할 때의 확인 — 전송된 메시지는 유지되고
+  /// 보내지 않은/실패한 첨부만 사라진다는 사실을 명시한다.
+  Future<void> _confirmLeaveWithPending() async {
+    final bool ok = await _confirm(
+      '보내지 않은 첨부가 있어요',
+      '화면을 나가면 대기 중인 첨부는 사라져요.\n이미 보낸 메시지는 그대로 남아요.',
+      '나가기',
+    );
+    if (ok && mounted) Navigator.of(context).pop(_changed);
   }
 
   AppRole get _role => widget.roleOverride ?? AuthService.instance.currentRole;
@@ -826,6 +845,10 @@ class _IqDetailScreenState extends State<IqDetailScreen>
                   // 멘토 작성·미연결 첨부(구버전 앱 등록분) — 멘토 방향 그룹.
                   if (groups.unlinkedMentor.isNotEmpty)
                     _unlinkedMentorBubble(data, groups.unlinkedMentor),
+                  // message_id 는 있으나 현재 목록에서 메시지를 확인하지 못한
+                  // 첨부 — fail-closed 중립(재조회로 확인되면 메시지 그룹 수렴).
+                  if (groups.unresolvedMessage.isNotEmpty)
+                    _unresolvedMessageBubble(groups.unresolvedMessage),
                 ],
               );
             },
@@ -992,6 +1015,25 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       align: ConversationAlign.start,
       tone: ConversationTone.neutral,
       authorLabel: '이전 첨부 · 작성자 미확인',
+      attachments: <Widget>[
+        _IqAttachmentGroup(
+          attachments: attachments,
+          urlResolver: _urlResolver,
+          onSave: _saveAttachment,
+        ),
+      ],
+    );
+  }
+
+  /// 연결 메시지 미확인 첨부 — fail-closed 중립 그룹. 업로더 기록으로
+  /// 재분류하지 않는다(재조회 후 귀속이 이동해 보이는 것을 막는다).
+  /// 첨삭 진입도 열지 않는다. 조회·저장은 유지.
+  Widget _unresolvedMessageBubble(List<IqAttachment> attachments) {
+    return ConversationBubble(
+      body: '',
+      align: ConversationAlign.start,
+      tone: ConversationTone.neutral,
+      authorLabel: '첨부 · 연결 메시지 미확인',
       attachments: <Widget>[
         _IqAttachmentGroup(
           attachments: attachments,
