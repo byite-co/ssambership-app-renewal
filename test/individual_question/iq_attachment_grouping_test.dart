@@ -62,11 +62,29 @@ void main() {
       expect(g.legacyUnknown, isEmpty);
     });
 
-    test('연결 메시지가 목록에 없으면(방어) 업로더 기록으로 폴백한다', () {
+    test('연결 메시지가 목록에 없으면 fail-closed — 업로더 기록으로 재분류하지 않는다', () {
+      // 연결 메시지가 정본인데 확인 불가(로드 공백·향후 pagination) — 학생/멘토
+      // 그룹으로 옮기면 재조회 후 귀속이 '이동'한다. 중립 대기 그룹에 남긴다.
       final IqAttachmentGroups g = _build(
-        <IqAttachment>[_att('a1', messageId: 'ghost', authorId: kMentor)],
+        <IqAttachment>[
+          _att('a1', messageId: 'ghost', authorId: kMentor),
+          _att('a2', messageId: 'ghost2', authorId: kStudent),
+        ],
       );
-      expect(g.unlinkedMentor.single.id, 'a1');
+      expect(g.unresolvedMessage.map((IqAttachment a) => a.id),
+          <String>['a1', 'a2']);
+      expect(g.unlinkedMentor, isEmpty);
+      expect(g.initialQuestion, isEmpty);
+      expect(g.legacyUnknown, isEmpty);
+    });
+
+    test('메시지가 재조회로 확인되면 unresolved 가 메시지 그룹으로 수렴한다', () {
+      final IqAttachmentGroups g = _build(
+        <IqAttachment>[_att('a1', messageId: 'm-1', authorId: kMentor)],
+        messages: <IqMessage>[_msg('m-1', kMentor)],
+      );
+      expect(g.forMessage('m-1').single.id, 'a1');
+      expect(g.unresolvedMessage, isEmpty);
     });
 
     test('없는 메시지 조회는 빈 목록(널 아님)', () {

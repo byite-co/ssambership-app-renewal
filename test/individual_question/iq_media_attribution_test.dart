@@ -240,6 +240,33 @@ void main() {
     expect(_bubbleWithBody(tester, '첫 답변').align, ConversationAlign.end);
   });
 
+  testWidgets('목록에 없는 message_id 첨부 → 연결 메시지 미확인 중립(fail-closed)',
+      (WidgetTester tester) async {
+    await _pump(
+      tester,
+      role: AppRole.student,
+      messages: <IqMessage>[_msg('m-1', kMentorId, '답변')],
+      attachments: <IqAttachment>[
+        // 작성자가 기록돼 있어도 연결 메시지를 확인 못 하면 재분류하지 않는다.
+        _fileAtt('ghost', messageId: 'not-loaded', authorId: kMentorId),
+      ],
+    );
+
+    expect(find.text('첨부 · 연결 메시지 미확인'), findsOneWidget);
+    expect(_inBubble('문제 본문', 'ghost.pdf'), findsNothing);
+    expect(_inBubble('답변', 'ghost.pdf'), findsNothing);
+    expect(_inBubble('', 'ghost.pdf'), findsOneWidget); // 중립 그룹 소속.
+    // 멘토 미연결 그룹(빈 본문 + '멘토' 라벨)으로도 가지 않는다 — 메시지
+    // 말풍선('답변')의 '멘토' 라벨과 구분해 빈 본문 그룹만 검사한다.
+    expect(
+      tester
+          .widgetList<ConversationBubble>(find.byType(ConversationBubble))
+          .where((ConversationBubble b) =>
+              b.body.isEmpty && b.authorLabel == '멘토'),
+      isEmpty,
+    );
+  });
+
   testWidgets('작성자 불명 메시지의 첨부는 그 메시지에 붙고 라벨은 미확인 유지',
       (WidgetTester tester) async {
     await _pump(
