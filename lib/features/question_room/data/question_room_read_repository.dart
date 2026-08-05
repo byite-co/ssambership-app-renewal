@@ -4,10 +4,24 @@ import '../../../core/entitlement/weekly_question_usage.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import 'models/connection_note.dart';
+import 'models/model_parse.dart';
 import 'models/question_attachment.dart';
 import 'models/question_message.dart';
 import 'models/question_thread.dart';
 import 'models/room.dart';
+
+/// 상태 집계 전용 슬림 스레드 행(N20) — 제목·본문 없이 방·상태·활동시각만.
+class ThreadStatusRow {
+  const ThreadStatusRow({
+    required this.roomId,
+    required this.status,
+    required this.updatedAt,
+  });
+
+  final String roomId;
+  final ThreadStatus status;
+  final DateTime updatedAt;
+}
 
 /// 질문방 읽기 전용 레포지토리.
 ///
@@ -66,6 +80,26 @@ class QuestionRoomReadRepository {
         .inFilter('mentor_student_room_id', roomIds)
         .order('updated_at', ascending: false);
     return rows.map(QuestionThread.fromMap).toList();
+  }
+
+  /// 여러 방의 스레드 상태만 슬림 조회(N20 — 집계 전용). select * 로 제목·
+  /// 과목까지 전량 내려받던 인박스·대시보드 집계를 방·상태·활동시각 3컬럼으로
+  /// 줄인다. 집계 규칙은 ThreadStatusCounts.fromStatuses 와 짝.
+  Future<List<ThreadStatusRow>> threadStatusRowsForRooms(
+      List<String> roomIds) async {
+    if (roomIds.isEmpty) return <ThreadStatusRow>[];
+    final List<Map<String, dynamic>> rows = await _client
+        .from('question_threads')
+        .select('mentor_student_room_id, status, updated_at')
+        .inFilter('mentor_student_room_id', roomIds);
+    return <ThreadStatusRow>[
+      for (final Map<String, dynamic> r in rows)
+        ThreadStatusRow(
+          roomId: (r['mentor_student_room_id'] as String?) ?? '',
+          status: ThreadStatus.fromCode(r['status'] as String?),
+          updatedAt: parseTime(r['updated_at']),
+        ),
+    ];
   }
 
   /// 방 멘토의 담당 과목 코드 목록(mentor_profiles.teaching_subjects, text[]).

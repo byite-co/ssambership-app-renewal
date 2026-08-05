@@ -6,7 +6,6 @@ import '../../../core/entitlement/weekly_question_usage.dart';
 import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import '../../question_room/data/mentor_lookup_repository.dart';
-import '../../question_room/data/models/question_thread.dart';
 import '../../question_room/data/models/room.dart';
 import '../../question_room/data/question_room_read_repository.dart';
 import '../../question_room/data/student_lookup_repository.dart';
@@ -186,8 +185,11 @@ class MyPageRepository {
     final Future<int?> settlementF = _loadLatestSettlement();
     final List<Room> rooms = await _rooms.myRooms();
     final List<String> roomIds = rooms.map((Room r) => r.id).toList();
-    final List<QuestionThread> threads = await _rooms.threadsForRooms(roomIds);
-    final ThreadStatusCounts counts = ThreadStatusCounts.from(threads);
+    // N20: 대기 수 집계엔 상태만 필요 — 슬림 조회(제목·본문 전량 수신 제거).
+    final List<ThreadStatusRow> statusRows =
+        await _rooms.threadStatusRowsForRooms(roomIds);
+    final ThreadStatusCounts counts = ThreadStatusCounts.fromStatuses(
+        statusRows.map((ThreadStatusRow r) => r.status));
     final int? settlement = await settlementF;
 
     return MentorDashboard(

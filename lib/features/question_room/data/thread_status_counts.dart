@@ -30,11 +30,16 @@ class ThreadStatusCounts {
   /// closed/archived 를 confirmed 와 분리 유지해 summaryLine 의미는 안 바꾼다.
   final int completed;
 
-  factory ThreadStatusCounts.from(Iterable<QuestionThread> threads) {
+  factory ThreadStatusCounts.from(Iterable<QuestionThread> threads) =>
+      ThreadStatusCounts.fromStatuses(
+          threads.map((QuestionThread t) => t.status));
+
+  /// 상태 값만으로 집계(N20 — 슬림 조회 행 지원). from 과 동일 규칙.
+  factory ThreadStatusCounts.fromStatuses(Iterable<ThreadStatus> statuses) {
     int p = 0, ip = 0, c = 0, done = 0, t = 0;
-    for (final QuestionThread th in threads) {
+    for (final ThreadStatus status in statuses) {
       t++;
-      switch (th.status) {
+      switch (status) {
         case ThreadStatus.pending:
           p++;
           break;

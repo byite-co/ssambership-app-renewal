@@ -9,7 +9,6 @@ import '../../../../design/widgets/empty_state.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../design/widgets/status_pill.dart';
 import '../../../../shared/format/formatters.dart';
-import '../../data/models/question_thread.dart';
 import '../../data/models/room.dart';
 import '../../data/question_room_read_repository.dart';
 import '../../data/student_lookup_repository.dart';
@@ -63,31 +62,38 @@ class _MentorInboxScreenState extends State<MentorInboxScreen> {
     if (rooms.isEmpty) return <_StudentItem>[];
 
     final List<String> roomIds = rooms.map((Room r) => r.id).toList();
-    final List<QuestionThread> threads = await _repo.threadsForRooms(roomIds);
-    final Map<String, List<QuestionThread>> byRoom =
-        <String, List<QuestionThread>>{};
-    for (final QuestionThread t in threads) {
-      (byRoom[t.roomId] ??= <QuestionThread>[]).add(t);
-    }
-
+    // N20: 집계에 필요한 방·상태·활동시각만 슬림 조회(제목·본문 전량 수신 제거).
+    // 학생 표시명 조회는 스레드 조회와 독립 — 병렬.
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.threadStatusRowsForRooms(roomIds),
+      _students.fetchMany(rooms.map((Room r) => r.studentId)),
+    ]);
+    final List<ThreadStatusRow> statusRows = loaded[0] as List<ThreadStatusRow>;
     final Map<String, StudentPublic> names =
-        await _students.fetchMany(rooms.map((Room r) => r.studentId));
+        loaded[1] as Map<String, StudentPublic>;
+
+    final Map<String, List<ThreadStatusRow>> byRoom =
+        <String, List<ThreadStatusRow>>{};
+    for (final ThreadStatusRow t in statusRows) {
+      (byRoom[t.roomId] ??= <ThreadStatusRow>[]).add(t);
+    }
 
     return <_StudentItem>[
       for (final Room r in rooms)
         _StudentItem(
           room: r,
           student: names[r.studentId],
-          counts:
-              ThreadStatusCounts.from(byRoom[r.id] ?? const <QuestionThread>[]),
+          counts: ThreadStatusCounts.fromStatuses(
+              (byRoom[r.id] ?? const <ThreadStatusRow>[])
+                  .map((ThreadStatusRow t) => t.status)),
           lastActivity: _lastActivity(byRoom[r.id], r),
         ),
     ];
   }
 
-  DateTime _lastActivity(List<QuestionThread>? threads, Room room) {
+  DateTime _lastActivity(List<ThreadStatusRow>? threads, Room room) {
     DateTime last = room.updatedAt;
-    for (final QuestionThread t in threads ?? const <QuestionThread>[]) {
+    for (final ThreadStatusRow t in threads ?? const <ThreadStatusRow>[]) {
       if (t.updatedAt.isAfter(last)) last = t.updatedAt;
     }
     return last;
