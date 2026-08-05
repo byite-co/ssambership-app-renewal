@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 import 'package:ssambership_app/features/notifications/data/notification_badge_controller.dart';
@@ -30,6 +32,24 @@ class _CountRepo implements NotificationsRepository {
   Future<int> unreadCount() async {
     calls++;
     if (fail) throw const AppError('네트워크');
+    return count;
+  }
+}
+
+/// N24 코얼레싱 검증용 — unreadCount 를 게이트로 붙잡아 in-flight 를 만든다.
+class _GatedCountRepo extends _CountRepo {
+  _GatedCountRepo(super.count);
+
+  Completer<void>? gate;
+
+  @override
+  Future<int> unreadCount() async {
+    calls++;
+    // ★ this. 필수 — 무접두 fail 은 상속 필드가 아니라 matcher 의 top-level
+    //   fail() 함수로 렉시컬 해석된다.
+    if (this.fail) throw const AppError('네트워크');
+    final Completer<void>? g = gate;
+    if (g != null) await g.future;
     return count;
   }
 }
@@ -194,6 +214,36 @@ void main() {
           appendNotificationsDeduped(items, seen, <AppNotification>[_n('a')]);
       expect(added, 0);
       expect(items.length, 1);
+    });
+  });
+
+  group('N24: 실시간 버스트 refresh 코얼레싱', () {
+    test('진행 중 5연타 → RPC 는 진행 1 + 후행 1 로 수렴, 최종값 반영', () async {
+      final _GatedCountRepo repo = _GatedCountRepo(3)
+        ..gate = Completer<void>();
+      final NotificationBadgeController c =
+          NotificationBadgeController(repository: repo);
+      final Future<void> first = c.refresh(); // in-flight(게이트에 붙잡힘)
+      await c.refresh(); // 큐잉(즉시 반환)
+      await c.refresh();
+      await c.refresh();
+      await c.refresh();
+      expect(repo.calls, 1); // 아직 진행 1건뿐 — 버스트가 RPC 로 새지 않음.
+      repo.count = 7; // 후행 조회가 최신값을 가져오는지 확인.
+      repo.gate!.complete();
+      repo.gate = null;
+      await first;
+      expect(repo.calls, 2); // 진행 1 + 후행 1.
+      expect(c.count.value, 7);
+    });
+
+    test('유휴 상태 단발 refresh 는 그대로 1회 조회', () async {
+      final _CountRepo repo = _CountRepo(2);
+      final NotificationBadgeController c =
+          NotificationBadgeController(repository: repo);
+      await c.refresh();
+      expect(repo.calls, 1);
+      expect(c.count.value, 2);
     });
   });
 }
