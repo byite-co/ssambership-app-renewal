@@ -235,7 +235,15 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
-  int get _unreadCount => _items.where((AppNotification n) => !n.isRead).length;
+  /// 로드된 목록 기준 로컬 미읽음(첫 페이지 범위) — 서버 값 폴백 전용.
+  int get _localUnreadCount =>
+      _items.where((AppNotification n) => !n.isRead).length;
+
+  /// N27: 미읽음 정본은 서버 배지 개수(notification_unread_count_self)다.
+  /// 목록은 키셋 첫 페이지만 들고 있어 로컬 계산은 페이지 밖 미읽음을 놓치고,
+  /// '모두 읽음' 버튼이 사라지는 상태가 생겼다 — 서버 값 미확인(null)일 때만
+  /// 로컬로 폴백한다(하단 탭 배지와 단일 소스).
+  int _effectiveUnread(int? server) => server ?? _localUnreadCount;
 
   List<AppNotification> get _filtered => _items.where((AppNotification n) {
         if (_kind != null && n.kind != _kind) return false;
@@ -258,7 +266,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Future<void> _markAll() async {
-    if (_unreadCount == 0) return;
+    if (_effectiveUnread(_badge.count.value) == 0) return;
     try {
       // 서버 RPC 가 본인 미읽음 전체를 갱신 — id 목록을 보내지 않는다.
       await _repo.markAllRead();
@@ -338,21 +346,30 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             AppSpacing.s8,
             AppSpacing.s12,
           ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                // D1-D: 미읽음 수를 카운트 배지로(스캔성↑). 0이면 배지 숨김.
-                child: Row(
-                  children: <Widget>[
-                    const Text('안 읽음', style: AppType.title),
-                    const SizedBox(width: 8),
-                    CountBadge(count: _unreadCount),
-                  ],
-                ),
-              ),
-              if (_unreadCount > 0)
-                TextButton(onPressed: _markAll, child: const Text('모두 읽음')),
-            ],
+          // N27: 헤더 카운트·'모두 읽음' 노출을 서버 배지 정본으로(탭 배지와
+          // 단일 소스). 서버 미확인일 때만 로컬(첫 페이지) 폴백.
+          child: ValueListenableBuilder<int?>(
+            valueListenable: _badge.count,
+            builder: (BuildContext context, int? server, Widget? _) {
+              final int unread = _effectiveUnread(server);
+              return Row(
+                children: <Widget>[
+                  Expanded(
+                    // D1-D: 미읽음 수를 카운트 배지로(스캔성↑). 0이면 배지 숨김.
+                    child: Row(
+                      children: <Widget>[
+                        const Text('안 읽음', style: AppType.title),
+                        const SizedBox(width: 8),
+                        CountBadge(count: unread),
+                      ],
+                    ),
+                  ),
+                  if (unread > 0)
+                    TextButton(
+                        onPressed: _markAll, child: const Text('모두 읽음')),
+                ],
+              );
+            },
           ),
         ),
         Padding(
