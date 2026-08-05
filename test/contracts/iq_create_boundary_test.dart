@@ -8,7 +8,6 @@ import 'package:ssambership_app/core/web_bridge/web_bridge_config.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_create_screen.dart';
 import 'package:ssambership_app/features/individual_question/ui/student_iq_list_screen.dart';
-import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
 import 'package:ssambership_app/features/mentors/ui/mentor_detail_screen.dart';
 
