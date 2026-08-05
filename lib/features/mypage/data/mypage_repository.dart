@@ -37,23 +37,32 @@ class MyPageRepository {
   }
 
   /// 화면 진입 시 1회 호출. 역할에 맞는 데이터를 모아 반환한다.
+  /// N17: 서로 독립인 조회는 병렬로 묶는다 — 종전 완전 직렬 팬아웃 제거.
   Future<MyPageData> load() async {
     final AuthService auth = AuthService.instance;
-    final MyProfile profile = await _loadProfile(auth);
 
     if (auth.currentRole == AppRole.mentor) {
+      final List<dynamic> r = await Future.wait(<Future<dynamic>>[
+        _loadProfile(auth),
+        _loadMentorDashboard(),
+      ]);
       return MyPageData(
         role: AppRole.mentor,
-        profile: profile,
-        mentor: await _loadMentorDashboard(),
+        profile: r[0] as MyProfile,
+        mentor: r[1] as MentorDashboard,
       );
     }
 
+    final List<dynamic> r = await Future.wait(<Future<dynamic>>[
+      _loadProfile(auth),
+      _loadSubscriptions(),
+      _loadCash(),
+    ]);
     return MyPageData(
       role: auth.currentRole,
-      profile: profile,
-      subscriptions: await _loadSubscriptions(),
-      cash: await _loadCash(),
+      profile: r[0] as MyProfile,
+      subscriptions: r[1] as List<SubscriptionCardInfo>,
+      cash: r[2] as CashSummary,
     );
   }
 
@@ -84,15 +93,19 @@ class MyPageRepository {
     final Map<String, SubscriptionSummary> subs =
         await SubscriptionReader.fetchForStudent(_client, _uid);
     if (subs.isEmpty) return const <SubscriptionCardInfo>[];
-    final Map<String, MentorPublic> names = await _mentors.fetchMany(subs.keys);
     // A2: 멘토별 주간 질문 사용량(RPC). ★ 한도값 재하드코딩 없이 RPC 반환만 사용.
     //     실패하면 null → 카드가 기존 상태 문구로 조용히 폴백(흐름 안 막음).
+    // N17: 멘토 표시명과 사용량 RPC 는 서로 독립 — 병렬 조회.
     final Map<String, WeeklyQuestionUsage?> usageByMentor =
         <String, WeeklyQuestionUsage?>{};
-    await Future.wait(subs.keys.map((String mentorId) async {
-      usageByMentor[mentorId] =
-          await _rooms.weeklyUsage(studentId: _uid, mentorId: mentorId);
-    }));
+    final List<dynamic> nu = await Future.wait(<Future<dynamic>>[
+      _mentors.fetchMany(subs.keys),
+      Future.wait(subs.keys.map((String mentorId) async {
+        usageByMentor[mentorId] =
+            await _rooms.weeklyUsage(studentId: _uid, mentorId: mentorId);
+      })),
+    ]);
+    final Map<String, MentorPublic> names = nu[0] as Map<String, MentorPublic>;
     final List<SubscriptionCardInfo> cards = <SubscriptionCardInfo>[
       for (final SubscriptionSummary s in subs.values)
         SubscriptionCardInfo(
@@ -114,7 +127,17 @@ class MyPageRepository {
   }
 
   /// 학생: 캐시 잔액 + 최근 내역(조회만). 지갑이 없으면 balance null.
+  /// N17: 잔액과 내역은 서로 독립 — 병렬 조회.
   Future<CashSummary> _loadCash() async {
+    final List<dynamic> r = await Future.wait(<Future<dynamic>>[
+      _loadCashBalance(),
+      _loadCashRecent(),
+    ]);
+    return CashSummary(
+        balanceCents: r[0] as int?, recent: r[1] as List<CashEntry>);
+  }
+
+  Future<int?> _loadCashBalance() async {
     int? balance;
     try {
       final Map<String, dynamic>? wallet = await _client
@@ -128,7 +151,10 @@ class MyPageRepository {
     } catch (_) {
       // 지갑 read 실패 → 잔액 미확인(비움). 날조하지 않는다.
     }
+    return balance;
+  }
 
+  Future<List<CashEntry>> _loadCashRecent() async {
     final List<CashEntry> recent = <CashEntry>[];
     try {
       final List<Map<String, dynamic>> rows = await _client
@@ -151,16 +177,27 @@ class MyPageRepository {
     } catch (_) {
       // 내역 read 실패 → 빈 목록.
     }
-    return CashSummary(balanceCents: balance, recent: recent);
+    return recent;
   }
 
   /// 멘토: 답변·정산 요약(조회만). 출금은 웹.
+  /// N17: 정산 조회는 방→스레드 체인과 독립 — 병렬 실행.
   Future<MentorDashboard> _loadMentorDashboard() async {
+    final Future<int?> settlementF = _loadLatestSettlement();
     final List<Room> rooms = await _rooms.myRooms();
     final List<String> roomIds = rooms.map((Room r) => r.id).toList();
     final List<QuestionThread> threads = await _rooms.threadsForRooms(roomIds);
     final ThreadStatusCounts counts = ThreadStatusCounts.from(threads);
+    final int? settlement = await settlementF;
 
+    return MentorDashboard(
+      studentCount: rooms.length,
+      pendingAnswers: counts.pending,
+      latestSettlementCents: settlement,
+    );
+  }
+
+  Future<int?> _loadLatestSettlement() async {
     // 학생 이름 조회는 대시보드 수치엔 불필요하지만, 연결 학생 수는 방 수로 센다.
     int? settlement;
     try {
@@ -178,12 +215,7 @@ class MyPageRepository {
     } catch (_) {
       // 정산 read 실패 → 표시 생략(null).
     }
-
-    return MentorDashboard(
-      studentCount: rooms.length,
-      pendingAnswers: counts.pending,
-      latestSettlementCents: settlement,
-    );
+    return settlement;
   }
 
   /// 멘토: 구독 학생 이름 목록(선택 표시용, 조회만). 화면에서 필요 시 사용.
