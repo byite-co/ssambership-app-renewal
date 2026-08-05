@@ -131,14 +131,21 @@ class CommunityReadRepository {
   }
 
   /// 내가 특정 반응(type: like|scrap)을 남긴 게시판 글 id 집합(반응 상태 표시용).
-  Future<Set<String>> myBoardReactionIds(String reactionType) async {
+  ///
+  /// [postId] 를 주면 그 글 1건으로 서버에서 필터한다(C9 — 상세 화면이 내 반응
+  /// 전체를 내려받아 contains 하던 전체 스캔 제거). 내 활동 탭처럼 전체 집합이
+  /// 필요한 곳만 postId 없이 부른다.
+  Future<Set<String>> myBoardReactionIds(String reactionType,
+      {String? postId}) async {
     final String? uid = _uid;
     if (uid == null) return <String>{};
-    final List<Map<String, dynamic>> rows = await _client
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> q = _client
         .from('post_reactions')
         .select('post_id')
         .eq('user_id', uid)
         .eq('type', reactionType);
+    if (postId != null) q = q.eq('post_id', postId);
+    final List<Map<String, dynamic>> rows = await q;
     return <String>{
       for (final Map<String, dynamic> r in rows)
         if (r['post_id'] != null) r['post_id'] as String,
@@ -146,14 +153,18 @@ class CommunityReadRepository {
   }
 
   /// 내가 특정 반응(type: like|scrap)을 남긴 숏폼 id 집합(숏폼 반응 상태 표시용).
-  Future<Set<String>> myShortformReactionIds(String reactionType) async {
+  /// [shortformId] 를 주면 그 숏폼 1건으로 서버에서 필터한다(C9).
+  Future<Set<String>> myShortformReactionIds(String reactionType,
+      {String? shortformId}) async {
     final String? uid = _uid;
     if (uid == null) return <String>{};
-    final List<Map<String, dynamic>> rows = await _client
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> q = _client
         .from('shortform_reactions')
         .select('shortform_id')
         .eq('user_id', uid)
         .eq('type', reactionType);
+    if (shortformId != null) q = q.eq('shortform_id', shortformId);
+    final List<Map<String, dynamic>> rows = await q;
     return <String>{
       for (final Map<String, dynamic> r in rows)
         if (r['shortform_id'] != null) r['shortform_id'] as String,

@@ -66,11 +66,13 @@ class FakeCommunityRead extends CommunityReadRepository {
       commentsList;
 
   @override
-  Future<Set<String>> myBoardReactionIds(String reactionType) async =>
+  Future<Set<String>> myBoardReactionIds(String reactionType,
+          {String? postId}) async =>
       <String>{};
 
   @override
-  Future<Set<String>> myShortformReactionIds(String reactionType) async =>
+  Future<Set<String>> myShortformReactionIds(String reactionType,
+          {String? shortformId}) async =>
       <String>{};
 
   @override

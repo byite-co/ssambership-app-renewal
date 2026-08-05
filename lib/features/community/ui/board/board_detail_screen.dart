@@ -80,14 +80,17 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   Future<void> _loadReactionState() async {
     try {
-      final Set<String> liked = await widget.read
-          .myBoardReactionIds(CommunityWriteRepository.reactionLike);
-      final Set<String> scrap = await widget.read
-          .myBoardReactionIds(CommunityWriteRepository.reactionScrap);
+      // C9: 이 글 1건으로 서버 필터 + 좋아요·스크랩 병렬 조회.
+      final List<Set<String>> rs = await Future.wait(<Future<Set<String>>>[
+        widget.read.myBoardReactionIds(CommunityWriteRepository.reactionLike,
+            postId: widget.post.id),
+        widget.read.myBoardReactionIds(CommunityWriteRepository.reactionScrap,
+            postId: widget.post.id),
+      ]);
       if (!mounted) return;
       setState(() {
-        _liked = liked.contains(widget.post.id);
-        _scrapped = scrap.contains(widget.post.id);
+        _liked = rs[0].contains(widget.post.id);
+        _scrapped = rs[1].contains(widget.post.id);
       });
     } catch (_) {
       // 반응 상태 조회 실패는 화면을 막지 않는다(기본 미반응).
