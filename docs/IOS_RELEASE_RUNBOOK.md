@@ -125,6 +125,32 @@ flutter build ipa --release   # build/ios/ipa/*.ipa (+ Xcode archive)
 
 업로드 후 처리 완료(수 분~수십 분)되면 TestFlight/심사 제출 가능.
 
+### 5-3. Xcode Cloud 빌드 (SwiftPM bootstrap — 2026-08-05 교정)
+
+Xcode Cloud 는 clean clone 직후 Swift Package dependency resolution 을 수행하는데,
+Runner 가 참조하는 local package
+`ios/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage` 는 Flutter 가
+생성하는 ignored/ephemeral 산출물이라 저장소에 없다(커밋 금지 — 계약 테스트가 고정).
+`ios/ci_scripts/ci_post_clone.sh` 가 resolution 이전에 이를 생성한다:
+
+1. Flutter **3.44.6** 준비(시스템 flutter 가 핀 버전이면 재사용, 아니면 태그 클론)
+2. 운영 `.env` 생성 — fail closed(아래 환경변수 필수, 값은 로그에 출력하지 않음)
+3. `flutter pub get` → `flutter precache --ios` → `flutter build ios --release --config-only --no-codesign`
+4. `FlutterGeneratedPluginSwiftPackage/Package.swift` 와 `Generated.xcconfig` 존재 검증
+
+**Xcode Cloud Workflow 환경변수(Secret 로 등록):**
+
+| 변수 | 값 |
+| --- | --- |
+| `SUPABASE_URL` | `https://lbeqxarxothkmzqvpudy.supabase.co` (다르면 스크립트가 중단) |
+| `SUPABASE_ANON_KEY` | 운영 anon key |
+
+기능 플래그(`IQ_CREATE_ENABLED` 등)는 **주입하지 않는다** — 스토어 빌드는 전부
+컴파일 타임 기본값(false) 유지(§4). archive 는 기존 Runner workspace/scheme 로
+Xcode Cloud 가 수행하며, post-clone 스크립트는 archive/업로드를 직접 실행하지 않는다.
+회귀 방지는 `test/contracts/xcode_cloud_bootstrap_contract_test.dart` (실행권한·
+버전 핀·fail-closed·secret 비출력·ephemeral 비추적·SwiftPM 배선).
+
 ## 6. 개인정보 매니페스트 (PrivacyInfo.xcprivacy)
 
 앱 수준 매니페스트는 **실측 근거로만** 선언한다 (2026-08-04, Flutter 3.44.6):
