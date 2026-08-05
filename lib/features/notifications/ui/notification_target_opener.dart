@@ -77,15 +77,9 @@ class NotificationTargetOpener {
     }
     if (roomId == null) return false;
 
-    // 내 방 목록(RLS: 당사자만)에서 대상 방을 찾는다 — 권한 밖이면 없음.
-    final List<Room> myRooms = await rooms.myRooms();
-    Room? room;
-    for (final Room r in myRooms) {
-      if (r.id == roomId) {
-        room = r;
-        break;
-      }
-    }
+    // N16: 대상 방 1건만 조회(RLS: 당사자만 통과 — 권한 밖이면 null).
+    // 종전에는 내 방 전량(myRooms)을 받아 클라이언트에서 찾았다.
+    final Room? room = await rooms.roomById(roomId);
     if (room == null) return false;
 
     // 클로저 캡처용 지역 확정값(널 승격을 클로저 안까지 보장).

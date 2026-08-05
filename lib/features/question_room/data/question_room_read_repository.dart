@@ -34,6 +34,17 @@ class QuestionRoomReadRepository {
     return rows.map(Room.fromMap).toList();
   }
 
+  /// 방 1건(N16 — 알림 딥링크용 단건 조회). RLS 로 당사자만 통과하므로
+  /// 없거나 권한 밖이면 null — 내 방 전량을 받아 뒤지지 않는다.
+  Future<Room?> roomById(String roomId) async {
+    final Map<String, dynamic>? row = await _client
+        .from('mentor_student_rooms')
+        .select('*')
+        .eq('id', roomId)
+        .maybeSingle();
+    return row == null ? null : Room.fromMap(row);
+  }
+
   /// 방의 질문 스레드 목록(최근 활동순 = updated_at desc).
   /// 웹 정본(questionRoomQueries: updated_at→created_at→id) 및 앱 threadsForRooms 와 정렬 일치(XV-QUERY-1).
   Future<List<QuestionThread>> threads(String roomId) async {
