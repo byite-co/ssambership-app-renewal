@@ -44,7 +44,8 @@ class _StudentItem {
   String get studentName => student?.displayName ?? '학생';
 }
 
-class _MentorInboxScreenState extends State<MentorInboxScreen> {
+class _MentorInboxScreenState extends State<MentorInboxScreen>
+    with WidgetsBindingObserver {
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final StudentLookupRepository _students = const StudentLookupRepository();
 
@@ -55,6 +56,20 @@ class _MentorInboxScreenState extends State<MentorInboxScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N33: 학생 탭(질문방 목록)은 resume 재조회가 있는데 멘토 인박스는 없어
+    // 같은 질문방 탭이 역할에 따라 신선도가 달랐다 — 동일 패턴으로 정렬.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<_StudentItem>> _load() async {
