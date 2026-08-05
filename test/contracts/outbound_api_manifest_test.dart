@@ -22,6 +22,7 @@ const Set<String> kExpectedRpcNames = <String>{
   // 프로필
   'user_profile_update_self',
   // 질문방(qna_*)
+  'ensure_free_question_room', // api_app_v1 — 무료질문 첫 진입 시 방 보장(N1)
   'qna_append_message',
   'qna_confirm_thread',
   'qna_create_free_question_thread',

@@ -16,8 +16,12 @@ import '../../question_room/data/qna_error_mapper.dart';
 ///   FREE_QUOTA_TOTAL_EXHAUSTED / FREE_QUOTA_MENTOR_EXHAUSTED).
 ///   앱은 질문권 수량·기간을 하드코딩하지 않고, 조회 가능한 사실값
 ///   (본인 free_question_usage 행 — RLS fqu_select_own)과 방 존재 여부만 읽는다.
-/// - 방(mentor_student_rooms) 은 SELECT 정책만 있고 앱이 만들 수 없다(생성은
-///   웹 서버 전용) → 방 부재 학생의 무료 질문 생성은 WAITING_SERVER_GATE.
+/// - 방(mentor_student_rooms) 직접 INSERT 는 앱에 없다(SELECT 정책만). 방 부재
+///   학생은 `api_app_v1.ensure_free_question_room(p_mentor_id)` RPC 로 첫 질문
+///   직전에 방을 만든다(staging 실측 2026-08-05: authenticated EXECUTE, 성공
+///   payload {ok, room_id, created, entitlement, contract_version:1}, 실패는
+///   예외가 아닌 {ok:false, code} 봉투 — 자격 판정(가입 7일/전역/멘토별 한도·
+///   차단·계정 상태)은 전부 서버가 한다).
 /// - 캐시 차감형 개별질문(IQ)과는 완전히 분리 — handler·RPC·상태 재사용 금지.
 
 /// 자격 조회 스냅샷(사실값만 — 한도 판정 없음).
@@ -28,7 +32,7 @@ class FreeQuestionEntrySnapshot {
     required this.perMentorUsed,
   });
 
-  /// 현재 학생↔이 멘토의 질문방 id. null = 방 없음(앱에서 생성 불가 — 서버 게이트).
+  /// 현재 학생↔이 멘토의 질문방 id. null = 방 없음(첫 질문 시 ensureRoom 으로 생성).
   final String? roomId;
 
   /// 내 무료 질문 사용 행 수(전역 — 표시용 사실값).
@@ -66,7 +70,8 @@ enum FreeQuestionCtaStatus {
   /// 조회 실패 — 재시도 제공, 활성 CTA 0, 생성 RPC 0.
   unavailable,
 
-  /// 방 없음 — 앱은 방을 만들 수 없다(서버 게이트). 활성 CTA 0.
+  /// 방 없음 — CTA 활성. 탭 시 ensureRoom RPC 로 방을 만든 뒤 작성으로 진행
+  /// (자격 판정은 서버 몫 — 앱은 수량·기간을 계산하지 않는다).
   roomMissing,
 
   /// 조회 성공 + 방 존재 → CTA 활성(최종 자격 판정은 생성 RPC 가 한다).
@@ -96,6 +101,10 @@ FreeQuestionCtaStatus decideFreeQuestionCta({
 /// 테스트 주입용 포트.
 abstract class FreeQuestionEntryPort {
   Future<FreeQuestionEntrySnapshot> fetch(String mentorId);
+
+  /// 이 멘토와의 질문방을 보장(없으면 생성)하고 room id 를 돌려준다.
+  /// 자격 미달·차단 등은 서버 봉투 코드 → AppError(한글)로 던진다.
+  Future<String> ensureRoom(String mentorId);
 
   Future<CreatedFreeQuestion> createFreeThread({
     required String roomId,
@@ -146,6 +155,28 @@ class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
       totalUsed: usage.length,
       perMentorUsed: per,
     );
+  }
+
+  @override
+  Future<String> ensureRoom(String mentorId) async {
+    final Object? data;
+    try {
+      // 방 보장 RPC — 자격(가입 7일/전역/멘토별 한도)·차단·계정 상태 판정과
+      // 원자 생성(동시 경합 직렬화)은 전부 서버 트랜잭션 몫.
+      data = await _client.schema('api_app_v1').rpc<dynamic>(
+        'ensure_free_question_room',
+        params: <String, dynamic>{'p_mentor_id': mentorId},
+      );
+    } catch (e) {
+      throw mapQnaError(e);
+    }
+    if (data is Map && data['ok'] == true && data['room_id'] is String) {
+      return data['room_id'] as String;
+    }
+    // 실패는 예외가 아닌 {ok:false, code} 봉투 — 문구 정본으로 변환해 던진다.
+    final Object? code = data is Map ? data['code'] : null;
+    final String? msg = code is String ? qnaMessageForCode(code) : null;
+    throw AppError(msg ?? '질문방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
   }
 
   @override

@@ -11,6 +11,13 @@ import '../../../shared/errors/app_error.dart';
 String? qnaErrorMessage(Object e) {
   final String? code = qnaErrorCode(e);
   if (code == null) return null;
+  return qnaMessageForCode(code);
+}
+
+/// 오류 코드 문자열 → 한글 문구. 예외가 아니라 **정상 반환 봉투**
+/// (`{ok:false, code}` — ensure_free_question_room 등)로 실패를 알리는 RPC 도
+/// 같은 문구 정본을 쓰도록 코드 단위 진입점을 분리한다.
+String? qnaMessageForCode(String code) {
   switch (code) {
     // 사용량·질문권
     case 'WEEKLY_LIMIT_EXHAUSTED':
@@ -34,9 +41,18 @@ String? qnaErrorMessage(Object e) {
       return '계정 이용이 제한된 상태예요. 자세한 내용은 문의해 주세요.';
     case 'ACCOUNT_NOT_ACTIVE':
       return '현재 계정 상태에서는 이 기능을 사용할 수 없어요.';
+    case 'ACCOUNT_DELETION_IN_PROGRESS':
+      return '탈퇴 처리 중인 계정이라 새 질문을 시작할 수 없어요.';
+    case 'ROLE_NOT_STUDENT':
+      return '학생 계정에서만 사용할 수 있는 기능이에요.';
     // 멘토 자격
     case 'MENTOR_NOT_APPROVED':
       return '멘토 승인 상태가 확인되지 않아 지금은 진행할 수 없어요.';
+    case 'MENTOR_NOT_FOUND':
+      return '멘토 정보를 찾을 수 없어요. 새로고침 후 다시 시도해 주세요.';
+    // 방 생성(ensure_free_question_room)
+    case 'ROOM_ENSURE_FAILED':
+      return '질문방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
     // 당사자·권한
     case 'NOT_ROOM_PARTY':
     case 'STUDENT_ONLY':
