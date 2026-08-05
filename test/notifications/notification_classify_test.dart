@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 
-/// 기대값 한 줄(정본 17종 테이블).
+/// 기대값 한 줄(정본 18종 테이블).
 class _Expect {
   const _Expect(this.code, this.type, this.kind, this.dest);
   final String code;
@@ -10,9 +10,12 @@ class _Expect {
   final NotificationDestination dest;
 }
 
-/// 서버 계약 스냅샷 §4.1 의 17종 전부 — 누락·오분류가 생기면 여기서 깨진다.
+/// 서버 계약 스냅샷 §4.1 + question_received(2026-08) 의 18종 전부 — 누락·오분류가 생기면 여기서 깨진다.
 const List<_Expect> _canonical = <_Expect>[
   _Expect('question_answered', NotificationEventType.questionAnswered,
+      NotificationKind.questionRoom, NotificationDestination.questionRoomTab),
+  // 2026-08 추가: 구독형 새 질문 → 방 멘토 수신(질문방 분류·질문방 탭 목적지).
+  _Expect('question_received', NotificationEventType.questionReceived,
       NotificationKind.questionRoom, NotificationDestination.questionRoomTab),
   _Expect('new_order_message', NotificationEventType.newOrderMessage,
       NotificationKind.customRequest, NotificationDestination.stay),
@@ -105,10 +108,10 @@ Map<String, dynamic> _row(
     };
 
 void main() {
-  test('정본 17종 — 타입·분류·목적지 정확 매핑(테이블 전수)', () {
+  test('정본 18종 — 타입·분류·목적지 정확 매핑(테이블 전수)', () {
     expect(_canonical.length, NotificationEventType.canonicalCount,
-        reason: '테이블은 정본 17종을 빠짐없이 다뤄야 한다');
-    // enum 자체도 unknown 제외 17종이어야 한다.
+        reason: '테이블은 정본 18종을 빠짐없이 다뤄야 한다');
+    // enum 자체도 unknown 제외 18종이어야 한다.
     expect(
         NotificationEventType.values
             .where(
@@ -182,6 +185,26 @@ void main() {
     expect(n.roomId, 'r1');
     expect(n.threadId, 't1');
     expect(n.questionId, isNull);
+  });
+
+  test('fromMap: question_received(멘토 새 질문) — room_id/thread_id 파싱·질문방 분류', () {
+    final AppNotification n = AppNotification.fromMap(_row(
+      'question_received',
+      body: '학생이 새 질문을 등록했어요.',
+      isRead: false,
+      data: <String, dynamic>{'title': '새 질문이 도착했어요'},
+      metadata: <String, dynamic>{
+        'room_id': 'r1',
+        'thread_id': 't1',
+        'student_id': 's1',
+      },
+    ));
+    expect(n.eventType, NotificationEventType.questionReceived);
+    expect(n.kind, NotificationKind.questionRoom);
+    expect(notificationDestinationOf(n.eventType),
+        NotificationDestination.questionRoomTab);
+    expect(n.roomId, 'r1');
+    expect(n.threadId, 't1');
   });
 
   test('fromMap: 개별질문 metadata.question_id 파싱', () {
