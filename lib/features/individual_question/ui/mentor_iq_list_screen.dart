@@ -44,7 +44,8 @@ class MentorIqListScreen extends StatefulWidget {
   State<MentorIqListScreen> createState() => _MentorIqListScreenState();
 }
 
-class _MentorIqListScreenState extends State<MentorIqListScreen> {
+class _MentorIqListScreenState extends State<MentorIqListScreen>
+    with WidgetsBindingObserver {
   final IndividualQuestionRepository _repo =
       const IndividualQuestionRepository();
   late Future<MentorIqListData> _future;
@@ -57,6 +58,20 @@ class _MentorIqListScreenState extends State<MentorIqListScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N34: 공개 질문 등록이 웹에서 일어나므로 앱 복귀 시 수락 대기 목록이
+    // 낡은 채였다 — resume 재조회 추가(질문방 탭과 동일 패턴).
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<MentorIqListData> _load() async {

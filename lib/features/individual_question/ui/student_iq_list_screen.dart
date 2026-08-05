@@ -44,7 +44,8 @@ class StudentIqListScreen extends StatefulWidget {
   State<StudentIqListScreen> createState() => _StudentIqListScreenState();
 }
 
-class _StudentIqListScreenState extends State<StudentIqListScreen> {
+class _StudentIqListScreenState extends State<StudentIqListScreen>
+    with WidgetsBindingObserver {
   final IndividualQuestionRepository _repo =
       const IndividualQuestionRepository();
   late Future<List<IndividualQuestion>> _future;
@@ -56,6 +57,20 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N34: 등록이 웹 전용이라 웹에서 등록 후 앱 복귀 시 목록이 낡은 채였다 —
+    // 질문방 탭과 동일하게 resume 시 재조회한다(PTR 의존 제거).
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<IndividualQuestion>> _load() =>
