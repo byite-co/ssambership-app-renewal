@@ -1,5 +1,6 @@
-/// 알림 이벤트 타입 정본(17종) — staging 트리거 소스 실추출로 확정
-/// (docs/APP_V16_SERVER_CONTRACT_SNAPSHOT.md §4.1). 키워드 포함 매칭 금지:
+/// 알림 이벤트 타입 정본(18종) — staging 트리거 소스 실추출로 확정
+/// (docs/APP_V16_SERVER_CONTRACT_SNAPSHOT.md §4.1 + 2026-08 question_received).
+/// 키워드 포함 매칭 금지:
 /// 정확한 문자열 일치만 사용하고, 목록 밖 타입은 [unknown](일반 알림 표시 ·
 /// 이동 없음)으로 다룬다. 내부 영문 코드는 화면에 노출하지 않는다.
 ///
@@ -19,6 +20,10 @@ const Set<String> kGatedNotificationTypeCodes = <String>{
 /// 서버 `notifications.type` 정확 매핑.
 enum NotificationEventType {
   questionAnswered('question_answered'),
+
+  /// 구독형 새 질문 → 방 멘토 수신(서버 producer: qna_create_question_thread,
+  /// 2026-08 추가 — metadata room_id/thread_id/student_id).
+  questionReceived('question_received'),
   newOrderMessage('new_order_message'),
   newApplication('new_application'),
   mentorSubscriptionPriceChanged('mentor_subscription_price_changed'),
@@ -55,8 +60,8 @@ enum NotificationEventType {
     return NotificationEventType.unknown;
   }
 
-  /// 정본 17종(unknown 제외).
-  static const int canonicalCount = 17;
+  /// 정본 18종(unknown 제외 — 2026-08 question_received 추가).
+  static const int canonicalCount = 18;
 }
 
 /// 화면 분류(필터 칩·배지). 표시용 그룹 — 서버 groups(qna/order/subscription/
@@ -91,6 +96,7 @@ String notificationKindLabel(NotificationKind kind) {
 NotificationKind notificationKindOf(NotificationEventType type) {
   switch (type) {
     case NotificationEventType.questionAnswered:
+    case NotificationEventType.questionReceived:
       return NotificationKind.questionRoom;
     case NotificationEventType.newOrderMessage:
     case NotificationEventType.newApplication:
@@ -138,6 +144,7 @@ enum NotificationDestination {
 NotificationDestination notificationDestinationOf(NotificationEventType type) {
   switch (type) {
     case NotificationEventType.questionAnswered:
+    case NotificationEventType.questionReceived:
       return NotificationDestination.questionRoomTab;
     case NotificationEventType.individualQuestionExpiredRefunded:
     case NotificationEventType.individualQuestionAssigned:

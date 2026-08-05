@@ -14,17 +14,22 @@ import '../widgets/thread_card.dart';
 import 'mentor_answer_screen.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
-/// 멘토 질문 목록(3뎁스). ★ 멘토 고유: 상태 탭(답변 대기 / 진행 중 / 완료) + 과목 필터 + 정렬.
-/// 카드는 S4 ThreadCard 재사용(탭/필터/정렬만 추가). 카드 탭 → 답변 화면.
+/// 멘토 질문 목록(3뎁스). ★ 멘토 고유: 상태 탭(전체 / 답변 대기 / 진행 중 / 완료) + 과목 필터 + 정렬.
+/// 기본 선택은 '전체' — 과거 기록이 첫 진입에서 바로 보인다(답변 대기 기본값이
+/// 기존 기록을 숨겨 보이던 문제 제거). 카드는 S4 ThreadCard 재사용. 카드 탭 → 답변 화면.
 class MentorQuestionListScreen extends StatefulWidget {
   const MentorQuestionListScreen({
     super.key,
     required this.room,
     required this.studentName,
+    this.readRepository = const QuestionRoomReadRepository(),
   });
 
   final Room room;
   final String studentName;
+
+  /// 테스트 주입 지점(기본: 운영 레포) — NewQuestionScreen 과 동일 패턴.
+  final QuestionRoomReadRepository readRepository;
 
   @override
   State<MentorQuestionListScreen> createState() =>
@@ -32,13 +37,15 @@ class MentorQuestionListScreen extends StatefulWidget {
 }
 
 /// 상태 탭. 라벨/색은 ThreadStatusPill·라벨 유틸과 동일 매핑.
-enum _StatusTab { pending, inProgress, confirmed }
+/// 전체=모든 상태(unknown 포함), 답변 대기=pending, 진행 중=answered/open,
+/// 완료=confirmed/closed/archived. 알 수 없는 상태는 전체 탭에서만 보인다.
+enum _StatusTab { all, pending, inProgress, done }
 
 class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
+  QuestionRoomReadRepository get _read => widget.readRepository;
 
   late Future<List<QuestionThread>> _future;
-  _StatusTab _tab = _StatusTab.pending;
+  _StatusTab _tab = _StatusTab.all; // 첫 진입 = 전체(기존 기록 노출).
   String? _subjectCode; // null = 전체
   bool _newestFirst = true;
 
@@ -52,13 +59,17 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
 
   bool _matchesTab(QuestionThread t) {
     switch (_tab) {
+      case _StatusTab.all:
+        return true; // 조회된 모든 질문(unknown 상태 포함).
       case _StatusTab.pending:
         return t.status == ThreadStatus.pending;
       case _StatusTab.inProgress:
         return t.status == ThreadStatus.answered ||
             t.status == ThreadStatus.open;
-      case _StatusTab.confirmed:
-        return t.status == ThreadStatus.confirmed;
+      case _StatusTab.done:
+        return t.status == ThreadStatus.confirmed ||
+            t.status == ThreadStatus.closed ||
+            t.status == ThreadStatus.archived;
     }
   }
 
@@ -133,9 +144,10 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
 
   Widget _statusTabs(ThreadStatusCounts c) {
     final List<String> labels = <String>[
+      '전체 ${c.total}',
       '답변 대기 ${c.pending}',
       '진행 중 ${c.inProgress}',
-      '완료 ${c.confirmed}',
+      '완료 ${c.completed}',
     ];
     // 아래 과목 필터 줄과 좌우 기준·줄 간격을 통일(같은 LTRB 프레임, 대칭 세로 간격).
     return Padding(

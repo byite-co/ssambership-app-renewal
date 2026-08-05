@@ -52,7 +52,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
   }
 
   /// 방 멘토(teaching_subjects)를 읽어 과목 후보를 그 멘토 담당 과목만으로 제한한다(A1).
-  /// 조회 실패/미지정이면 후보가 비어 '선택 안 함'만 남는다(전체 과목을 뿌리지 않음).
+  /// 조회 실패/미지정이면 빈 리스트 → 후보는 전체 정본 과목으로 폴백한다
+  /// (restrictQuestionSubjectCodes — 웹과 동일, '선택 안 함'만 남기지 않는다).
   Future<void> _loadMentorSubjects() async {
     final List<String> codes =
         await _read.mentorTeachingSubjects(widget.room.mentorId);
@@ -168,10 +169,13 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
 
   Widget _subjectPicker() {
     // 로딩 전(_mentorCodes==null)에는 잠가 두어, 로드 후 후보에서 빠질 값이
-    // 미리 선택되는 문제를 막는다. 로드되면 '해당 멘토 담당 과목만' 노출(전체 폴백 없음).
+    // 미리 선택되는 문제를 막는다. 로드되면 정규화된 멘토 담당 과목만 노출하고,
+    // 담당 과목이 없거나 조회·정규화 결과가 비면 전체 정본 과목으로 폴백한다
+    // (restrictQuestionSubjectCodes — 빈 드롭다운으로 '선택 안 함'만 남기지 않는다).
+    // 후보는 전부 정본 code 라 화면엔 한글 라벨, 전송엔 code 또는 null 만 나간다.
     final bool loaded = _mentorCodes != null;
     final List<String> codes =
-        loaded ? mentorSubjectCodesStrict(_mentorCodes!) : const <String>[];
+        loaded ? restrictQuestionSubjectCodes(_mentorCodes!) : const <String>[];
     final List<DropdownMenuItem<String?>> items = <DropdownMenuItem<String?>>[
       const DropdownMenuItem<String?>(value: null, child: Text('선택 안 함')),
       for (final String code in codes)

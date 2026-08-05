@@ -11,14 +11,19 @@ import 'package:ssambership_app/features/question_room/ui/new_question_screen.da
 
 /// P2-13(usage fail-closed) + P1-8(원자 생성 RPC 1회) 제출 흐름 검증.
 class _FakeRead extends QuestionRoomReadRepository {
-  const _FakeRead({this.usage, this.usageFails = false});
+  const _FakeRead({
+    this.usage,
+    this.usageFails = false,
+    this.teachingSubjects = const <String>['math'],
+  });
 
   final WeeklyQuestionUsage? usage;
   final bool usageFails;
+  final List<String> teachingSubjects;
 
   @override
   Future<List<String>> mentorTeachingSubjects(String mentorId) async =>
-      <String>['math'];
+      teachingSubjects;
 
   @override
   Future<List<QuestionThread>> threads(String roomId) async =>
@@ -141,5 +146,84 @@ void main() {
     expect(write.createCalls, 1);
     expect(find.textContaining('질문 등록에 실패했어요'), findsOneWidget);
     expect(find.byType(NewQuestionScreen), findsOneWidget); // pop 안 됨.
+  });
+
+  group('과목 드롭다운(A1: 멘토 담당 과목 제한 + 전체 폴백)', () {
+    Future<void> pump(WidgetTester tester,
+        {required QuestionRoomReadRepository read,
+        required _FakeWrite write}) async {
+      await tester.pumpWidget(MaterialApp(
+        home: NewQuestionScreen(
+            room: _room(), readRepository: read, writeRepository: write),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('코드형 담당 과목(math) → 해당 과목만 한글 라벨로 표시', (WidgetTester tester) async {
+      await pump(tester,
+          read: const _FakeRead(
+              usage: _ok, teachingSubjects: <String>['math', 'english']),
+          write: _FakeWrite());
+      await tester.tap(find.text('선택 안 함').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('수학'), findsOneWidget);
+      expect(find.text('영어'), findsOneWidget);
+      // 담당 밖 과목은 후보에 없다(전체 폴백 아님) + 영문 코드 비노출.
+      expect(find.text('국어'), findsNothing);
+      expect(find.text('math'), findsNothing);
+    });
+
+    testWidgets('한글형 담당 과목(수학) → 정규화되어 표시·선택 시 정본 코드 전송',
+        (WidgetTester tester) async {
+      final _FakeWrite write = _FakeWrite();
+      await pump(tester,
+          read: const _FakeRead(usage: _ok, teachingSubjects: <String>['수학']),
+          write: write);
+      await tester.tap(find.text('선택 안 함').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('수학').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).last, '수학 질문이에요');
+      await tester.tap(find.text('질문 등록'));
+      await tester.pumpAndSettle();
+
+      expect(write.createCalls, 1);
+      expect(write.lastSubject, 'math'); // 정본 code 전송(한글 라벨 금지).
+    });
+
+    testWidgets('담당 과목이 비면(미지정·조회 실패) 전체 정본 과목 폴백', (WidgetTester tester) async {
+      await pump(tester,
+          read: const _FakeRead(usage: _ok, teachingSubjects: <String>[]),
+          write: _FakeWrite());
+      await tester.tap(find.text('선택 안 함').first);
+      await tester.pumpAndSettle();
+
+      // 전체 카탈로그가 후보로 뜬다('선택 안 함'만 남지 않음).
+      expect(find.text('수학'), findsOneWidget);
+      expect(find.text('국어'), findsOneWidget);
+      expect(find.text('영어'), findsOneWidget);
+    });
+
+    testWidgets('정규화 불가 자유 라벨만이면 전체 폴백', (WidgetTester tester) async {
+      await pump(tester,
+          read: const _FakeRead(usage: _ok, teachingSubjects: <String>['코딩']),
+          write: _FakeWrite());
+      await tester.tap(find.text('선택 안 함').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('수학'), findsOneWidget);
+      expect(find.text('국어'), findsOneWidget);
+    });
+
+    testWidgets('과목 미선택 제출 → 생성 RPC 에 subject=null 전달', (WidgetTester tester) async {
+      final _FakeWrite write = _FakeWrite();
+      await _pumpAndSubmit(tester,
+          read: const _FakeRead(usage: _ok), write: write);
+
+      expect(write.createCalls, 1);
+      expect(write.lastSubject, isNull);
+    });
   });
 }

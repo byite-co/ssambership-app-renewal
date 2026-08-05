@@ -11,9 +11,10 @@ class ThreadStatusCounts {
     required this.pending,
     required this.inProgress,
     required this.confirmed,
+    this.completed = 0,
   });
 
-  /// 스레드 총 개수.
+  /// 스레드 총 개수(unknown 포함 — '전체' 탭의 개수).
   final int total;
 
   /// 답변 대기(pending) — 멘토가 답할 차례.
@@ -22,11 +23,15 @@ class ThreadStatusCounts {
   /// 진행 중(answered/open) — 답변은 갔고 학생 확인 대기.
   final int inProgress;
 
-  /// 답변 완료(confirmed).
+  /// 답변 완료(confirmed). 요약 라인·주의 표시용(기존 소비처 호환).
   final int confirmed;
 
+  /// 완료 탭 집계(confirmed + closed + archived). 멘토 질문 목록 '완료' 탭용 —
+  /// closed/archived 를 confirmed 와 분리 유지해 summaryLine 의미는 안 바꾼다.
+  final int completed;
+
   factory ThreadStatusCounts.from(Iterable<QuestionThread> threads) {
-    int p = 0, ip = 0, c = 0, t = 0;
+    int p = 0, ip = 0, c = 0, done = 0, t = 0;
     for (final QuestionThread th in threads) {
       t++;
       switch (th.status) {
@@ -39,14 +44,18 @@ class ThreadStatusCounts {
           break;
         case ThreadStatus.confirmed:
           c++;
+          done++;
           break;
         case ThreadStatus.closed:
         case ThreadStatus.archived:
+          done++; // 완료 탭에는 포함(요약 라인에서는 기존대로 제외).
+          break;
         case ThreadStatus.unknown:
-          break; // 내부 취급 — 요약 카운트에서 제외
+          break; // 알 수 없는 상태 — total(전체)에만 포함
       }
     }
-    return ThreadStatusCounts(total: t, pending: p, inProgress: ip, confirmed: c);
+    return ThreadStatusCounts(
+        total: t, pending: p, inProgress: ip, confirmed: c, completed: done);
   }
 
   /// 멘토 주의 필요(답할 게 있음).
