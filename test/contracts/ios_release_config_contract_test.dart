@@ -156,9 +156,12 @@ void main() {
           reason: 'ATS 전면 해제는 심사 사유 요구 대상 — 도입 금지');
     });
 
-    test('권한 문구(사진·카메라)는 유지', () {
+    test('권한 문구(사진·카메라·마이크)는 유지', () {
       expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
       expect(plist, contains('<key>NSCameraUsageDescription</key>'));
+      // 숏폼 WebView 영상 촬영은 마이크 권한을 함께 요구한다 — 키가 빠지면
+      // '촬영' 선택 순간 TCC 강제 종료(2026-08 실기기 크래시 교정).
+      expect(plist, contains('<key>NSMicrophoneUsageDescription</key>'));
     });
   });
 

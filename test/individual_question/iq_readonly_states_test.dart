@@ -147,30 +147,12 @@ void main() {
     });
   });
 
-  group('첨삭 진입 상태 게이트 — 활성 구간(assigned/claimed/answered)에서만', () {
-    // §4-1: 첫 답변 전(claimed/assigned)과 답변 도착 후 해결 완료 전(answered).
-    for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
-      IndividualQuestionStatus.assigned,
-      IndividualQuestionStatus.claimed,
-      IndividualQuestionStatus.answered,
-    ]) {
-      testWidgets('멘토 · $s: 첨삭하기 표시', (WidgetTester tester) async {
-        await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
-
-        expect(find.text('첨삭하기'), findsOneWidget);
-      });
-    }
-
-    // 종결·답변자 미정·미지 7개 상태는 전부 읽기 전용.
-    for (final IndividualQuestionStatus s in <IndividualQuestionStatus>[
-      IndividualQuestionStatus.escrowed,
-      IndividualQuestionStatus.open,
-      IndividualQuestionStatus.released,
-      IndividualQuestionStatus.refunded,
-      IndividualQuestionStatus.expired,
-      IndividualQuestionStatus.canceled,
-      IndividualQuestionStatus.unknown,
-    ]) {
+  group('첨삭 진입 게이트 — 폐쇄(2026-08): 모든 상태·역할에서 미노출', () {
+    // ★ 첨삭 기능이 제품에서 닫혀 있는 동안 진입 버튼을 노출하지 않는다
+    //   (버튼만 남고 기능이 막힌 반쪽 상태 금지 — iOS 멘토 실기기 실측).
+    //   재개 시 iq_detail_screen._canAnnotateGroup 원복과 함께 과거 상태
+    //   매트릭스(git 이력 이 파일 2026-08 이전, §4-1 활성 구간)를 되살릴 것.
+    for (final IndividualQuestionStatus s in IndividualQuestionStatus.values) {
       testWidgets('멘토 · $s: 첨삭하기 미표시(첨부 조회·저장은 유지)',
           (WidgetTester tester) async {
         await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
@@ -188,20 +170,6 @@ void main() {
         expect(find.text('첨삭하기'), findsNothing);
       });
     }
-
-    testWidgets('게이트는 iqCanMentorAnnotate 와 같은 구간을 쓴다(정의 이탈 가드)',
-        (WidgetTester tester) async {
-      for (final IndividualQuestionStatus s
-          in IndividualQuestionStatus.values) {
-        await _pump(tester, s, role: AppRole.mentor, attachments: _oneImage);
-
-        expect(
-          find.text('첨삭하기'),
-          iqCanMentorAnnotate(s) ? findsOneWidget : findsNothing,
-          reason: '$s: iqCanMentorAnnotate=${iqCanMentorAnnotate(s)} 와 어긋난다',
-        );
-      }
-    });
 
     testWidgets('작성자 미기록 레거시 첨부: 활성 상태에서도 첨삭하기 미노출(추측 금지)',
         (WidgetTester tester) async {
