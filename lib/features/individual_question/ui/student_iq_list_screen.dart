@@ -6,21 +6,25 @@ import '../../../design/typography_tokens.dart';
 import '../../../design/widgets/chip_scroll.dart';
 import '../../../design/widgets/empty_state.dart';
 import '../../../design/widgets/primary_button.dart';
+import '../../../core/web_bridge/web_bridge.dart';
+import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../data/individual_question_repository.dart';
 import '../data/models/individual_question_models.dart';
 import '../iq_flags.dart';
-import 'iq_create_screen.dart';
 import 'iq_detail_screen.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/friendly_error.dart';
 
-/// 학생 — 내 개별질문 목록. 작성은 공개형(전체 멘토 대상);
-/// 지정형은 멘토 상세의 '개별질문 하기'에서 진입한다.
+/// 학생 — 내 개별질문 목록. 신규 등록은 경계 확정(2026-08-05)에 따라 웹에서만
+/// 한다 — 여기 CTA 는 웹 등록 페이지를 연다. 지정형 등록은 멘토 상세에서 같은
+/// 방식으로 진입한다. 조회·상세는 앱에 그대로 남는다.
 class StudentIqListScreen extends StatefulWidget {
   const StudentIqListScreen({
     super.key,
     this.loaderOverride,
     this.embedded = false,
+    this.webBridgeOverride,
+    this.createCtaOverride,
   });
 
   /// 테스트용 데이터 주입. null 이면 실제 레포 사용.
@@ -29,6 +33,12 @@ class StudentIqListScreen extends StatefulWidget {
   /// true: 하단 탭(HomeShell)에 임베드 — 자체 Scaffold/AppBar 없이 본문만.
   /// false(기본): 단독 push 화면 — 기존과 동일하게 AppBar 포함.
   final bool embedded;
+
+  /// 테스트용 웹 브릿지 주입(loaderOverride 패턴) — 실사용은 null.
+  final WebBridge? webBridgeOverride;
+
+  /// 테스트용 신규 등록 CTA 노출 강제 — 실사용은 null(플래그 기준 기존 판정).
+  final bool? createCtaOverride;
 
   @override
   State<StudentIqListScreen> createState() => _StudentIqListScreenState();
@@ -58,14 +68,14 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
     setState(() => _future = _load());
   }
 
-  Future<void> _openCreate() async {
-    final bool? created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => const IqCreateScreen(),
-      ),
-    );
-    if (created == true && mounted) _refresh();
-  }
+  /// 신규 등록 CTA 노출 판정 — 기존 플래그 의미 유지(테스트 override 만 추가).
+  bool get _createCtaVisible =>
+      widget.createCtaOverride ?? kIndividualQuestionCreateEnabled;
+
+  /// 경계 확정(2026-08-05): 신규 등록은 웹 전용 — 네이티브 등록 화면을 열지 않는다.
+  /// 웹에서 등록 후 앱으로 돌아오면 당겨서 새로고침(_refresh)이 목록 최신화 경로다.
+  Future<void> _openCreate() =>
+      openIqCreateWeb(context, bridge: widget.webBridgeOverride);
 
   Future<void> _openDetail(IndividualQuestion q) async {
     final bool? changed = await Navigator.of(context).push<bool>(
@@ -122,8 +132,8 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
             icon: Icons.help_outline,
             title: '아직 개별질문이 없어요',
             message: '구독 없이 1건씩 캐시로 질문할 수 있어요.',
-            actionLabel: kIndividualQuestionCreateEnabled ? '새 개별질문' : null,
-            onAction: kIndividualQuestionCreateEnabled ? _openCreate : null,
+            actionLabel: _createCtaVisible ? '새 개별질문' : null,
+            onAction: _createCtaVisible ? _openCreate : null,
           );
         }
         final List<IndividualQuestion> filtered = items
@@ -135,7 +145,7 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenH, 12, AppSpacing.screenH, 24),
             children: <Widget>[
-              if (kIndividualQuestionCreateEnabled) ...<Widget>[
+              if (_createCtaVisible) ...<Widget>[
                 PrimaryButton(
                   label: '새 개별질문 (공개형)',
                   icon: Icons.add,

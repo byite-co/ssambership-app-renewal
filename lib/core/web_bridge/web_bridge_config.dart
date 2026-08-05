@@ -41,6 +41,16 @@ class WebBridgeConfig {
   static const String accountDeletePath =
       '/account/delete'; // app/(student)/account/delete
 
+  /// 개별질문 신규 등록(학생) — 경계 확정(2026-08-05): 네이티브 등록 화면 진입을
+  /// 제거했고 신규 등록은 웹에서만 한다. 조회·답변·첨부·첨삭은 앱에 그대로 남는다.
+  static const String iqCreatePath =
+      '/individual-questions/new'; // app/(student)/individual-questions/new
+
+  /// 멘토 지정형 개별질문 등록 — 웹 실측 라우트의 path param 계약을 그대로 쓴다.
+  static String iqCreateForMentorPath(String mentorId) =>
+      // app/(student)/mentors/[mentorId]/individual-question/new
+      '/mentors/${Uri.encodeComponent(mentorId)}/individual-question/new';
+
   /// baseUrl 이 채워졌는지(=웹 열기 가능). 비면 안내 폴백.
   static bool get isConfigured => baseUrl.isNotEmpty;
 }
