@@ -17,7 +17,10 @@ import '../../question_room/data/mentor_lookup_repository.dart';
 import '../../question_room/data/models/question_thread.dart';
 import '../../question_room/data/models/room.dart';
 import '../../question_room/data/question_room_read_repository.dart';
+import '../../question_room/data/student_lookup_repository.dart';
 import '../../question_room/ui/chat_screen.dart';
+import '../../question_room/ui/mentor/mentor_answer_screen.dart';
+import '../../question_room/ui/mentor/student_room_home_screen.dart';
 import '../../question_room/ui/mentor_room_home_screen.dart';
 
 /// 알림 상세 목적지 열기 — 검증된 route([NotificationDeepLinkRoute])만 받아
@@ -52,11 +55,14 @@ class NotificationTargetOpener {
     }
   }
 
-  /// 질문방 — 학생 화면 계약(question_answered 는 학생 수신). roomId 가 없으면
-  /// threadId 로 방을 역추적한다. 멘토 역할이면 폴백(멘토 흐름은 받은함 경유).
+  /// 질문방 — 역할별 화면으로 연다(학생=기존 계약, 멘토=답변 화면/학생방 홈).
+  /// roomId 가 없으면 threadId 로 방을 역추적한다. 그 외 역할(관리자·게스트)은
+  /// 폴백. 과거엔 멘토를 무조건 폴백시켜 질문방 계열 알림 탭이 막혔다 —
+  /// 웹 딥링크(role=mentor → /mentor/question-room/…)와 동일하게 교정.
   Future<bool> _openRoom(
       BuildContext context, NotificationRoomRoute route) async {
-    if (AuthService.instance.currentRole != AppRole.student) return false;
+    final AppRole role = AuthService.instance.currentRole;
+    if (role != AppRole.student && role != AppRole.mentor) return false;
     const QuestionRoomReadRepository rooms = QuestionRoomReadRepository();
 
     QuestionThread? thread;
@@ -82,6 +88,42 @@ class NotificationTargetOpener {
     }
     if (room == null) return false;
 
+    // 클로저 캡처용 지역 확정값(널 승격을 클로저 안까지 보장).
+    final Room targetRoom = room;
+    final QuestionThread? targetThread = thread;
+
+    if (role == AppRole.mentor) {
+      // 멘토 — 상대(학생) 이름 조회 후 해당 질문 답변 화면/학생방 홈으로.
+      String studentName = '학생';
+      try {
+        final Map<String, StudentPublic> students =
+            await const StudentLookupRepository()
+                .fetchMany(<String>[targetRoom.studentId]);
+        studentName =
+            students[targetRoom.studentId]?.displayName ?? '학생';
+      } catch (_) {
+        // 이름 조회 실패는 중립 표시로 계속 진행.
+      }
+      if (!context.mounted) return false;
+      final String sName = studentName;
+      if (targetThread != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => MentorAnswerScreen(
+                thread: targetThread, studentName: sName, room: targetRoom),
+          ),
+        );
+      } else {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                StudentRoomHomeScreen(room: targetRoom, studentName: sName),
+          ),
+        );
+      }
+      return true;
+    }
+
     String mentorName = '멘토';
     try {
       mentorName =
@@ -93,9 +135,6 @@ class NotificationTargetOpener {
     }
 
     if (!context.mounted) return false;
-    // 클로저 캡처용 지역 확정값(널 승격을 클로저 안까지 보장).
-    final Room targetRoom = room;
-    final QuestionThread? targetThread = thread;
     final String name = mentorName;
     if (targetThread != null) {
       await Navigator.of(context).push(
