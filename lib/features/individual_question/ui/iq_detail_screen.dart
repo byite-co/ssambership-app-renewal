@@ -244,8 +244,8 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다.
-    if (state == AppLifecycleState.resumed) _refresh();
+    // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다(N19 코얼레싱).
+    if (state == AppLifecycleState.resumed) _coalescedRefresh();
   }
 
   /// 로그아웃/계정 전환 — 이전 사용자 채널을 정리한다(구독 누수·오배달 방지).
@@ -273,19 +273,19 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         if (!mounted) return;
         _messages.upsertFromServer(m);
       },
-      // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회.
+      // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회(N19 코얼레싱).
       onQuestionUpdate: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
       // 첨부 행 생성 → 첨부 목록 서버 재조회(실시간 payload 를 정본으로 쓰지
       // 않는다 — 서명 URL·귀속 그룹·정렬은 재조회가 담당. 재조회는 그룹을
-      // 통째로 다시 만들므로 중복 표시 0).
+      // 통째로 다시 만들므로 중복 표시 0). N19 코얼레싱.
       onAttachmentInsert: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
-      // 재연결 — 끊긴 사이 공백을 전체 재조회로 메운다.
+      // 재연결 — 끊긴 사이 공백을 전체 재조회로 메운다(N19 코얼레싱).
       onReconnected: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
     );
   }
@@ -351,6 +351,32 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (!mounted) return; // await 뒤 호출 경로 대비(P3-4).
     if (scrollToLatest) _scrollToLatestOnData = true;
     final Future<IqDetailData> next = _load();
+    setState(() {
+      _future = next;
+    });
+  }
+
+  // N19: 실시간 이벤트 버스트(질문 UPDATE + 첨부 INSERT 연쇄·재연결 등)마다
+  // 3쿼리 전체 재조회가 중첩 발화하지 않게 — 진행 중 1 + 종료 후 후행 1 로
+  // 수렴한다. 사용자 액션(해결완료·환불·전송 후) 재조회는 즉시성 우선이라
+  // 기존 _refresh 그대로.
+  bool _rtRefreshing = false;
+  bool _rtRefreshQueued = false;
+
+  void _coalescedRefresh() {
+    if (!mounted) return;
+    if (_rtRefreshing) {
+      _rtRefreshQueued = true;
+      return;
+    }
+    _rtRefreshing = true;
+    final Future<IqDetailData> next = _load().whenComplete(() {
+      _rtRefreshing = false;
+      if (_rtRefreshQueued) {
+        _rtRefreshQueued = false;
+        _coalescedRefresh();
+      }
+    });
     setState(() {
       _future = next;
     });
