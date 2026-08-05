@@ -62,6 +62,17 @@ class WebBridge {
   Future<WebOpenResult> openAccountDelete({String source = 'app'}) =>
       _open(WebBridgeConfig.accountDeletePath, <String, String>{'src': source});
 
+  /// 개별질문 신규 등록 — 경계 확정(2026-08-05): 네이티브 등록 화면 진입 제거,
+  /// 웹 전용. [mentorId] 가 있으면 멘토 지정형 등록 라우트로 간다.
+  Future<WebOpenResult> openIqCreate(
+          {String? mentorId, String source = 'app'}) =>
+      _open(
+        (mentorId == null || mentorId.isEmpty)
+            ? WebBridgeConfig.iqCreatePath
+            : WebBridgeConfig.iqCreateForMentorPath(mentorId),
+        <String, String>{'src': source},
+      );
+
   /// URL 조립(테스트/검토용). baseUrl 미확정/파싱 불가면 null.
   /// ★ 조립만 한다 — 실제 열기 전 검증은 [isAllowedUri] 가 한다.
   Uri? buildUri(String path,

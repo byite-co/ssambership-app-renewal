@@ -21,8 +21,9 @@ import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/widgets/secondary_button.dart';
 import '../../../shared/widgets/commerce_notice_card.dart';
+import '../../../core/web_bridge/web_bridge.dart';
+import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../../individual_question/iq_flags.dart';
-import '../../individual_question/ui/iq_create_screen.dart';
 
 /// 멘토 상세(열람 전용). 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
 /// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](웹 브릿지).
@@ -37,6 +38,8 @@ class MentorDetailScreen extends StatefulWidget {
     required this.item,
     this.initialFavorited = false,
     this.extrasLoaderOverride,
+    this.webBridgeOverride,
+    this.createCtaOverride,
   });
 
   final MentorListItem item;
@@ -46,6 +49,13 @@ class MentorDetailScreen extends StatefulWidget {
 
   /// 테스트용 extras 로더 주입(loaderOverride 패턴) — 실사용은 null.
   final Future<MentorDetailExtras> Function()? extrasLoaderOverride;
+
+  /// 테스트용 웹 브릿지 주입(loaderOverride 패턴) — 실사용은 null.
+  final WebBridge? webBridgeOverride;
+
+  /// 테스트용 '개별질문 하기' CTA 노출 강제 — 실사용은 null
+  /// (null 이면 플래그·역할 기준 기존 판정 그대로).
+  final bool? createCtaOverride;
 
   @override
   State<MentorDetailScreen> createState() => _MentorDetailScreenState();
@@ -225,10 +235,13 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
               );
             },
           ),
-          // 개별질문: 구독 없이 1건씩 캐시로 질문(지정형). 학생만.
-          if (kIndividualQuestionEnabled &&
-              kIndividualQuestionCreateEnabled &&
-              AuthService.instance.currentRole == AppRole.student) ...<Widget>[
+          // 개별질문(지정형) 신규 등록: 경계 확정(2026-08-05) — 등록은 웹에서만.
+          // 이 CTA 는 네이티브 등록 화면이 아니라 웹 등록 페이지를 연다. 학생만.
+          if (widget.createCtaOverride ??
+              (kIndividualQuestionEnabled &&
+                  kIndividualQuestionCreateEnabled &&
+                  AuthService.instance.currentRole ==
+                      AppRole.student)) ...<Widget>[
             const SizedBox(height: 10),
             SecondaryButton(
               label: '개별질문 하기',
@@ -241,16 +254,11 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
     );
   }
 
-  Future<void> _openIndividualQuestion(BuildContext context) async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqCreateScreen(
-          mentorId: widget.item.id,
-          mentorName: widget.item.displayName,
-        ),
-      ),
-    );
-  }
+  /// 경계 확정(2026-08-05): 신규 개별질문 등록은 웹 전용 — 네이티브 등록 화면을
+  /// 열지 않고 멘토 지정형 웹 등록 페이지로 연결한다(실패·미확정 시 안내 폴백).
+  Future<void> _openIndividualQuestion(BuildContext context) =>
+      openIqCreateWeb(context,
+          mentorId: widget.item.id, bridge: widget.webBridgeOverride);
 
   void _goToQuestionRoom(BuildContext context) {
     // 루트(HomeShell)로 되돌아간 뒤 질문방 탭으로 전환 요청.
