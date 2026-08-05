@@ -187,7 +187,22 @@ class AuthService extends ChangeNotifier {
     unawaited(_loadProfile().then((_) => notifyListeners()));
   }
 
-  Future<void> _loadProfile() async {
+  /// 진행 중인 프로필 로드(single-flight). 부팅의 직접 로드와 initialSession
+  /// 이벤트 로드, 로그인 직후 명시 로드와 signedIn 이벤트 로드가 각각 겹쳐
+  /// 같은 왕복을 두 번 하던 것을 하나로 합친다(C1).
+  Future<void>? _profileLoad;
+
+  Future<void> _loadProfile() {
+    final Future<void>? inFlight = _profileLoad;
+    if (inFlight != null) return inFlight;
+    final Future<void> load = _loadProfileOnce().whenComplete(() {
+      _profileLoad = null;
+    });
+    _profileLoad = load;
+    return load;
+  }
+
+  Future<void> _loadProfileOnce() async {
     final SupabaseClient? client = _client;
     final Session? session = _session;
     if (client == null || session == null) {
@@ -195,17 +210,60 @@ class AuthService extends ChangeNotifier {
       return;
     }
     final String userId = session.user.id;
-    // role 조회 '실패'(네트워크 등)는 '역할 없음(guest)'과 구분해 재시도 가능 차단으로.
-    final AppRole? role = await _readRole(client, userId);
+    // users 본인 행 1회 통합 조회(C1) — role·표시명·계정상태 판정이 같은 행을
+    // 나눠 쓴다(종전 3회 SELECT). 조회 '실패'(네트워크 등)는 '역할 없음(guest)'
+    // 과 구분해 재시도 가능 차단으로.
+    Map<String, dynamic>? userRow;
+    bool userRowFetchFailed = false;
+    try {
+      userRow = await client
+          .from('users')
+          .select('role, nickname, full_name, status, suspended_until')
+          .eq('id', userId)
+          .maybeSingle();
+    } catch (_) {
+      userRowFetchFailed = true;
+    }
+    final AppRole? role =
+        userRowFetchFailed ? null : _parseRole(userRow?['role'] as String?);
     _roleFetchFailed = role == null;
     _role = role ?? AppRole.guest;
-    _displayName = await _readDisplayName(client, userId);
-    _account = await AccountStatusReader.fetch(client, userId);
+    _displayName = _parseDisplayName(userRow);
+    _account = await AccountStatusReader.resolve(
+      PrefetchedUserRowGateway(
+        inner: SupabaseAccountStatusGateway(client),
+        userRow: userRow,
+        userRowFetchFailed: userRowFetchFailed,
+      ),
+      userId,
+    );
     if (_role == AppRole.student) {
       _entitlement = await EntitlementReader.fetchForStudent(client, userId);
     } else {
       _entitlement = Entitlement.none;
     }
+  }
+
+  /// role 파싱. 값 없음/미지 값 → guest(비복구 차단). (조회 실패는 호출부에서
+  /// null 로 구분한다 — 재시도 가능 차단.)
+  static AppRole _parseRole(String? raw) {
+    switch (raw?.trim()) {
+      case 'student':
+        return AppRole.student;
+      case 'mentor':
+        return AppRole.mentor;
+      case 'admin':
+        return AppRole.admin;
+      default:
+        return AppRole.guest;
+    }
+  }
+
+  /// 표시용 이름 파싱(nickname 우선, 없으면 full_name, 둘 다 없으면 '').
+  static String _parseDisplayName(Map<String, dynamic>? row) {
+    final String nickname = (row?['nickname'] as String?)?.trim() ?? '';
+    if (nickname.isNotEmpty) return nickname;
+    return (row?['full_name'] as String?)?.trim() ?? '';
   }
 
   void _resetProfile() {
@@ -214,45 +272,6 @@ class AuthService extends ChangeNotifier {
     _displayName = '';
     _account = AccountState.fetchFailed;
     _entitlement = Entitlement.none;
-  }
-
-  /// role read. 값 없음 → guest(비복구 차단), 조회 실패 → null(재시도 가능 차단).
-  Future<AppRole?> _readRole(SupabaseClient client, String userId) async {
-    try {
-      final Map<String, dynamic>? row = await client
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle();
-      switch ((row?['role'] as String?)?.trim()) {
-        case 'student':
-          return AppRole.student;
-        case 'mentor':
-          return AppRole.mentor;
-        case 'admin':
-          return AppRole.admin;
-        default:
-          return AppRole.guest;
-      }
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// 표시용 이름 read(RLS: 본인 행만). nickname 우선, 없으면 full_name, 둘 다 없으면 ''.
-  Future<String> _readDisplayName(SupabaseClient client, String userId) async {
-    try {
-      final Map<String, dynamic>? row = await client
-          .from('users')
-          .select('nickname, full_name')
-          .eq('id', userId)
-          .maybeSingle();
-      final String nickname = (row?['nickname'] as String?)?.trim() ?? '';
-      if (nickname.isNotEmpty) return nickname;
-      return (row?['full_name'] as String?)?.trim() ?? '';
-    } catch (_) {
-      return '';
-    }
   }
 
   /// 이메일+비밀번호 로그인. 실패 시 AuthException 전파(화면에서 안내).
