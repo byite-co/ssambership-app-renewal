@@ -910,14 +910,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     );
   }
 
-  /// 멘토가 이 첨부에 첨삭할 수 있는가 — 담당 멘토 + 활성 상태(assigned/
-  /// claimed/answered) + **학생 작성 첨부**만(§4-1). 작성자 미확인 레거시는
-  /// 추측으로 열지 않는다. (이미지 여부는 첨부 그룹 위젯이 항목별로 거른다.)
+  /// 멘토 첨삭 진입 게이트 — **항상 false(2026-08 폐쇄)**.
+  ///
+  /// 첨삭 기능이 제품에서 닫혀 있는 동안 진입 버튼('첨삭하기')을 노출하지
+  /// 않는다 — 버튼만 남고 기능이 막힌 반쪽 상태 금지(iOS 멘토 실기기 실측).
+  /// 재개 시 이 게이트만 원복하면 된다. 원래 조건(§4-1): 담당 멘토 + 활성
+  /// 상태(iqCanMentorAnnotate) + 학생 작성 첨부만. S18 기계 부품
+  /// (_annotateAttachment·IqAnnotationRepository·오버라이드 주입점)은 유지.
   bool _canAnnotateGroup(IndividualQuestion q, IqMessageAuthor groupAuthor) =>
-      _role == AppRole.mentor &&
-      !_busy &&
-      iqCanMentorAnnotate(q.status) &&
-      groupAuthor == IqMessageAuthor.student;
+      false;
 
   /// 원본 질문 = 타임라인의 첫 대화 항목. 제목·본문·작성시각·**학생 첨부**가 한
   /// 말풍선 그룹이다(별도 질문 카드·첨부 섹션 금지).
