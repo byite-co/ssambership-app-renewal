@@ -53,14 +53,22 @@ class MentorLookupRepository {
     return MentorPublic.fromMap(row);
   }
 
-  /// 여러 멘토를 한 번에(개별 단건 조회). id → MentorPublic.
+  /// 여러 멘토를 한 번에 — 뷰 배치 1회(in 필터). id → MentorPublic.
+  /// C14: 종전 id 별 순차 단건 조회(N+1)를 학생 조회(get_mentor_student_
+  /// nicknames 배열 1회)와 대칭인 단일 왕복으로 바꾼다.
   /// 뷰에 없는(비공개) 멘토는 결과에서 빠진다 — 호출부가 중립 표시로 폴백.
   Future<Map<String, MentorPublic>> fetchMany(Iterable<String> ids) async {
-    final Map<String, MentorPublic> out = <String, MentorPublic>{};
-    for (final String id in ids.toSet()) {
-      final MentorPublic? m = await fetch(id);
-      if (m != null) out[id] = m;
-    }
-    return out;
+    final Set<String> unique = ids.toSet();
+    if (unique.isEmpty) return <String, MentorPublic>{};
+    final List<Map<String, dynamic>> rows = await _client
+        .schema('api_web_v1')
+        .from('mentor_directory_v1')
+        .select('mentor_id, nickname')
+        .inFilter('mentor_id', unique.toList());
+    return <String, MentorPublic>{
+      for (final Map<String, dynamic> r in rows)
+        if (r['mentor_id'] is String)
+          r['mentor_id'] as String: MentorPublic.fromMap(r),
+    };
   }
 }
