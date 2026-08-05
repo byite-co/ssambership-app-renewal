@@ -182,8 +182,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _load() async {
     try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      final List<QuestionAttachment> atts = await _loadAttachments();
+      // N21: 메시지·첨부는 독립 조회 — 병렬(종전 순차 2왕복 벽시계 절감).
+      final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+        _read.messages(widget.thread.id),
+        _loadAttachments(),
+      ]);
+      final List<QuestionMessage> msgs = loaded[0] as List<QuestionMessage>;
+      final List<QuestionAttachment> atts =
+          loaded[1] as List<QuestionAttachment>;
       if (!mounted) return;
       setState(() {
         _messages = ThreadMessagesController(msgs);
@@ -236,13 +242,14 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _refresh() async {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null) return;
-    try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      ctrl.resetTo(msgs);
-    } catch (_) {
-      // 조용히 무시 — 기존 목록 유지.
-    }
-    final List<QuestionAttachment> atts = await _loadAttachments();
+    // N21: 메시지·첨부 재조회 병렬화(메시지 실패는 조용히 무시 — 기존 목록 유지).
+    final Future<void> msgsF = _read
+        .messages(widget.thread.id)
+        .then(ctrl.resetTo)
+        .catchError((Object _) {});
+    final Future<List<QuestionAttachment>> attsF = _loadAttachments();
+    await msgsF;
+    final List<QuestionAttachment> atts = await attsF;
     if (mounted) setState(() => _attachments = atts);
   }
 
@@ -313,7 +320,8 @@ class _ChatScreenState extends State<ChatScreen> {
         messageId: messageId,
         image: image,
       );
-      await _refresh(); // 첨부 반영.
+      // N21: 본문은 전송 시 서버 반환 행으로 이미 반영 — 첨부만 재조회.
+      await _reloadAttachments();
       return true;
     } catch (e) {
       _showError('이미지 첨부에 실패했어요. ${friendlyError(e)}');

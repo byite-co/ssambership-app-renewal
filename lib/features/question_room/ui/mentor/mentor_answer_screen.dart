@@ -222,13 +222,14 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   Future<void> _refresh() async {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null) return;
-    try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      ctrl.resetTo(msgs);
-    } catch (_) {
-      // 무시 — 기존 목록 유지.
-    }
-    final List<QuestionAttachment> atts = await _loadAttachments();
+    // N21: 메시지·첨부 재조회 병렬화(메시지 실패는 조용히 무시 — 기존 목록 유지).
+    final Future<void> msgsF = _read
+        .messages(widget.thread.id)
+        .then(ctrl.resetTo)
+        .catchError((Object _) {});
+    final Future<List<QuestionAttachment>> attsF = _loadAttachments();
+    await msgsF;
+    final List<QuestionAttachment> atts = await attsF;
     if (mounted) setState(() => _attachments = atts);
   }
 
@@ -316,7 +317,8 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
       if (result.answeredTransition && mounted) {
         setState(() => _status = ThreadStatus.answered);
       }
-      await _refresh();
+      // N21: 본문은 전송 시 서버 반환 행으로 이미 반영 — 첨부만 재조회.
+      await _reloadAttachments();
       return true;
     } catch (e) {
       _showError('이미지 첨부에 실패했어요. ${friendlyError(e)}');
