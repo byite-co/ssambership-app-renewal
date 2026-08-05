@@ -156,12 +156,26 @@ void main() {
           reason: 'ATS 전면 해제는 심사 사유 요구 대상 — 도입 금지');
     });
 
-    test('권한 문구(사진·카메라·마이크)는 유지', () {
-      expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
-      expect(plist, contains('<key>NSCameraUsageDescription</key>'));
-      // 숏폼 WebView 영상 촬영은 마이크 권한을 함께 요구한다 — 키가 빠지면
-      // '촬영' 선택 순간 TCC 강제 종료(2026-08 실기기 크래시 교정).
-      expect(plist, contains('<key>NSMicrophoneUsageDescription</key>'));
+    test('권한 문구(사진·카메라·마이크)는 유지 — 키+비어있지 않은 문구 쌍으로 검사', () {
+      // ★ contains(키) 단독 검사는 주석 처리·빈 <string/> 회귀를 못 잡는다
+      //   (PrivacyInfo 테스트의 '주석 오탐 차단'과 동일 원칙). 키 바로 다음
+      //   줄의 <string> 값이 비어 있지 않은 '실제 선언'만 인정한다.
+      for (final String key in <String>[
+        'NSPhotoLibraryUsageDescription',
+        'NSCameraUsageDescription',
+        // 숏폼 WebView 영상 촬영은 마이크 권한을 함께 요구한다 — 키가 빠지면
+        // '촬영' 선택 순간 TCC 강제 종료(2026-08 실기기 크래시 교정, 런북 §2).
+        'NSMicrophoneUsageDescription',
+      ]) {
+        expect(
+          RegExp('^\\t<key>$key</key>\\n\\t<string>[^<]+</string>',
+                  multiLine: true)
+              .hasMatch(plist),
+          isTrue,
+          reason: '$key: 주석 밖 + 비어있지 않은 사용 사유 문구가 필요하다'
+              '(빈 문구는 심사·런타임 문제, 키 부재는 해당 기능 진입 시 크래시)',
+        );
+      }
     });
   });
 

@@ -33,7 +33,7 @@
 | 방향 | iPhone: 세로+가로 2종 / iPad: 4종 | Info.plist |
 | 서명 | `CODE_SIGN_STYLE = Automatic` (팀 선택만 하면 됨) | pbxproj |
 | ATS | `NSAllowsLocalNetworking` 만(로컬 Supabase 개발용 — 전면 해제 아님) | Info.plist |
-| 권한 문구 | 사진 보관함·카메라(한글) — file_picker/pdfx 는 문서 선택기 방식이라 추가 권한 불필요 | Info.plist |
+| 권한 문구 | 사진 보관함·카메라·마이크(한글) — 마이크는 숏폼 WebView 영상 촬영이 요구(키 부재 시 촬영 순간 TCC 강제 종료, 2026-08 실기기 크래시 교정). file_picker/pdfx 는 문서 선택기 방식이라 추가 권한 불필요 | Info.plist |
 | 조회 스킴 | `LSApplicationQueriesSchemes = [https]` (§5-1) | Info.plist |
 | 수출규정 | `ITSAppUsesNonExemptEncryption = false` (§7) | Info.plist |
 | 개인정보 매니페스트 | `ios/Runner/PrivacyInfo.xcprivacy` — Runner Resources 에 정확히 1회 배선 (§6) | pbxproj |
