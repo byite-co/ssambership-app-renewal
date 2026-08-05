@@ -4,15 +4,21 @@ import '../../data/user_blocks_repository.dart';
 
 /// 작성자 차단 확인 다이얼로그 → 차단 실행(공용). 차단 성공 시 true.
 ///
-/// [table]: 'community_posts' | 'comments'(게시판 댓글 — v16 정본) |
-/// 'community_comments'(숏폼 댓글) | 'shortform_posts'.
-/// author_id 는 [contentId]로 서버에서 조회해 차단하므로 화면에 노출하지 않는다.
+/// 두 진입 방식 중 하나로 호출한다:
+/// - [authorId]: 화면이 이미 정본 행에서 작성자 id 를 갖고 있는 경우(게시판
+///   글 — 뷰 community_posts_v1 행. C10: 베이스 테이블 재조회 금지).
+/// - [table]+[contentId]: 'comments'(게시판 댓글 — v16 정본) |
+///   'community_comments'(숏폼 댓글) | 'shortform_posts' — 서버에서 author_id
+///   를 조회해 차단(화면에 노출하지 않음).
 Future<bool> confirmAndBlockAuthor(
   BuildContext context, {
-  required String table,
-  required String contentId,
+  String? table,
+  String? contentId,
+  String? authorId,
   UserBlocksRepository repo = const UserBlocksRepository(),
 }) async {
+  assert(authorId != null || (table != null && contentId != null),
+      'authorId 또는 table+contentId 중 하나는 필요하다');
   final bool? ok = await showDialog<bool>(
     context: context,
     builder: (BuildContext ctx) => AlertDialog(
@@ -32,8 +38,9 @@ Future<bool> confirmAndBlockAuthor(
   );
   if (ok != true) return false;
 
-  final BlockResult r =
-      await repo.blockAuthorOf(table: table, contentId: contentId);
+  final BlockResult r = authorId != null
+      ? await repo.blockAuthor(authorId)
+      : await repo.blockAuthorOf(table: table!, contentId: contentId!);
   if (!context.mounted) return r == BlockResult.blocked;
   final String msg;
   switch (r) {

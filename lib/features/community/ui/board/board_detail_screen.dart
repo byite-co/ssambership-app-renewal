@@ -174,12 +174,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   }
 
   /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
+  /// C10: author_id 는 이미 뷰(community_posts_v1) 행에 있으므로 재조회 없이
+  /// 그대로 쓴다 — community_posts 베이스 테이블 접근 0건 계약.
   Future<void> _blockPostAuthor() async {
-    final bool blocked = await confirmAndBlockAuthor(
-      context,
-      table: 'community_posts',
-      contentId: widget.post.id,
-    );
+    final String? authorId = widget.post.authorId;
+    if (authorId == null) {
+      // 뷰 행에 작성자 id 가 없으면 차단 불가(베이스 재조회로 우회하지 않는다).
+      _snack('차단에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    final bool blocked = await confirmAndBlockAuthor(context, authorId: authorId);
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 

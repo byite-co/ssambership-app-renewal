@@ -159,7 +159,13 @@ void main() {
 
     test('차단 시도 → notLoggedIn (INSERT 미시도)', () async {
       final BlockResult r = await const UserBlocksRepository()
-          .blockAuthorOf(table: 'community_posts', contentId: 'p1');
+          .blockAuthorOf(table: 'comments', contentId: 'c1');
+      expect(r, BlockResult.notLoggedIn);
+    });
+
+    test('작성자 id 직접 차단(C10 경로)도 notLoggedIn (INSERT 미시도)', () async {
+      final BlockResult r =
+          await const UserBlocksRepository().blockAuthor('u-1');
       expect(r, BlockResult.notLoggedIn);
     });
   });
