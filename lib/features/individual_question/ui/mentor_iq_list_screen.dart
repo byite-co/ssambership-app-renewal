@@ -76,9 +76,15 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
 
   Future<MentorIqListData> _load() async {
     if (widget.loaderOverride != null) return widget.loaderOverride!();
-    final List<OpenIndividualQuestion> open = await _repo.listOpenForMentor();
-    final List<IndividualQuestion> mine = await _repo.listForMentor();
-    return MentorIqListData(open: open, mine: mine);
+    // C22: 두 목록은 독립 — 병렬 조회(종전 순차 await).
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.listOpenForMentor(),
+      _repo.listForMentor(),
+    ]);
+    return MentorIqListData(
+      open: loaded[0] as List<OpenIndividualQuestion>,
+      mine: loaded[1] as List<IndividualQuestion>,
+    );
   }
 
   void _refresh() {

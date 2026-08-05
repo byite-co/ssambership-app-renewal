@@ -312,12 +312,19 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   Future<IqDetailData> _loadRaw() async {
     if (widget.loaderOverride != null) return widget.loaderOverride!();
-    final IndividualQuestion? q = await _repo.fetch(widget.questionId);
+    // C22: 질문·메시지·첨부는 전부 questionId 로 독립 조회 — 병렬로 묶는다
+    // (RT 수신·재연결·앱 복귀마다 재실행되는 경로라 벽시계 절감 폭이 크다).
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.fetch(widget.questionId),
+      _repo.listMessages(widget.questionId),
+      _repo.listAttachments(widget.questionId),
+    ]);
+    final IndividualQuestion? q = loaded[0] as IndividualQuestion?;
     if (q == null) {
       throw Exception('질문을 찾을 수 없어요.');
     }
-    final List<IqMessage> messages = await _repo.listMessages(q.id);
-    final List<IqAttachment> attachments = await _repo.listAttachments(q.id);
+    final List<IqMessage> messages = loaded[1] as List<IqMessage>;
+    final List<IqAttachment> attachments = loaded[2] as List<IqAttachment>;
     String? mentorName;
     final String? mentorId = q.mentorId;
     if (mentorId != null && _role == AppRole.student) {
