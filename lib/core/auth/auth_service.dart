@@ -202,6 +202,11 @@ class AuthService extends ChangeNotifier {
     return load;
   }
 
+  /// 마지막으로 '정상 이용 가능' 프로필을 로드한 사용자 id(N32).
+  /// 같은 사용자의 백그라운드 재로드(토큰 갱신 등)가 일시 조회 실패해도
+  /// 이 값이 일치하면 마지막 정상 프로필을 유지해 전면 차단 전이를 막는다.
+  String? _lastGoodProfileUid;
+
   Future<void> _loadProfileOnce() async {
     final SupabaseClient? client = _client;
     final Session? session = _session;
@@ -226,10 +231,7 @@ class AuthService extends ChangeNotifier {
     }
     final AppRole? role =
         userRowFetchFailed ? null : _parseRole(userRow?['role'] as String?);
-    _roleFetchFailed = role == null;
-    _role = role ?? AppRole.guest;
-    _displayName = _parseDisplayName(userRow);
-    _account = await AccountStatusReader.resolve(
+    final AccountState account = await AccountStatusReader.resolve(
       PrefetchedUserRowGateway(
         inner: SupabaseAccountStatusGateway(client),
         userRow: userRow,
@@ -237,12 +239,41 @@ class AuthService extends ChangeNotifier {
       ),
       userId,
     );
+    // N32: 이미 정상 이용 중인 같은 사용자의 '일시 조회 실패'는 마지막 정상
+    // 프로필을 유지한다(사용 중 화면이 순간 차단 화면으로 튀지 않게).
+    // 서버가 '확정'한 차단(banned/suspended/탈퇴 — 조회 성공)은 즉시 반영되고,
+    // 최초 로드(부팅·로그인)의 실패는 종전대로 fail-closed 차단이다.
+    if (shouldRetainLastGoodProfile(
+      transientFetchFailure: role == null || account.isRetryable,
+      sameUserAsLastGood: _lastGoodProfileUid == userId,
+    )) {
+      return;
+    }
+    _roleFetchFailed = role == null;
+    _role = role ?? AppRole.guest;
+    _displayName = _parseDisplayName(userRow);
+    _account = account;
     if (_role == AppRole.student) {
       _entitlement = await EntitlementReader.fetchForStudent(client, userId);
     } else {
       _entitlement = Entitlement.none;
     }
+    // '정상 이용 가능' 로드였을 때만 유지 기준점 갱신 — 확정 차단·역할 불명은
+    // 기준점을 지워 이후 일시 실패도 종전대로 차단 처리한다.
+    final bool usable = !_roleFetchFailed &&
+        account.allowsAppUse &&
+        (_role == AppRole.student || _role == AppRole.mentor);
+    _lastGoodProfileUid = usable ? userId : null;
   }
+
+  /// N32 유지 판정(단위 테스트 진입점) — '일시 조회 실패' + '같은 사용자의
+  /// 정상 프로필이 이미 있음'일 때만 true. 확정 차단(조회 성공)은 해당 없음.
+  @visibleForTesting
+  static bool shouldRetainLastGoodProfile({
+    required bool transientFetchFailure,
+    required bool sameUserAsLastGood,
+  }) =>
+      transientFetchFailure && sameUserAsLastGood;
 
   /// role 파싱. 값 없음/미지 값 → guest(비복구 차단). (조회 실패는 호출부에서
   /// null 로 구분한다 — 재시도 가능 차단.)
@@ -272,6 +303,7 @@ class AuthService extends ChangeNotifier {
     _displayName = '';
     _account = AccountState.fetchFailed;
     _entitlement = Entitlement.none;
+    _lastGoodProfileUid = null; // 계정 전환 시 이전 사용자 프로필 유지 금지(N32).
   }
 
   /// 이메일+비밀번호 로그인. 실패 시 AuthException 전파(화면에서 안내).

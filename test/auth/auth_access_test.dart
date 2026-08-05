@@ -118,4 +118,36 @@ void main() {
       AccessState.guest,
     );
   });
+
+  group('N32: 마지막 정상 프로필 유지 판정(shouldRetainLastGoodProfile)', () {
+    test('같은 사용자 + 일시 조회 실패 → 유지(차단 전이 없음)', () {
+      expect(
+        AuthService.shouldRetainLastGoodProfile(
+          transientFetchFailure: true,
+          sameUserAsLastGood: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('조회 성공(확정 판정 — banned 포함) → 유지 아님(즉시 반영)', () {
+      expect(
+        AuthService.shouldRetainLastGoodProfile(
+          transientFetchFailure: false,
+          sameUserAsLastGood: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('정상 프로필 이력 없음(부팅·로그인 최초 실패) → 유지 아님(fail-closed 차단)', () {
+      expect(
+        AuthService.shouldRetainLastGoodProfile(
+          transientFetchFailure: true,
+          sameUserAsLastGood: false,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
