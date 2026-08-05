@@ -178,18 +178,36 @@ class CommunityReadRepository {
     final String? uid = _uid;
     if (uid == null) return const MyActivity();
 
-    final List<Map<String, dynamic>> mineRows = await _client
-        .schema('api_web_v1')
-        .from('community_posts_v1')
-        .select('*')
-        .eq('author_id', uid)
-        .order('created_at', ascending: false);
-    final List<BoardPost> myPosts = mineRows.map(BoardPost.fromMap).toList();
+    // N22: ① 내 글·좋아요 id·스크랩 id 를 병렬 조회하고 ② 좋아요∪스크랩
+    // 본문을 한 번에 조회해 나눠 담는다(양쪽에 겹치는 글 이중 조회 제거).
+    // 종전 5회 순차 왕복 → 병렬 3 + 통합 1 의 2단계.
+    final List<dynamic> first = await Future.wait(<Future<dynamic>>[
+      _client
+          .schema('api_web_v1')
+          .from('community_posts_v1')
+          .select('*')
+          .eq('author_id', uid)
+          .order('created_at', ascending: false),
+      myBoardReactionIds('like'),
+      myBoardReactionIds('scrap'),
+    ]);
+    final List<BoardPost> myPosts = (first[0] as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(BoardPost.fromMap)
+        .toList();
+    final Set<String> likedIds = first[1] as Set<String>;
+    final Set<String> scrapIds = first[2] as Set<String>;
 
-    final Set<String> likedIds = await myBoardReactionIds('like');
-    final Set<String> scrapIds = await myBoardReactionIds('scrap');
-    final List<BoardPost> liked = await _postsByIds(likedIds);
-    final List<BoardPost> scrapped = await _postsByIds(scrapIds);
+    final List<BoardPost> union =
+        await _postsByIds(<String>{...likedIds, ...scrapIds});
+    final List<BoardPost> liked = <BoardPost>[
+      for (final BoardPost p in union)
+        if (likedIds.contains(p.id)) p,
+    ];
+    final List<BoardPost> scrapped = <BoardPost>[
+      for (final BoardPost p in union)
+        if (scrapIds.contains(p.id)) p,
+    ];
 
     return MyActivity(myPosts: myPosts, liked: liked, scrapped: scrapped);
   }
