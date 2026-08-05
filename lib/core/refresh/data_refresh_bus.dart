@@ -37,4 +37,14 @@ class DataRefreshBus {
 
   /// 알림 재조회가 필요한 지점(알림 탭 재선택 등)에서 호출.
   static void bumpNotifications() => notificationsGeneration.value++;
+
+  /// 질문방 표면 세대(N35) — 탭 전환·재선택, 무료 질문 생성 등 '질문방 목록을
+  /// 다시 보라'는 신호. 학생 목록·멘토 인박스가 살아 있으면(IndexedStack)
+  /// 재조회한다. 종전에는 알림 탭에만 이런 배선이 있어, 무료 질문 직후
+  /// 질문방 탭이 낡은 목록을 보여줬다.
+  static final ValueNotifier<int> questionRoomsGeneration =
+      ValueNotifier<int>(0);
+
+  /// 질문방 재조회가 필요한 지점(탭 선택·재선택, 스레드 생성 성공 등)에서 호출.
+  static void bumpQuestionRooms() => questionRoomsGeneration.value++;
 }

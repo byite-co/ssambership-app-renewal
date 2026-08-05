@@ -14,6 +14,7 @@ import '../../data/question_room_read_repository.dart';
 import '../../data/student_lookup_repository.dart';
 import '../../data/thread_status_counts.dart';
 import 'student_room_home_screen.dart';
+import '../../../../core/refresh/data_refresh_bus.dart';
 import '../../../../shared/errors/friendly_error.dart';
 
 /// 멘토 질문방 1뎁스 = '받은 학생' 목록(카카오톡식 리스트). 본문만(셸이 AppBar/탭 제공).
@@ -59,6 +60,8 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
     // N33: 학생 탭(질문방 목록)은 resume 재조회가 있는데 멘토 인박스는 없어
     // 같은 질문방 탭이 역할에 따라 신선도가 달랐다 — 동일 패턴으로 정렬.
     WidgetsBinding.instance.addObserver(this);
+    // N35: 탭 전환·재선택 등 질문방 표면 신호 수신(학생 목록과 동일 배선).
+    DataRefreshBus.questionRoomsGeneration.addListener(_refresh);
   }
 
   @override
@@ -68,6 +71,7 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
 
   @override
   void dispose() {
+    DataRefreshBus.questionRoomsGeneration.removeListener(_refresh);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

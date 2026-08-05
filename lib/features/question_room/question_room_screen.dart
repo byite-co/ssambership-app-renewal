@@ -4,6 +4,7 @@ import '../../app/app_tabs.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/commerce/commerce_policy.dart';
 import '../../core/entitlement/subscription_status_display.dart';
+import '../../core/refresh/data_refresh_bus.dart';
 import '../../core/entitlement/subscription_summary.dart';
 import '../../core/entitlement/weekly_question_usage.dart';
 import '../../core/supabase/supabase_client.dart';
@@ -88,6 +89,8 @@ class _StudentRoomListState extends State<_StudentRoomList>
     // §4: 웹에서 구독·결제 후 앱 복귀 시 방 목록·구독 상태 재조회
     // (IndexedStack 탭이라 재빌드가 없으므로 lifecycle 신호로 갱신).
     WidgetsBinding.instance.addObserver(this);
+    // N35: 탭 전환·재선택, 무료 질문 생성 등 질문방 표면 신호 수신.
+    DataRefreshBus.questionRoomsGeneration.addListener(_refresh);
   }
 
   @override
@@ -97,6 +100,7 @@ class _StudentRoomListState extends State<_StudentRoomList>
 
   @override
   void dispose() {
+    DataRefreshBus.questionRoomsGeneration.removeListener(_refresh);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

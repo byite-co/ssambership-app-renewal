@@ -103,6 +103,8 @@ class _HomeShellState extends State<HomeShell> {
     }
     // 알림 탭 선택(재선택 포함) — 살아 있는 알림 화면에 재조회 신호.
     if (i == AppTab.notifications) DataRefreshBus.bumpNotifications();
+    // 질문방 탭 선택(재선택 포함) — 학생 목록·멘토 인박스 재조회 신호(N35).
+    if (i == AppTab.questionRoom) DataRefreshBus.bumpQuestionRooms();
     setState(() {
       _index = i;
       _built[i] = true; // N13: 첫 방문 시점에 빌드.
