@@ -179,7 +179,10 @@ class _StudentRoomListState extends State<_StudentRoomList>
     return FutureBuilder<List<_RoomItem>>(
       future: _future,
       builder: (BuildContext context, AsyncSnapshot<List<_RoomItem>> snap) {
-        if (snap.connectionState != ConnectionState.done) {
+        // R1(20건 리뷰): future 교체형 새로고침(N35 탭 신호·resume) 동안
+        // 이전 데이터가 스냅샷에 유지되므로, 데이터가 있으면 스피너 대신
+        // 기존 목록을 계속 보여준다(탭 전환마다 번쩍임 제거).
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
