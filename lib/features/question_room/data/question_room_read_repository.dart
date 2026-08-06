@@ -158,6 +158,39 @@ class QuestionRoomReadRepository {
     }
   }
 
+  /// 여러 멘토의 주간 사용량을 왕복 1회로(C15 — 목록 표면용 배치).
+  ///
+  /// 서버 계약: api_web_v1.weekly_question_usage_self_batch(p_mentor_ids)
+  ///   {ok:true, contract_version:1, items:[{mentor_id, used, limit, ...}]}
+  /// 실패(봉투 포함)면 빈 맵 — 호출부는 멘토별 null(판정 불가)로 처리한다.
+  Future<Map<String, WeeklyQuestionUsage?>> weeklyUsageBatch(
+      Iterable<String> mentorIds) async {
+    final List<String> ids = mentorIds.toSet().toList();
+    if (ids.isEmpty) return const <String, WeeklyQuestionUsage?>{};
+    try {
+      final Object? data = await _client.schema('api_web_v1').rpc(
+        'weekly_question_usage_self_batch',
+        params: <String, dynamic>{'p_mentor_ids': ids},
+      );
+      if (data is! Map || data['ok'] != true) {
+        return const <String, WeeklyQuestionUsage?>{};
+      }
+      final Object? items = data['items'];
+      final Map<String, WeeklyQuestionUsage?> out =
+          <String, WeeklyQuestionUsage?>{};
+      if (items is List) {
+        for (final Object? item in items) {
+          if (item is! Map) continue;
+          final Object? mid = item['mentor_id'];
+          if (mid is String) out[mid] = WeeklyQuestionUsage.fromRpc(item);
+        }
+      }
+      return out;
+    } catch (_) {
+      return const <String, WeeklyQuestionUsage?>{};
+    }
+  }
+
   /// 스레드 1건의 최신 상태(실시간 상태 변경 후 재조회용). 없으면 null.
   Future<QuestionThread?> threadById(String threadId) async {
     final Map<String, dynamic>? row = await _client

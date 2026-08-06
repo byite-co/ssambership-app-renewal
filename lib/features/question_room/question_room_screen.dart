@@ -133,16 +133,11 @@ class _StudentRoomListState extends State<_StudentRoomList>
             SupabaseInit.clientOrNull!, studentId);
     final Map<String, MentorPublic> names =
         await _mentors.fetchMany(rooms.map((Room r) => r.mentorId));
-    // A2: 멘토별 주간 사용량(RPC). ★ 한도값 재하드코딩 없이 RPC 반환만. 실패는 null(표시 생략).
-    final Map<String, WeeklyQuestionUsage?> usageByMentor =
-        <String, WeeklyQuestionUsage?>{};
-    if (studentId != null) {
-      final Set<String> mentorIds = rooms.map((Room r) => r.mentorId).toSet();
-      await Future.wait(mentorIds.map((String mentorId) async {
-        usageByMentor[mentorId] =
-            await _repo.weeklyUsage(mentorId: mentorId);
-      }));
-    }
+    // A2: 멘토별 주간 사용량. ★ 한도값 재하드코딩 없이 RPC 반환만. 실패는 null(표시 생략).
+    // C15: 멘토 수만큼 병렬 호출하던 것을 배치 RPC 1회로.
+    final Map<String, WeeklyQuestionUsage?> usageByMentor = studentId == null
+        ? <String, WeeklyQuestionUsage?>{}
+        : await _repo.weeklyUsageBatch(rooms.map((Room r) => r.mentorId));
     // N37: 방별 실제 활동시각 — 스레드 슬림 조회 1회(방·상태·활동시각만).
     final Map<String, DateTime> lastByRoom = <String, DateTime>{};
     try {

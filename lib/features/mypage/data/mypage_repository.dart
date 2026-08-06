@@ -92,17 +92,14 @@ class MyPageRepository {
     if (subs.isEmpty) return const <SubscriptionCardInfo>[];
     // A2: 멘토별 주간 질문 사용량(RPC). ★ 한도값 재하드코딩 없이 RPC 반환만 사용.
     //     실패하면 null → 카드가 기존 상태 문구로 조용히 폴백(흐름 안 막음).
-    // N17: 멘토 표시명과 사용량 RPC 는 서로 독립 — 병렬 조회.
-    final Map<String, WeeklyQuestionUsage?> usageByMentor =
-        <String, WeeklyQuestionUsage?>{};
+    // N17: 멘토 표시명과 사용량은 서로 독립 — 병렬. C15: 사용량은 배치 1회.
     final List<dynamic> nu = await Future.wait(<Future<dynamic>>[
       _mentors.fetchMany(subs.keys),
-      Future.wait(subs.keys.map((String mentorId) async {
-        usageByMentor[mentorId] =
-            await _rooms.weeklyUsage(mentorId: mentorId);
-      })),
+      _rooms.weeklyUsageBatch(subs.keys),
     ]);
     final Map<String, MentorPublic> names = nu[0] as Map<String, MentorPublic>;
+    final Map<String, WeeklyQuestionUsage?> usageByMentor =
+        nu[1] as Map<String, WeeklyQuestionUsage?>;
     final List<SubscriptionCardInfo> cards = <SubscriptionCardInfo>[
       for (final SubscriptionSummary s in subs.values)
         SubscriptionCardInfo(
