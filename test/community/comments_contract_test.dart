@@ -10,15 +10,15 @@ import 'fakes.dart';
 /// 숏폼 댓글은 기존 `community_comments`(post_type='shortform') 유지.
 /// 실제 DB 없이 기록형 가짜 게이트웨이(RecordingCommentsGateway)로 검증.
 void main() {
-  group('게시판 댓글 읽기(정본 comments)', () {
-    test('comments 테이블에서 post_id 필터만으로 조회(is_deleted 는 서버 RLS)', () async {
+  group('게시판 댓글 읽기(N5 — api_web_v1.community_comments_v1 뷰)', () {
+    test('뷰에서 post_id 필터만으로 조회(is_deleted 제외는 뷰가 보장)', () async {
       final RecordingCommentsGateway gw = RecordingCommentsGateway(
         selectRows: <Map<String, dynamic>>[
           <String, dynamic>{
             'id': 'c1',
             'post_id': 'p1',
             'author_id': 'other-user',
-            'content': '정본 본문',
+            'body': '정본 본문', // 뷰가 content 를 body 로 노출
             'parent_id': null,
             'created_at': '2026-07-20T00:00:00Z',
           },
@@ -29,9 +29,10 @@ void main() {
       final List<CommunityComment> list =
           await read.comments(CommunityPostType.board, 'p1');
 
-      expect(gw.lastSelectTable, 'comments');
+      expect(gw.lastSelectSchema, 'api_web_v1');
+      expect(gw.lastSelectTable, 'community_comments_v1');
       expect(gw.lastSelectFilters, <String, Object>{'post_id': 'p1'});
-      expect(list.single.body, '정본 본문'); // content → 모델 body 매핑
+      expect(list.single.body, '정본 본문');
       expect(list.single.parentId, isNull);
     });
 

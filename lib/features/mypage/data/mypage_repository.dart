@@ -135,10 +135,12 @@ class MyPageRepository {
   }
 
   Future<int?> _loadCashBalance() async {
+    // N5: 원테이블 직접 SELECT → 본인 한정 invoker 뷰(api_web_v1.my_wallet_v1).
     int? balance;
     try {
       final Map<String, dynamic>? wallet = await _client
-          .from('cash_wallets')
+          .schema('api_web_v1')
+          .from('my_wallet_v1')
           .select('balance_cents')
           .eq('user_id', _uid)
           .maybeSingle();
@@ -154,10 +156,12 @@ class MyPageRepository {
   Future<List<CashEntry>> _loadCashRecent() async {
     final List<CashEntry> recent = <CashEntry>[];
     try {
+      // N5: 원테이블 직접 SELECT → 본인 한정 invoker 뷰(my_cash_ledger_v1).
+      // 뷰에 user_id 노출이 없다 — 본인 행 한정은 베이스 RLS 가 보장한다.
       final List<Map<String, dynamic>> rows = await _client
-          .from('cash_ledger')
+          .schema('api_web_v1')
+          .from('my_cash_ledger_v1')
           .select('delta_cents, created_at, reason')
-          .eq('user_id', _uid)
           .order('created_at', ascending: false)
           .limit(5);
       for (final Map<String, dynamic> r in rows) {

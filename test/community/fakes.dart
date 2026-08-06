@@ -302,6 +302,7 @@ class RecordingCommentsGateway extends CommentsGateway {
   /// 지정 시 insertComment 가 이 오류를 던진다(서버 트리거 거부 흉내).
   final Object? insertError;
 
+  String? lastSelectSchema;
   String? lastSelectTable;
   Map<String, Object>? lastSelectFilters;
   int? lastSelectLimit;
@@ -324,7 +325,9 @@ class RecordingCommentsGateway extends CommentsGateway {
     required Map<String, Object> filters,
     int? limit,
     int offset = 0,
+    String? schema,
   }) async {
+    lastSelectSchema = schema;
     lastSelectTable = table;
     lastSelectFilters = filters;
     lastSelectLimit = limit;

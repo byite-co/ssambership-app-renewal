@@ -102,8 +102,9 @@ class CommunityReadRepository {
 
   /// 글/숏폼의 댓글(대화순=오름차순). [limit]/[offset] 로 페이징(하위 호환: null=전체).
   ///
-  /// v16 정본 전환 — 게시판: 정본 `comments` 에서 post_id 로만 조회
-  /// (삭제 댓글 제외 is_deleted=false 는 서버 RLS 가 보장, 앱 필터 불필요).
+  /// N5 뷰 이행 — 게시판: `api_web_v1.community_comments_v1`(invoker 뷰,
+  /// is_deleted=false 를 뷰가 보장)에서 post_id 로만 조회. 쓰기(INSERT)는
+  /// 종전대로 정본 `comments` 베이스다(뷰는 읽기 전용 표면).
   /// 숏폼: 기존 `community_comments`(post_type='shortform', status='visible') 유지.
   Future<List<CommunityComment>> comments(
     CommunityPostType type,
@@ -111,7 +112,8 @@ class CommunityReadRepository {
     int? limit,
     int offset = 0,
   }) async {
-    final Map<String, Object> filters = type == CommunityPostType.board
+    final bool board = type == CommunityPostType.board;
+    final Map<String, Object> filters = board
         ? <String, Object>{'post_id': postId}
         : <String, Object>{
             'post_type': type.code,
@@ -120,7 +122,8 @@ class CommunityReadRepository {
           };
     final Future<Set<String>> blockedF = _blocks.myBlockedIds();
     final List<Map<String, dynamic>> rows = await _gateway.selectComments(
-      table: type.commentsTable,
+      table: board ? 'community_comments_v1' : type.commentsTable,
+      schema: board ? 'api_web_v1' : null,
       filters: filters,
       limit: limit,
       offset: offset,

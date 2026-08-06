@@ -148,8 +148,10 @@ class IndividualQuestionRepository {
   /// 내 캐시 잔액(cents). 지갑 미생성이면 0. 표시·사전 안내용 —
   /// 실제 검증은 서버(RPC)가 한다(앱은 결제·차감 계산을 하지 않는다).
   Future<int> fetchWalletBalanceCents() async {
+    // N5: 원테이블 직접 SELECT → 본인 한정 invoker 뷰(api_web_v1.my_wallet_v1).
     final Map<String, dynamic>? row = await _client
-        .from('cash_wallets')
+        .schema('api_web_v1')
+        .from('my_wallet_v1')
         .select('balance_cents')
         .eq('user_id', _uid)
         .maybeSingle();

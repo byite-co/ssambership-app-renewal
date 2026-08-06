@@ -66,6 +66,7 @@ const Set<String> kExpectedSchemas = <String>{'api_app_v1', 'api_web_v1'};
 
 const Set<String> kExpectedSchemaIdentifiers = <String>{
   'kBoardPostCreateSchema',
+  'schema', // comments_gateway seam 파라미터(N5 — api_web_v1 뷰 읽기)
 };
 
 /// DB 테이블/뷰(문자열 리터럴 from) — 읽기/쓰기 표면 전체.
@@ -74,8 +75,9 @@ const Set<String> kExpectedTables = <String>{
   'users', // ★ SELECT 전용 — update 체인 금지는 아래 별도 테스트.
   'subscriptions',
   'subscription_settlement_items',
-  'cash_wallets',
-  'cash_ledger',
+  // N5: 지갑·캐시내역 읽기는 본인 한정 invoker 뷰(api_web_v1)로 이행.
+  'my_wallet_v1',
+  'my_cash_ledger_v1',
   'notifications',
   // 질문방
   'mentor_student_rooms',
@@ -95,6 +97,8 @@ const Set<String> kExpectedTables = <String>{
   'mentor_individual_question_pricing',
   // 커뮤니티(계약 수렴: 게시판 읽기는 뷰)
   'community_posts_v1',
+  // ★ community_comments_v1(N5 게시판 댓글 읽기 뷰)은 comments_gateway 의
+  //   table seam 파라미터로 넘어가므로 from-리터럴 집합엔 나타나지 않는다.
   'shortform_posts',
   'post_reactions',
   'shortform_reactions',

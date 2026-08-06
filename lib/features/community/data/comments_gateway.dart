@@ -26,13 +26,16 @@ class CommentsGateway {
 
   /// [table] 에서 [filters](모두 eq 조건)로 조회, created_at 오름차순(대화순).
   /// [limit] 지정 시 [offset]부터 그만큼만(페이징).
+  /// [schema] 지정 시 그 스키마의 뷰/테이블에서 읽는다(N5 — api_web_v1 뷰 이행).
   Future<List<Map<String, dynamic>>> selectComments({
     required String table,
     required Map<String, Object> filters,
     int? limit,
     int offset = 0,
+    String? schema,
   }) async {
-    dynamic q = _client.from(table).select('*');
+    final dynamic source = schema == null ? _client : _client.schema(schema);
+    dynamic q = source.from(table).select('*');
     for (final MapEntry<String, Object> f in filters.entries) {
       q = q.eq(f.key, f.value);
     }
