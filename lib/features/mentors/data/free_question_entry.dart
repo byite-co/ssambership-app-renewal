@@ -134,26 +134,30 @@ class SupabaseFreeQuestionEntryRepository implements FreeQuestionEntryPort {
   Future<FreeQuestionEntrySnapshot> fetch(String mentorId) async {
     final SupabaseClient client = _client;
     final String uid = _uid;
-    final Map<String, dynamic>? room = await client
-        .from('mentor_student_rooms')
-        .select('id')
-        .eq('student_id', uid)
-        .eq('mentor_id', mentorId)
-        .maybeSingle();
-    // 사용 행은 서버 계약상 소수(전역 총량 한도 내) — 행을 읽어 사실값만 센다.
-    final List<dynamic> usage = await client
-        .from('free_question_usage')
-        .select('mentor_id')
-        .eq('student_id', uid);
-    int per = 0;
-    for (final dynamic r in usage) {
-      if (r is Map && r['mentor_id'] == mentorId) per++;
-    }
+    // C27: 행 본문 대신 서버 count 로 사실값만 받는다 + 서로 독립인 3조회 병렬.
+    final List<dynamic> r = await Future.wait(<Future<dynamic>>[
+      client
+          .from('mentor_student_rooms')
+          .select('id')
+          .eq('student_id', uid)
+          .eq('mentor_id', mentorId)
+          .maybeSingle(),
+      client
+          .from('free_question_usage')
+          .count(CountOption.exact)
+          .eq('student_id', uid),
+      client
+          .from('free_question_usage')
+          .count(CountOption.exact)
+          .eq('student_id', uid)
+          .eq('mentor_id', mentorId),
+    ]);
+    final Map<String, dynamic>? room = r[0] as Map<String, dynamic>?;
     final Object? roomIdValue = room?['id'];
     return FreeQuestionEntrySnapshot(
       roomId: roomIdValue is String ? roomIdValue : null,
-      totalUsed: usage.length,
-      perMentorUsed: per,
+      totalUsed: r[1] as int,
+      perMentorUsed: r[2] as int,
     );
   }
 
