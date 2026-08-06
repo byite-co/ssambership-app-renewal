@@ -9,11 +9,14 @@ void main() {
     required FakeVersionPolicyPort port,
     int? build = 1,
     String? platform = 'android',
+    FakeGatePassCache? passCache,
   }) {
     return VersionGateController(
       port: port,
       buildNumber: () async => build,
       platformResolver: () => platform,
+      // 테스트 격리 — 운영 shared_preferences 구현이 실제 저장소를 만지지 않게.
+      passCache: passCache ?? FakeGatePassCache(),
     );
   }
 
@@ -67,6 +70,49 @@ void main() {
     port.failing = false; // 네트워크 회복
     await c.retry();
     expect(c.status, VersionGateStatus.pass);
+  });
+
+  group('G1: 마지막 통과 캐시(오프라인 콜드스타트 완화)', () {
+    test('통과한 빌드는 조회 실패에도 입장 허용(캐시 히트)', () async {
+      final FakeGatePassCache cache = FakeGatePassCache();
+      final FakeVersionPolicyPort port =
+          FakeVersionPolicyPort(policy: policyOf(min: 1, latest: 1));
+      final VersionGateController c =
+          make(port: port, build: 7, passCache: cache);
+
+      await c.start(); // 온라인 통과 → 캐시 기록
+      expect(cache.value, 7);
+
+      port.failing = true; // 오프라인 재시작
+      await c.start();
+      expect(c.status, VersionGateStatus.pass, reason: '같은 빌드 캐시 히트');
+    });
+
+    test('캐시가 없거나(최초 설치) 다른 빌드면 종전대로 재시도 화면', () async {
+      final FakeVersionPolicyPort port = FakeVersionPolicyPort(
+          policy: policyOf(min: 1, latest: 1), failing: true);
+      final VersionGateController c = make(
+          port: port, build: 7, passCache: FakeGatePassCache(6));
+
+      await c.start();
+      expect(c.status, VersionGateStatus.fetchFailed);
+    });
+
+    test('forceUpdate 판정은 캐시를 지운다 — 오프라인 우회 차단', () async {
+      final FakeGatePassCache cache = FakeGatePassCache(7);
+      final FakeVersionPolicyPort port =
+          FakeVersionPolicyPort(policy: policyOf(min: 9, latest: 9));
+      final VersionGateController c =
+          make(port: port, build: 7, passCache: cache);
+
+      await c.start(); // 온라인 — 강제 업데이트 + 캐시 제거
+      expect(c.status, VersionGateStatus.forceUpdate);
+      expect(cache.value, isNull);
+
+      port.failing = true; // 이후 오프라인 재시작 — 우회 불가
+      await c.start();
+      expect(c.status, VersionGateStatus.fetchFailed);
+    });
   });
 
   test('웹/미대상 플랫폼(resolver=null) → 게이트 건너뜀 + RPC 미호출', () async {

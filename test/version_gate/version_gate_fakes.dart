@@ -43,3 +43,27 @@ VersionPolicy policyOf({
     message: message,
   );
 }
+
+/// G1: 마지막 통과 빌드 캐시 — 인메모리 fake.
+class FakeGatePassCache implements GatePassCache {
+  FakeGatePassCache([this.value]);
+
+  int? value;
+  int writes = 0;
+  int clears = 0;
+
+  @override
+  Future<int?> readLastPassBuild() async => value;
+
+  @override
+  Future<void> writeLastPassBuild(int build) async {
+    value = build;
+    writes++;
+  }
+
+  @override
+  Future<void> clear() async {
+    value = null;
+    clears++;
+  }
+}
