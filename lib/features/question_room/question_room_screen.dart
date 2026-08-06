@@ -63,13 +63,23 @@ class _StudentRoomList extends StatefulWidget {
 
 /// 목록 한 행에 필요한 묶음(방 + 멘토 표시명 + 구독 요약 + 주간 사용량).
 class _RoomItem {
-  const _RoomItem({required this.room, this.mentor, this.sub, this.usage});
+  const _RoomItem(
+      {required this.room,
+      this.mentor,
+      this.sub,
+      this.usage,
+      required this.lastActivity});
   final Room room;
   final MentorPublic? mentor;
   final SubscriptionSummary? sub;
 
   /// A2: 이 멘토와의 이번 주 질문 사용량(RPC). null = 미조회/실패 → 표시 생략.
   final WeeklyQuestionUsage? usage;
+
+  /// N37: 실제 마지막 활동 = max(방 updated_at, 스레드 updated_at) — 서버는
+  /// Q&A 활동 시 방 행을 갱신하지 않으므로(트리거·RPC 실측) 방 값만으로는
+  /// 동결된다. 멘토 인박스와 동일 기준으로 통일.
+  final DateTime lastActivity;
 
   String get mentorName => mentor?.displayName ?? '멘토';
 }
@@ -125,14 +135,37 @@ class _StudentRoomListState extends State<_StudentRoomList>
             await _repo.weeklyUsage(studentId: studentId, mentorId: mentorId);
       }));
     }
-    return rooms
+    // N37: 방별 실제 활동시각 — 스레드 슬림 조회 1회(방·상태·활동시각만).
+    final Map<String, DateTime> lastByRoom = <String, DateTime>{};
+    try {
+      final List<ThreadStatusRow> statusRows = await _repo
+          .threadStatusRowsForRooms(rooms.map((Room r) => r.id).toList());
+      for (final ThreadStatusRow t in statusRows) {
+        final DateTime? cur = lastByRoom[t.roomId];
+        if (cur == null || t.updatedAt.isAfter(cur)) {
+          lastByRoom[t.roomId] = t.updatedAt;
+        }
+      }
+    } catch (_) {
+      // 실패 시 방 updated_at 폴백(표시 저하일 뿐 흐름은 막지 않는다).
+    }
+    DateTime activityOf(Room r) {
+      final DateTime? t = lastByRoom[r.id];
+      return (t != null && t.isAfter(r.updatedAt)) ? t : r.updatedAt;
+    }
+    final List<_RoomItem> items = rooms
         .map((Room r) => _RoomItem(
+              lastActivity: activityOf(r),
               room: r,
               mentor: names[r.mentorId],
               sub: subs[r.mentorId],
               usage: usageByMentor[r.mentorId],
             ))
         .toList();
+    // N37: 표시·정렬 기준 통일 — 실제 활동시각 내림차순(인박스와 동일).
+    items.sort(
+        (_RoomItem a, _RoomItem b) => b.lastActivity.compareTo(a.lastActivity));
+    return items;
   }
 
   void _refresh() {
@@ -315,9 +348,9 @@ class _RoomTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s8),
-                    // 마지막 활동시각(정렬에 쓰던 room.updatedAt) — 새 조회 없음.
+                    // 마지막 활동시각 — N37: 방·스레드 max(인박스와 동일 기준).
                     Text(
-                      '${Formatters.relativeKorean(item.room.updatedAt)} 활동',
+                      '${Formatters.relativeKorean(item.lastActivity)} 활동',
                       style: AppType.caption,
                     ),
                   ],
