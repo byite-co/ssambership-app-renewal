@@ -90,16 +90,27 @@ class CommunityWriteRepository {
     }
   }
 
-  /// 게시글 조회수 +1(상세 진입 시). 기존 RPC 사용. ★ RPC 부재/실패 시 조용히 무시(조회수만 안 오름).
-  /// N40: 성공 여부를 돌려줘 화면이 본인 진입 +1 을 표시에 반영할 수 있게 한다
-  /// (실패는 종전대로 조용히 무시 — false 반환, 표시 가산 없음).
-  Future<bool> incrementBoardView(String postId) async {
+  /// 게시글 조회 기록 v2(상세 진입 시) — (post, event_key) 멱등(C7).
+  ///
+  /// 구 `increment_community_post_view` 는 멱등키가 없어 재시도·재진입마다
+  /// 무한 가산됐다 — 숏폼 v2 와 같은 규약으로 전환. [eventKey] 는 **화면
+  /// 노출 1회당 1개**(UUID v4, initState 에서 생성)를 재사용한다: 실패해도
+  /// 새 키로 재시도하지 않는다(중복 가산 0).
+  /// N40: 서버가 실제 가산했는지(incremented)를 돌려줘 화면이 본인 진입
+  /// +1 을 표시에 반영한다(실패·중복 키는 false — 표시 가산 없음).
+  Future<bool> incrementBoardView(String postId,
+      {required String eventKey}) async {
     try {
-      await _client.rpc('increment_community_post_view',
-          params: <String, dynamic>{'p_post_id': postId});
-      return true;
+      final Object? data = await _client
+          .rpc('community_post_view_record_v2', params: <String, dynamic>{
+        'p_post_id': postId,
+        'p_event_key': eventKey,
+      });
+      return data is Map &&
+          data['ok'] == true &&
+          data['incremented'] == true;
     } catch (_) {
-      // 증분 RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
+      // RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
       return false;
     }
   }

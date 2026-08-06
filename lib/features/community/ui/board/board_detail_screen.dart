@@ -9,6 +9,8 @@ import '../../../../design/widgets/app_badge.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
+import '../../data/board_post_create_gateway.dart'
+    show newBoardPostIdempotencyKey;
 import '../../data/community_models.dart';
 import '../../data/community_post_image_url_resolver.dart';
 import '../../data/community_read_repository.dart';
@@ -62,8 +64,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   /// §4: 댓글 수 최신값(목록 스냅샷 p.commentCount 의 상세 내 stale 해소).
   int? _commentCountOverride;
 
-  /// N40: 본인 진입 조회수 증분(서버 성공 시 1) — 표시에만 가산.
+  /// N40: 본인 진입 조회수 증분(서버 실제 가산 시 1) — 표시에만 가산.
   int _viewCountBump = 0;
+
+  /// C7: 조회 기록 v2 이벤트 키 — **화면 노출(초기 진입) 1회당 1개**(UUID v4).
+  /// late final 이라 리빌드에도 재생성되지 않는다(멱등 계약 — 중복 가산 0).
+  late final String _viewEventKey = newBoardPostIdempotencyKey();
 
   @override
   void initState() {
@@ -71,9 +77,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     _likeCount = widget.post.likeCount;
     _comments = widget.read.comments(CommunityPostType.board, widget.post.id);
     _loadReactionState();
-    // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
-    // N40: 서버 증분 성공 시 본인 진입 +1 을 표시에 반영(목록 스냅샷 고정 해소).
-    widget.write.incrementBoardView(widget.post.id).then((bool ok) {
+    // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
+    // N40: 서버가 실제 가산했을 때만 본인 진입 +1 을 표시에 반영.
+    widget.write
+        .incrementBoardView(widget.post.id, eventKey: _viewEventKey)
+        .then((bool ok) {
       if (ok && mounted) setState(() => _viewCountBump = 1);
     });
   }
