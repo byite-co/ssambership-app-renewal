@@ -215,6 +215,8 @@ class QuestionRoomReadRepository {
 
   /// 최근 메시지 [limit]건(N21 완결 — 무제한 전량 조회 제거). 반환은
   /// 대화순(asc). 반환 길이 == limit 이면 이전 페이지가 더 있을 수 있다.
+  /// ★ 정렬은 (created_at DESC, id DESC) 복합 — 동일 시각 다건에서도
+  ///   페이지 경계가 결정론적이다(커서 계약과 동일 축).
   Future<List<QuestionMessage>> recentMessages(
     String threadId, {
     required int limit,
@@ -224,23 +226,29 @@ class QuestionRoomReadRepository {
         .select('*')
         .eq('thread_id', threadId)
         .order('created_at', ascending: false)
+        .order('id', ascending: false)
         .limit(limit);
     return rows.map(QuestionMessage.fromMap).toList().reversed.toList();
   }
 
-  /// [before] 미만(과거 방향) 메시지 [limit]건 — '이전 대화 불러오기'용(asc).
-  /// 동일 created_at 경계 행은 건너뛸 수 있다(초 단위 동시 작성 — 수용 한계).
+  /// [cursor] 이전(과거 방향) 메시지 [limit]건 — '이전 대화 불러오기'용(asc).
+  ///
+  /// 복합 커서(created_at, id): `created_at < c.ts OR (created_at = c.ts AND
+  /// id < c.id)` — 동일 created_at 경계에서도 누락 0·중복 0. 타임스탬프는
+  /// UTC ISO(마이크로초 보존 — PG µs 정밀도와 일치)로 보낸다.
   Future<List<QuestionMessage>> messagesBefore(
     String threadId, {
-    required DateTime before,
+    required MessageCursor cursor,
     required int limit,
   }) async {
+    final String ts = cursor.createdAt.toUtc().toIso8601String();
     final List<Map<String, dynamic>> rows = await _client
         .from('question_messages')
         .select('*')
         .eq('thread_id', threadId)
-        .lt('created_at', before.toUtc().toIso8601String())
+        .or(messageCursorBeforeFilter(ts: ts, id: cursor.id))
         .order('created_at', ascending: false)
+        .order('id', ascending: false)
         .limit(limit);
     return rows.map(QuestionMessage.fromMap).toList().reversed.toList();
   }
@@ -265,4 +273,32 @@ class QuestionRoomReadRepository {
         .order('created_at', ascending: false);
     return rows.map(QuestionAttachment.fromMap).toList();
   }
+}
+
+/// N21: 메시지 페이지네이션 복합 커서 — 현재 로드된 가장 오래된 행의
+/// (created_at, id). created_at 단독 커서는 동일 시각 다건에서 경계 행을
+/// 건너뛴다 — id 타이브레이크로 무손실을 보장한다.
+class MessageCursor {
+  const MessageCursor({required this.createdAt, required this.id});
+
+  /// 커서 행의 created_at(서버 정본 파싱값 — µs 정밀 보존).
+  final DateTime createdAt;
+
+  /// 커서 행의 id(uuid — PostgREST uuid 비교는 바이트 순).
+  final String id;
+
+  /// 대화순(asc) 목록의 첫 행 = 가장 오래된 행에서 커서를 만든다.
+  factory MessageCursor.oldestOf(List<QuestionMessage> ascMessages) =>
+      MessageCursor(
+        createdAt: ascMessages.first.createdAt,
+        id: ascMessages.first.id,
+      );
+}
+
+/// PostgREST or= 필터 문자열(과거 방향):
+/// `created_at.lt.TS , and(created_at.eq.TS, id.lt.ID)`.
+/// 순수 함수 — 테스트가 형식을 고정한다(따옴표 규약: 타임스탬프는 콤마·콜론
+/// 포함 값이라 쌍따옴표로 감싼다 — PostgREST reserved-char 규약).
+String messageCursorBeforeFilter({required String ts, required String id}) {
+  return 'created_at.lt."$ts",and(created_at.eq."$ts",id.lt."$id")';
 }

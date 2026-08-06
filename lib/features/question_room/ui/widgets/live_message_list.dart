@@ -94,17 +94,40 @@ class _LiveMessageListState extends State<LiveMessageList> {
     super.dispose();
   }
 
-  /// N21: 이전 페이지 로드 직후엔 맨 아래로 점프하지 않는다(읽던 위치 유지).
+  /// N21: 이전 페이지 prepend 시 '맨 아래 점프'를 막고 **실제 스크롤 앵커를
+  /// 보존**한다 — prepend 직전 좌표(pixels·maxScrollExtent)를 notify 시점에
+  /// 실측하고, 다음 프레임에서 늘어난 extent 만큼(offset + extentDelta) 보정
+  /// 점프한다. 이 리스트는 non-reverse(ListView 기본 좌표계)다 — 위쪽 삽입은
+  /// maxScrollExtent 증가로 나타나므로 델타 가산이 viewport 를 유지시킨다.
   bool _suppressNextJump = false;
   bool _loadingEarlier = false;
 
   void _onChanged() {
     if (!mounted) return;
-    setState(() {});
     if (_suppressNextJump) {
       _suppressNextJump = false;
+      // prepend 리빌드 '직전' 실측 — 로드 대기 중 사용자가 스크롤했어도
+      // 이 시점 좌표가 사용자가 보고 있던 진짜 위치다.
+      final bool hasClients = _scroll.hasClients;
+      final double oldOffset = hasClients ? _scroll.position.pixels : 0;
+      final double oldMax = hasClients ? _scroll.position.maxScrollExtent : 0;
+      setState(() {});
+      if (hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scroll.hasClients) return;
+          final ScrollPosition pos = _scroll.position;
+          final double extentDelta = pos.maxScrollExtent - oldMax;
+          if (extentDelta <= 0) return; // 삽입 없음 — 보정 불요.
+          final double target = (oldOffset + extentDelta)
+              .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+          // 애니메이션 대신 결정론적 jumpTo — 접근성 포커스·후속 제스처와
+          // 경합하지 않는다.
+          pos.jumpTo(target);
+        });
+      }
       return;
     }
+    setState(() {});
     _jumpToEndSoon();
   }
 
@@ -115,7 +138,13 @@ class _LiveMessageListState extends State<LiveMessageList> {
     _suppressNextJump = true;
     try {
       await load();
+    } catch (_) {
+      // 로드 실패 — 기존 목록 유지, 버튼이 남아 재시도 가능(호출부가 별도
+      // 안내를 하지 않아도 크래시로 새지 않는다).
     } finally {
+      // 로드가 행을 못 붙였으면(실패·빈 페이지) notify 가 없어 플래그가
+      // 남는다 — 다음 정상 수신이 점프를 건너뛰지 않게 해제한다.
+      _suppressNextJump = false;
       if (mounted) setState(() => _loadingEarlier = false);
     }
   }
@@ -165,9 +194,8 @@ class _LiveMessageListState extends State<LiveMessageList> {
     final List<QuestionMessage> messages = widget.controller.items;
     final AttachmentUrlResolver? resolver = widget.resolver;
 
-    final List<QuestionAttachment> atts = resolver == null
-        ? const <QuestionAttachment>[]
-        : widget.attachments;
+    final List<QuestionAttachment> atts =
+        resolver == null ? const <QuestionAttachment>[] : widget.attachments;
     final Set<String> msgIds =
         messages.map((QuestionMessage m) => m.id).toSet();
     final Map<String, List<QuestionAttachment>> linked =
@@ -187,7 +215,8 @@ class _LiveMessageListState extends State<LiveMessageList> {
       final bool mine =
           widget.currentUid != null && m.authorId == widget.currentUid;
       final List<Widget> chips = <Widget>[
-        for (final QuestionAttachment a in linked[m.id] ?? const <QuestionAttachment>[])
+        for (final QuestionAttachment a
+            in linked[m.id] ?? const <QuestionAttachment>[])
           _attachmentWidget(a, resolver!),
       ];
       rows.add(_Row(

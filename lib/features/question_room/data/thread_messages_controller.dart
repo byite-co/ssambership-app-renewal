@@ -7,7 +7,8 @@ import 'models/question_message.dart';
 /// ★ 중복 id 는 무시(같은 메시지가 낙관적 추가 + 실시간으로 두 번 와도 1개만).
 ///   순서는 created_at 오름차순 유지. append 전용(수정/삭제 없음).
 class ThreadMessagesController extends ChangeNotifier {
-  ThreadMessagesController([List<QuestionMessage> initial = const <QuestionMessage>[]]) {
+  ThreadMessagesController(
+      [List<QuestionMessage> initial = const <QuestionMessage>[]]) {
     resetTo(initial, notify: false);
   }
 
@@ -38,13 +39,38 @@ class ThreadMessagesController extends ChangeNotifier {
   ///   표시·정렬의 정본이 된다(S3-E §4 우선순위 ②).
   /// 새 id 면 [add] 와 동일하게 추가한다.
   bool upsertFromServer(QuestionMessage m) {
-    final int i =
-        _items.indexWhere((QuestionMessage e) => e.id == m.id);
+    final int i = _items.indexWhere((QuestionMessage e) => e.id == m.id);
     if (i < 0) return add(m);
     _items[i] = m;
     _sort();
     notifyListeners();
     return true;
+  }
+
+  /// 서버 행 **일괄** 병합(N21 페이지 병합·재조회 merge — notify 정확 1회).
+  ///
+  /// 행별 [upsertFromServer] 루프는 notify 를 N회 발생시켜 리스트의 점프
+  /// 억제/앵커 보정이 첫 행에서만 적용되는 회귀를 만든다 — 페이지 단위
+  /// 병합은 반드시 이 메서드로 한다. 변경이 0건이면 notify 도 없다.
+  bool upsertAllFromServer(List<QuestionMessage> list) {
+    bool changed = false;
+    for (final QuestionMessage m in list) {
+      final int i = _items.indexWhere((QuestionMessage e) => e.id == m.id);
+      if (i < 0) {
+        if (_ids.add(m.id)) {
+          _items.add(m);
+          changed = true;
+        }
+      } else {
+        _items[i] = m;
+        changed = true;
+      }
+    }
+    if (changed) {
+      _sort();
+      notifyListeners();
+    }
+    return changed;
   }
 
   /// 전체 교체(폴백 재조회 결과 반영). [notify] false 면 알림 생략(초기화용).
@@ -59,7 +85,11 @@ class ThreadMessagesController extends ChangeNotifier {
   }
 
   void _sort() {
-    _items.sort((QuestionMessage a, QuestionMessage b) =>
-        a.createdAt.compareTo(b.createdAt));
+    // N21: 동일 created_at 다건에서도 결정론적 순서 — 서버 커서 축
+    // (created_at, id)과 동일한 타이브레이크.
+    _items.sort((QuestionMessage a, QuestionMessage b) {
+      final int c = a.createdAt.compareTo(b.createdAt);
+      return c != 0 ? c : a.id.compareTo(b.id);
+    });
   }
 }

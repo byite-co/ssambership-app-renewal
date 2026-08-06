@@ -51,6 +51,7 @@ class MentorAnswerScreen extends StatefulWidget {
     this.realtimeFactory = _defaultRealtime,
     this.safety = const SupabaseRoomSafetyRepository(),
     this.currentUserIdOverride,
+    this.readRepository = const QuestionRoomReadRepository(),
   });
 
   final QuestionThread thread;
@@ -76,6 +77,9 @@ class MentorAnswerScreen extends StatefulWidget {
   /// ★ 상대 도출은 이 값과 [room] 참여자 데이터로만 한다 — 화면 문자열/메시지 추정 금지.
   final String? currentUserIdOverride;
 
+  /// 읽기 레포 주입 seam(테스트 전용 — N21 페이지 계약 검증).
+  final QuestionRoomReadRepository readRepository;
+
   static ThreadRealtimePort _defaultRealtime(String threadId) =>
       SupabaseThreadRealtime(threadId);
 
@@ -88,7 +92,7 @@ const String _blockedNotice = '차단한 사용자예요. 새 메시지·첨부�
     ' 지난 대화는 그대로 볼 수 있고, 해제는 설정 > 차단 사용자 관리에서 할 수 있어요.';
 
 class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
+  QuestionRoomReadRepository get _read => widget.readRepository;
   final QuestionRoomWriteRepository _write =
       const QuestionRoomWriteRepository();
   final TextEditingController _input = TextEditingController();
@@ -240,9 +244,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     final Future<void> msgsF = _read
         .recentMessages(widget.thread.id, limit: _messagesPageSize)
         .then((List<QuestionMessage> msgs) {
-      for (final QuestionMessage m in msgs) {
-        ctrl.upsertFromServer(m);
-      }
+      ctrl.upsertAllFromServer(msgs); // 일괄 병합(notify ≤1회)
     }).catchError((Object _) {});
     final Future<List<QuestionAttachment>> attsF = _loadAttachments();
     await msgsF;
@@ -255,14 +257,14 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null || ctrl.isEmpty) return;
     try {
+      // N21: 복합 커서(created_at, id) — 동일 시각 경계에서도 누락·중복 0.
       final List<QuestionMessage> older = await _read.messagesBefore(
         widget.thread.id,
-        before: ctrl.items.first.createdAt,
+        cursor: MessageCursor.oldestOf(ctrl.items),
         limit: _messagesPageSize,
       );
-      for (final QuestionMessage m in older) {
-        ctrl.upsertFromServer(m);
-      }
+      // 일괄 병합(notify 1회) — 행별 notify 는 앵커 보정을 깨뜨린다.
+      ctrl.upsertAllFromServer(older);
       if (mounted) {
         setState(() => _hasEarlierMessages = older.length >= _messagesPageSize);
       }
