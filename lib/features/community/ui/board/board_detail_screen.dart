@@ -62,6 +62,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   /// §4: 댓글 수 최신값(목록 스냅샷 p.commentCount 의 상세 내 stale 해소).
   int? _commentCountOverride;
 
+  /// N40: 본인 진입 조회수 증분(서버 성공 시 1) — 표시에만 가산.
+  int _viewCountBump = 0;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +72,10 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     _comments = widget.read.comments(CommunityPostType.board, widget.post.id);
     _loadReactionState();
     // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
-    widget.write.incrementBoardView(widget.post.id);
+    // N40: 서버 증분 성공 시 본인 진입 +1 을 표시에 반영(목록 스냅샷 고정 해소).
+    widget.write.incrementBoardView(widget.post.id).then((bool ok) {
+      if (ok && mounted) setState(() => _viewCountBump = 1);
+    });
   }
 
   @override
@@ -329,7 +335,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                     const SizedBox(width: 8),
                     Text(p.authorName, style: AppType.caption),
                     const SizedBox(width: 10),
-                    Text('조회 ${p.viewCount}', style: AppType.caption),
+                    Text('조회 ${p.viewCount + _viewCountBump}', style: AppType.caption),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s16),

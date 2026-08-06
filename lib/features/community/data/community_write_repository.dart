@@ -91,12 +91,16 @@ class CommunityWriteRepository {
   }
 
   /// 게시글 조회수 +1(상세 진입 시). 기존 RPC 사용. ★ RPC 부재/실패 시 조용히 무시(조회수만 안 오름).
-  Future<void> incrementBoardView(String postId) async {
+  /// N40: 성공 여부를 돌려줘 화면이 본인 진입 +1 을 표시에 반영할 수 있게 한다
+  /// (실패는 종전대로 조용히 무시 — false 반환, 표시 가산 없음).
+  Future<bool> incrementBoardView(String postId) async {
     try {
       await _client.rpc('increment_community_post_view',
           params: <String, dynamic>{'p_post_id': postId});
+      return true;
     } catch (_) {
       // 증분 RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
+      return false;
     }
   }
 
