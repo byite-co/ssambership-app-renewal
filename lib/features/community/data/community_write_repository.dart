@@ -206,6 +206,55 @@ class CommunityWriteRepository {
         const AppError('댓글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
   }
 
+  /// 게시판 글 **본인** 소프트삭제 — 서버 RPC 단일 경로(N3).
+  ///
+  /// 서버 계약: api_app_v1.community_post_soft_delete(p_post_id uuid)
+  ///   성공: {ok:true, contract_version:1, post_id, deleted_at[, already_deleted]}
+  ///   실패 코드: AUTH_REQUIRED · POST_NOT_FOUND_OR_NOT_OWNED ·
+  ///     ACCOUNT_BANNED · ACCOUNT_SUSPENDED · ACCOUNT_DELETION_IN_PROGRESS
+  /// 이미 삭제(already_deleted)는 정상 성공으로 취급한다(이중 탭 안전).
+  /// 행·이미지 참조는 서버가 보존한다(soft delete) — 앱은 Storage 를 건드리지
+  /// 않는다.
+  Future<void> deleteMyPost(String postId) async {
+    final Object? data;
+    try {
+      // ★ 작성·수정과 같은 api_app_v1 스키마 — 생략 시 public 으로 나가 PGRST202.
+      data = await _client.schema(kBoardPostCreateSchema).rpc(
+          'community_post_soft_delete',
+          params: <String, dynamic>{'p_post_id': postId});
+    } catch (e) {
+      final AppError? friendly = postDeleteError(e.toString());
+      if (friendly != null) throw friendly;
+      rethrow;
+    }
+    ensurePostSoftDeleteOk(data);
+  }
+
+  /// 삭제 봉투 검증 — 성공 봉투가 아니면 던진다(성공 위장 금지).
+  static void ensurePostSoftDeleteOk(Object? data) {
+    if (data is Map && data['ok'] == true) {
+      if (data['contract_version'] != 1) {
+        throw const AppError('삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.');
+      }
+      return; // 성공(already_deleted 멱등 히트 포함).
+    }
+    final Object? code = data is Map ? data['code'] : null;
+    throw postDeleteError(code is String ? code : '') ??
+        const AppError('글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+
+  /// 글 삭제 서버 오류 코드 → 사용자용 한글 문구(코드·원문 비노출).
+  /// ACCOUNT_*/AUTH 공통 코드는 댓글 삭제 매퍼를 재사용한다.
+  static AppError? postDeleteError(String raw) {
+    if (raw.contains('POST_NOT_FOUND_OR_NOT_OWNED')) {
+      return const AppError('내가 쓴 글만 삭제할 수 있어요. 이미 삭제된 글일 수도 있어요.');
+    }
+    if (raw.contains('AUTH_REQUIRED')) {
+      return const AppError('로그인이 필요해요.');
+    }
+    return shortformCommentDeleteError(raw);
+  }
+
   /// 숏폼 댓글 삭제 서버 오류 코드 → 사용자용 한글 문구(코드·원문 비노출).
   /// 매핑 대상이 아니면 null(호출부가 공통 문구/원 예외로 폴백).
   static AppError? shortformCommentDeleteError(String raw) {

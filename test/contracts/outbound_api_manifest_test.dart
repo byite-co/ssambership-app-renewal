@@ -43,6 +43,7 @@ const Set<String> kExpectedRpcNames = <String>{
   'release_individual_question',
   // 커뮤니티
   'community_comment_soft_delete_self',
+  'community_post_soft_delete',
   'increment_community_post_view',
   'shortform_view_record_v2',
   // 알림

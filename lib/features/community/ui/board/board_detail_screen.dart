@@ -182,6 +182,34 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (updated == true && mounted) Navigator.of(context).pop(true);
   }
 
+  /// 내 글 삭제 — 서버 소프트삭제 RPC 단일 경로(N3). 성공 시 상세를 닫아
+  /// 목록을 새로고침시킨다(deleted_at 이 찍힌 행은 뷰에서 사라진다).
+  Future<void> _deleteMyPost() async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('글을 삭제할까요?'),
+        content: const Text('삭제한 글은 다시 볼 수 없어요.'),
+        actions: <Widget>[
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.write.deleteMyPost(widget.post.id);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      _snack('글 삭제에 실패했어요. ${friendlyError(e)}');
+    }
+  }
+
   /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
   /// C10: author_id 는 이미 뷰(community_posts_v1) 행에 있으므로 재조회 없이
   /// 그대로 쓴다 — community_posts 베이스 테이블 접근 0건 계약.
@@ -297,12 +325,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             tooltip: '더보기',
             onSelected: (String v) {
               if (v == 'edit') _editMyPost();
+              if (v == 'delete') _deleteMyPost();
               if (v == 'block') _blockPostAuthor();
             },
             itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
-              // 수정은 내 글에만 노출(타인 글 수정 UI 미노출 — 서버도 거부).
+              // 수정·삭제는 내 글에만 노출(타인 글 UI 미노출 — 서버도 거부).
               if (_isMyPost)
                 const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+              if (_isMyPost)
+                const PopupMenuItem<String>(value: 'delete', child: Text('삭제')),
               const PopupMenuItem<String>(
                   value: 'block', child: Text('이 사용자 차단')),
             ],
