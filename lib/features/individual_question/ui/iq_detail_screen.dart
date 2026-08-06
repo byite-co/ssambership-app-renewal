@@ -279,6 +279,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       onMessageInsert: (IqMessage m) {
         if (!mounted) return;
         _messages.upsertFromServer(m);
+        // N36: 귀속 그룹은 로드 스냅샷에서 1회 계산이라 스스로 안 움직인다 —
+        // 이 메시지 귀속인데 '연결 메시지 미확인'에 남은 첨부가 있으면
+        // 재조회로 재귀속한다(N19 코얼레싱 경유 — 폭주 없음).
+        final IqDetailData? d = _lastData;
+        if (d != null &&
+            d.groups.unresolvedMessage
+                .any((IqAttachment a) => a.messageId == m.id)) {
+          _coalescedRefresh();
+        }
       },
       // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회(N19 코얼레싱).
       onQuestionUpdate: () {
@@ -309,11 +318,16 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     super.dispose();
   }
 
+  /// 마지막으로 로드된 스냅샷(N36 — 실시간 메시지 도착 시 미해결 첨부
+  /// 재귀속 판정용). 표시는 여전히 FutureBuilder(_future)가 정본이다.
+  IqDetailData? _lastData;
+
   Future<IqDetailData> _load() async {
     final IqDetailData data = await _loadRaw();
     // 서버 목록이 대화 정본 — 실시간 수신분과 id 로 합쳐진 뷰를 갱신한다.
     // (notify 는 FutureBuilder 리빌드가 대신한다 — build 중 재통지 방지.)
     _messages.resetTo(data.messages, notify: false);
+    _lastData = data;
     return data;
   }
 
