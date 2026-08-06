@@ -11,6 +11,7 @@ import '../data/models/individual_question_models.dart';
 import 'iq_detail_screen.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 화면에 함께 담는 데이터(대기 공개 질문 + 내 질문).
 class MentorIqListData {
@@ -45,7 +46,8 @@ class MentorIqListScreen extends StatefulWidget {
 }
 
 class _MentorIqListScreenState extends State<MentorIqListScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final IndividualQuestionRepository _repo =
       const IndividualQuestionRepository();
   late Future<MentorIqListData> _future;
@@ -65,7 +67,13 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refresh();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
   }
 
   @override

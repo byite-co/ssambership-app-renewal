@@ -24,6 +24,7 @@ import '../../../shared/widgets/commerce_notice_card.dart';
 import '../../../core/web_bridge/web_bridge.dart';
 import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../../individual_question/iq_flags.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 상세(열람 전용). 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
 /// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](웹 브릿지).
@@ -62,7 +63,8 @@ class MentorDetailScreen extends StatefulWidget {
 }
 
 class _MentorDetailScreenState extends State<MentorDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final MentorDirectoryRepository _repo = const MentorDirectoryRepository();
   final MentorFavoritesRepository _favRepo = const MentorFavoritesRepository();
   late bool _favorited = widget.initialFavorited;
@@ -89,7 +91,13 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _reloadExtras();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _reloadExtras();
   }
 
   @override

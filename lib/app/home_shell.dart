@@ -12,6 +12,7 @@ import '../features/notifications/data/notification_badge_controller.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
@@ -155,8 +156,13 @@ class _HomeShellState extends State<HomeShell> {
               children: <Widget>[
                 // N13: 미방문 탭은 빈 자리표시자 — 첫 방문 때 실제 화면으로
                 // 교체되고 이후에는 계속 살아 있다(상태 유지).
+                // N12: 활성 탭 여부를 ScreenVisibility 로 알려 복귀(resumed)
+                // 재조회가 보이는 탭에서만 즉시 돌게 한다(나머지는 재방문 시).
                 for (int i = 0; i < _pages.length; i++)
-                  _built[i] ? _pages[i] : const SizedBox.shrink(),
+                  ScreenVisibility(
+                    visible: i == _index,
+                    child: _built[i] ? _pages[i] : const SizedBox.shrink(),
+                  ),
               ],
             ),
           ),

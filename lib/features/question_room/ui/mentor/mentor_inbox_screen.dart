@@ -16,6 +16,7 @@ import '../../data/thread_status_counts.dart';
 import 'student_room_home_screen.dart';
 import '../../../../core/refresh/data_refresh_bus.dart';
 import '../../../../shared/errors/friendly_error.dart';
+import '../../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 질문방 1뎁스 = '받은 학생' 목록(카카오톡식 리스트). 본문만(셸이 AppBar/탭 제공).
 ///
@@ -46,7 +47,8 @@ class _StudentItem {
 }
 
 class _MentorInboxScreenState extends State<MentorInboxScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final StudentLookupRepository _students = const StudentLookupRepository();
 
@@ -66,7 +68,13 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refresh();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
   }
 
   @override

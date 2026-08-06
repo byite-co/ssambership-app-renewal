@@ -35,6 +35,7 @@ import '../data/iq_realtime.dart';
 import '../data/models/individual_question_models.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/app_error.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 import '../../../shared/errors/friendly_error.dart';
 
 /// 상세 화면 데이터 묶음(질문 + 메시지 + 첨부 + 멘토 표시명).
@@ -169,7 +170,7 @@ class IqAnnotateRequest {
 }
 
 class _IqDetailScreenState extends State<IqDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
   IndividualQuestionRepository get _repo =>
       widget.repositoryOverride ?? const IndividualQuestionRepository();
   IqAttachmentsPort get _attachments =>
@@ -245,7 +246,13 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다(N19 코얼레싱).
-    if (state == AppLifecycleState.resumed) _coalescedRefresh();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(첨부 뷰어 등이 덮여 있으면 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _coalescedRefresh();
   }
 
   /// 로그아웃/계정 전환 — 이전 사용자 채널을 정리한다(구독 누수·오배달 방지).

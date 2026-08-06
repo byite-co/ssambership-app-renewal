@@ -25,6 +25,7 @@ import 'data/question_room_read_repository.dart';
 import 'ui/mentor/mentor_inbox_screen.dart';
 import 'ui/mentor_room_home_screen.dart';
 import '../../shared/errors/friendly_error.dart';
+import '../../shared/widgets/screen_visibility.dart';
 
 /// 질문방 탭(1뎁스). HomeShell 이 AppBar/하단탭을 제공하므로 본문만 구성(자체 Scaffold 없음).
 ///
@@ -85,7 +86,8 @@ class _RoomItem {
 }
 
 class _StudentRoomListState extends State<_StudentRoomList>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final MentorLookupRepository _mentors = const MentorLookupRepository();
 
@@ -105,7 +107,13 @@ class _StudentRoomListState extends State<_StudentRoomList>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refresh();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
   }
 
   @override

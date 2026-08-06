@@ -14,6 +14,7 @@ import '../../shared/errors/friendly_error.dart';
 import 'data/app_notification.dart';
 import 'data/notification_badge_controller.dart';
 import 'data/notifications_realtime.dart';
+import '../../shared/widgets/screen_visibility.dart';
 import 'data/notifications_repository.dart';
 import 'ui/notification_target_opener.dart';
 import 'ui/widgets/notification_card.dart';
@@ -74,7 +75,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
   static const int _pageSize = 20;
 
   /// 필터 칩 구성('기타' 는 전용 칩 없이 전체에서만 노출).
@@ -131,9 +132,18 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 앱 복귀 — 백그라운드 동안의 수신 공백을 첫 페이지 + 개수 재조회로 메운다.
     if (state == AppLifecycleState.resumed) {
-      _load();
+      // ★ 배지 refresh 는 가시성 게이트 밖 — 탭 아이콘 배지는 어느 탭에
+      //   있어도 보이는 전역 표시라 복귀 즉시 갱신한다(N24 코얼레싱·
+      //   single-flight 라 중복 호출 안전).
       _badge.refresh();
+      handleResumed();
     }
+  }
+
+  // N12: 목록 재조회는 보일 때만(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _load();
   }
 
   void _onRefreshSignal() {
