@@ -23,6 +23,10 @@ class DataRefreshBus {
   ///
   /// ★ 앱 밖 변경(웹 구독 완료 후 앱 복귀)은 세대 신호가 올 수 없으므로
   ///   화면 resume 재조회가 정본 경로다 — 이 세대는 그 보완재지 대체재가 아니다.
+  /// ★ N30: 현재 생산자(bumpSubscription 호출) 0건은 **의도된 대기 상태**다 —
+  ///   Commerce-Zero 로 앱 안에서 구독 변화를 알게 되는 지점이 아직 없다.
+  ///   앱 내에서 구독 상태를 알게 되는 표면이 생기면 그 성공 지점에서 부른다.
+  ///   (리스너·가드 테스트는 test/refresh/subscription_stale_test.dart 에 유지.)
   static final ValueNotifier<int> subscriptionGeneration =
       ValueNotifier<int>(0);
 
