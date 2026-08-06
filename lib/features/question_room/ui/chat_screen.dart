@@ -180,11 +180,18 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// N21 완결: 메시지 1페이지 크기 — 무제한 전량 조회 제거.
+  static const int _messagesPageSize = 200;
+
+  /// 이전 페이지가 더 있을 수 있는지(마지막 페이지가 한도만큼 꽉 찼는지).
+  bool _hasEarlierMessages = false;
+
   Future<void> _load() async {
     try {
       // N21: 메시지·첨부는 독립 조회 — 병렬(종전 순차 2왕복 벽시계 절감).
+      // 메시지는 최근 페이지만 — 이전 대화는 상단 버튼으로 명시 확장.
       final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
-        _read.messages(widget.thread.id),
+        _read.recentMessages(widget.thread.id, limit: _messagesPageSize),
         _loadAttachments(),
       ]);
       final List<QuestionMessage> msgs = loaded[0] as List<QuestionMessage>;
@@ -192,6 +199,7 @@ class _ChatScreenState extends State<ChatScreen> {
           loaded[1] as List<QuestionAttachment>;
       if (!mounted) return;
       setState(() {
+        _hasEarlierMessages = msgs.length >= _messagesPageSize;
         _messages = ThreadMessagesController(msgs);
         _attachments = atts;
         _loading = false;
@@ -202,6 +210,27 @@ class _ChatScreenState extends State<ChatScreen> {
         _loadError = e;
         _loading = false;
       });
+    }
+  }
+
+  /// '이전 대화 불러오기' — 현재 가장 오래된 메시지 이전 1페이지를 합친다.
+  Future<void> _loadEarlierMessages() async {
+    final ThreadMessagesController? ctrl = _messages;
+    if (ctrl == null || ctrl.isEmpty) return;
+    try {
+      final List<QuestionMessage> older = await _read.messagesBefore(
+        widget.thread.id,
+        before: ctrl.items.first.createdAt,
+        limit: _messagesPageSize,
+      );
+      for (final QuestionMessage m in older) {
+        ctrl.upsertFromServer(m); // id dedup + created_at 정렬 유지
+      }
+      if (mounted) {
+        setState(() => _hasEarlierMessages = older.length >= _messagesPageSize);
+      }
+    } catch (_) {
+      // 실패 시 조용히 유지 — 버튼이 남아 재시도 가능.
     }
   }
 
@@ -243,10 +272,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null) return;
     // N21: 메시지·첨부 재조회 병렬화(메시지 실패는 조용히 무시 — 기존 목록 유지).
+    // 최근 페이지를 merge(upsert)로 합친다 — resetTo 는 이미 불러온 이전
+    // 페이지를 버리므로 금지(메시지는 삭제 경로가 없어 merge 가 안전).
     final Future<void> msgsF = _read
-        .messages(widget.thread.id)
-        .then(ctrl.resetTo)
-        .catchError((Object _) {});
+        .recentMessages(widget.thread.id, limit: _messagesPageSize)
+        .then((List<QuestionMessage> msgs) {
+      for (final QuestionMessage m in msgs) {
+        ctrl.upsertFromServer(m);
+      }
+    }).catchError((Object _) {});
     final Future<List<QuestionAttachment>> attsF = _loadAttachments();
     await msgsF;
     final List<QuestionAttachment> atts = await attsF;
@@ -468,6 +502,8 @@ class _ChatScreenState extends State<ChatScreen> {
       onOpenImage: _openImage,
       onOpenFile: _openFile,
       onAttachmentInsert: _reloadAttachments,
+      hasEarlier: _hasEarlierMessages,
+      onLoadEarlier: _loadEarlierMessages,
     );
   }
 }

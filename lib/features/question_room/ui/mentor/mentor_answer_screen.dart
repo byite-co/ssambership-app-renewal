@@ -167,12 +167,25 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     super.dispose();
   }
 
+  /// N21 완결: 메시지 1페이지 크기 — 무제한 전량 조회 제거.
+  static const int _messagesPageSize = 200;
+
+  /// 이전 페이지가 더 있을 수 있는지(마지막 페이지가 한도만큼 꽉 찼는지).
+  bool _hasEarlierMessages = false;
+
   Future<void> _load() async {
     try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      final List<QuestionAttachment> atts = await _loadAttachments();
+      // N21: 메시지는 최근 페이지만 + 첨부와 병렬 — 이전 대화는 상단 버튼.
+      final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+        _read.recentMessages(widget.thread.id, limit: _messagesPageSize),
+        _loadAttachments(),
+      ]);
+      final List<QuestionMessage> msgs = loaded[0] as List<QuestionMessage>;
+      final List<QuestionAttachment> atts =
+          loaded[1] as List<QuestionAttachment>;
       if (!mounted) return;
       setState(() {
+        _hasEarlierMessages = msgs.length >= _messagesPageSize;
         _messages = ThreadMessagesController(msgs);
         _attachments = atts;
         _loading = false;
@@ -223,14 +236,39 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null) return;
     // N21: 메시지·첨부 재조회 병렬화(메시지 실패는 조용히 무시 — 기존 목록 유지).
+    // 최근 페이지 merge(upsert) — resetTo 는 이전 페이지를 버리므로 금지.
     final Future<void> msgsF = _read
-        .messages(widget.thread.id)
-        .then(ctrl.resetTo)
-        .catchError((Object _) {});
+        .recentMessages(widget.thread.id, limit: _messagesPageSize)
+        .then((List<QuestionMessage> msgs) {
+      for (final QuestionMessage m in msgs) {
+        ctrl.upsertFromServer(m);
+      }
+    }).catchError((Object _) {});
     final Future<List<QuestionAttachment>> attsF = _loadAttachments();
     await msgsF;
     final List<QuestionAttachment> atts = await attsF;
     if (mounted) setState(() => _attachments = atts);
+  }
+
+  /// '이전 대화 불러오기' — 현재 가장 오래된 메시지 이전 1페이지를 합친다.
+  Future<void> _loadEarlierMessages() async {
+    final ThreadMessagesController? ctrl = _messages;
+    if (ctrl == null || ctrl.isEmpty) return;
+    try {
+      final List<QuestionMessage> older = await _read.messagesBefore(
+        widget.thread.id,
+        before: ctrl.items.first.createdAt,
+        limit: _messagesPageSize,
+      );
+      for (final QuestionMessage m in older) {
+        ctrl.upsertFromServer(m);
+      }
+      if (mounted) {
+        setState(() => _hasEarlierMessages = older.length >= _messagesPageSize);
+      }
+    } catch (_) {
+      // 실패 시 조용히 유지 — 버튼이 남아 재시도 가능.
+    }
   }
 
   /// 이미지 첨부 탭 → 전체화면 뷰어. 주석이 전송되면 목록 새로고침.
@@ -451,6 +489,8 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
       onOpenImage: _openImage,
       onOpenFile: _openFile,
       onAttachmentInsert: _reloadAttachments,
+      hasEarlier: _hasEarlierMessages,
+      onLoadEarlier: _loadEarlierMessages,
     );
   }
 }

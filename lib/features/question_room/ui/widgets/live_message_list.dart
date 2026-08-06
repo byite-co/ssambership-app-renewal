@@ -29,6 +29,8 @@ class LiveMessageList extends StatefulWidget {
     this.onOpenImage,
     this.onOpenFile,
     this.onAttachmentInsert,
+    this.hasEarlier = false,
+    this.onLoadEarlier,
   });
 
   final ThreadMessagesController controller;
@@ -54,6 +56,13 @@ class LiveMessageList extends StatefulWidget {
   /// 첨부 행 insert 실시간 수신 시(부모가 첨부 재조회). publication 에
   /// question_attachments 가 포함돼 있을 때만 도착한다(웹 117 마이그레이션).
   final VoidCallback? onAttachmentInsert;
+
+  /// N21: 이전 페이지가 더 있을 수 있으면 목록 상단에 '이전 대화 불러오기'
+  /// 를 노출한다. [onLoadEarlier] 가 null 이면 미노출(하위호환).
+  final bool hasEarlier;
+
+  /// '이전 대화 불러오기' 탭 — 부모가 이전 페이지를 controller 에 합친다.
+  final Future<void> Function()? onLoadEarlier;
 
   @override
   State<LiveMessageList> createState() => _LiveMessageListState();
@@ -85,10 +94,30 @@ class _LiveMessageListState extends State<LiveMessageList> {
     super.dispose();
   }
 
+  /// N21: 이전 페이지 로드 직후엔 맨 아래로 점프하지 않는다(읽던 위치 유지).
+  bool _suppressNextJump = false;
+  bool _loadingEarlier = false;
+
   void _onChanged() {
     if (!mounted) return;
     setState(() {});
+    if (_suppressNextJump) {
+      _suppressNextJump = false;
+      return;
+    }
     _jumpToEndSoon();
+  }
+
+  Future<void> _loadEarlier() async {
+    final Future<void> Function()? load = widget.onLoadEarlier;
+    if (load == null || _loadingEarlier) return;
+    setState(() => _loadingEarlier = true);
+    _suppressNextJump = true;
+    try {
+      await load();
+    } finally {
+      if (mounted) setState(() => _loadingEarlier = false);
+    }
   }
 
   void _jumpToEndSoon() {
@@ -107,12 +136,24 @@ class _LiveMessageListState extends State<LiveMessageList> {
         child: Text(widget.emptyHint, style: AppType.caption),
       );
     }
+    // N21: 상단 '이전 대화 불러오기'(이전 페이지가 있을 수 있을 때만).
+    final bool showEarlier = widget.hasEarlier && widget.onLoadEarlier != null;
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
-      itemCount: rows.length,
-      itemBuilder: (BuildContext context, int i) => rows[i].child,
+      itemCount: rows.length + (showEarlier ? 1 : 0),
+      itemBuilder: (BuildContext context, int i) {
+        if (showEarlier && i == 0) {
+          return Center(
+            child: TextButton(
+              onPressed: _loadingEarlier ? null : _loadEarlier,
+              child: Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+            ),
+          );
+        }
+        return rows[i - (showEarlier ? 1 : 0)].child;
+      },
     );
   }
 

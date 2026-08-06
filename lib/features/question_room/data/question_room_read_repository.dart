@@ -201,7 +201,9 @@ class QuestionRoomReadRepository {
     return row == null ? null : QuestionThread.fromMap(row);
   }
 
-  /// 스레드의 메시지 목록(대화 순서 = created_at 오름차순).
+  /// 스레드의 메시지 목록(대화 순서 = created_at 오름차순) — **무제한 전량**.
+  /// ★ N21: 화면(채팅·답변)은 [recentMessages]/[messagesBefore] 페이지 경로를
+  ///   쓴다. 이 메서드는 dev 인스펙터 등 소량 확정 표면 전용으로 남긴다.
   Future<List<QuestionMessage>> messages(String threadId) async {
     final List<Map<String, dynamic>> rows = await _client
         .from('question_messages')
@@ -209,6 +211,38 @@ class QuestionRoomReadRepository {
         .eq('thread_id', threadId)
         .order('created_at', ascending: true);
     return rows.map(QuestionMessage.fromMap).toList();
+  }
+
+  /// 최근 메시지 [limit]건(N21 완결 — 무제한 전량 조회 제거). 반환은
+  /// 대화순(asc). 반환 길이 == limit 이면 이전 페이지가 더 있을 수 있다.
+  Future<List<QuestionMessage>> recentMessages(
+    String threadId, {
+    required int limit,
+  }) async {
+    final List<Map<String, dynamic>> rows = await _client
+        .from('question_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return rows.map(QuestionMessage.fromMap).toList().reversed.toList();
+  }
+
+  /// [before] 미만(과거 방향) 메시지 [limit]건 — '이전 대화 불러오기'용(asc).
+  /// 동일 created_at 경계 행은 건너뛸 수 있다(초 단위 동시 작성 — 수용 한계).
+  Future<List<QuestionMessage>> messagesBefore(
+    String threadId, {
+    required DateTime before,
+    required int limit,
+  }) async {
+    final List<Map<String, dynamic>> rows = await _client
+        .from('question_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .lt('created_at', before.toUtc().toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return rows.map(QuestionMessage.fromMap).toList().reversed.toList();
   }
 
   /// 방의 연결노트 전부(학생·멘토 섞여 옴, 최근 수정순).
