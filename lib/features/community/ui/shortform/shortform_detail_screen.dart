@@ -84,6 +84,17 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
+  /// C6: ReactionBar 표시용 실개수(로드 완료 시 갱신 — 0 하드코딩 제거).
+  int _commentCount = 0;
+
+  Future<List<CommunityComment>> _fetchComments() =>
+      widget.read.comments(CommunityPostType.shortform, widget.post.id).then(
+        (List<CommunityComment> list) {
+          if (mounted) setState(() => _commentCount = list.length);
+          return list;
+        },
+      );
+
   /// 조회 기록 v2 의 이벤트 키 — **화면 노출(초기 진입) 1회당 1개**(UUID v4).
   /// late final 필드라 리빌드·setState 에도 재생성되지 않는다. 실패해도 새
   /// 키로 재시도하지 않는다(멱등 계약 — 중복 가산 0). 테스트 검증용 공개.
@@ -109,8 +120,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
-    _comments =
-        widget.read.comments(CommunityPostType.shortform, widget.post.id);
+    _comments = _fetchComments();
     _loadReactionState();
     _loadMedia();
     // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
@@ -317,8 +327,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
     );
     if (blocked && mounted) {
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     }
   }
@@ -349,8 +358,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
       if (!mounted) return;
       _snack('댓글을 삭제했어요.');
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     } catch (e) {
       _snack('댓글 삭제에 실패했어요. ${friendlyError(e)}');
@@ -373,8 +381,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
       if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     } catch (e) {
       _snack('댓글 등록에 실패했어요. ${friendlyError(e)}');
@@ -443,7 +450,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
                         liked: _liked,
                         scrapped: _scrapped,
                         likeCount: _likeCount,
-                        commentCount: 0,
+                        commentCount: _commentCount,
                         onToggleLike: _toggleLike,
                         onToggleScrap: _toggleScrap,
                         onReport: _report,
