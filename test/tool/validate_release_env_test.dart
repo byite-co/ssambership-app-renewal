@@ -4,13 +4,18 @@ import '../../tool/validate_release_env.dart';
 
 /// §16 release preflight — 출시 빌드 환경 판정(secret 미출력 계약 포함).
 ///
-/// fixture 값은 실제 운영 값을 닮지 않은 순수 테스트 문자열이다.
+/// SUPABASE_URL 은 출시 정본 URL(공개 식별자, secret 아님)과의 '정확 일치'
+/// 게이트다 — 허용 정규화는 단일 trailing slash 제거 하나뿐. DSN·key
+/// fixture 는 실제 운영 값을 닮지 않은 순수 테스트 문자열이다.
 Map<String, String> _base() => <String, String>{
       'SENTRY_DSN': 'test-fixture-dsn-not-real',
       'SENTRY_ENVIRONMENT': 'production',
-      'SUPABASE_URL': 'https://example-project.supabase.co',
+      'SUPABASE_URL': kProductionSupabaseUrl,
       'SUPABASE_ANON_KEY': 'test-fixture-key-not-real',
     };
+
+bool _urlOk(String url) => validateReleaseEnv(_base()..['SUPABASE_URL'] = url)
+    .supabaseUrlIsExactProduction;
 
 void main() {
   test('14a. DSN 없음 → FAIL', () {
@@ -34,19 +39,6 @@ void main() {
     expect(validateReleaseEnv(_base()).ok, isTrue);
   });
 
-  test('14e. 로컬 Supabase URL(127.0.0.1/localhost/http) → FAIL', () {
-    for (final String bad in <String>[
-      'http://127.0.0.1:54321',
-      'http://localhost:54321',
-      'https://192.168.0.10:54321',
-      '',
-    ]) {
-      final Map<String, String> env = _base()..['SUPABASE_URL'] = bad;
-      expect(validateReleaseEnv(env).supabaseUrlIsRemoteHttps, isFalse,
-          reason: bad);
-    }
-  });
-
   test('14f. anon key 없음 → FAIL', () {
     final Map<String, String> env = _base()..['SUPABASE_ANON_KEY'] = '';
     expect(validateReleaseEnv(env).ok, isFalse);
@@ -59,9 +51,49 @@ void main() {
     expect(<Object>[
       r.dsnPresent,
       r.environmentIsProduction,
-      r.supabaseUrlIsRemoteHttps,
+      r.supabaseUrlIsExactProduction,
       r.anonKeyPresent,
     ], everyElement(isA<bool>()));
+  });
+
+  group('SUPABASE_URL 정확 일치 게이트(7종)', () {
+    test('1. 출시 정본 URL 정확 일치 → PASS', () {
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co'), isTrue);
+    });
+
+    test('2. 단일 trailing slash → PASS(허용되는 유일한 정규화)', () {
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co/'), isTrue);
+      // 이중 slash 는 정규화 대상이 아니다 — FAIL.
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co//'), isFalse);
+    });
+
+    test('3. 다른 Supabase 프로젝트(HTTPS 라도) → FAIL', () {
+      expect(_urlOk('https://example-project.supabase.co'), isFalse);
+      expect(_urlOk('https://aaaaaaaaaaaaaaaaaaaa.supabase.co'), isFalse);
+    });
+
+    test('4. localhost → FAIL', () {
+      expect(_urlOk('http://localhost:54321'), isFalse);
+      expect(_urlOk('https://localhost'), isFalse);
+      expect(_urlOk('http://127.0.0.1:54321'), isFalse);
+    });
+
+    test('5. LAN 주소 → FAIL', () {
+      expect(_urlOk('https://192.168.0.10:54321'), isFalse);
+      expect(_urlOk('http://10.0.2.2:54321'), isFalse);
+    });
+
+    test('6. production host 라도 http → FAIL', () {
+      expect(_urlOk('http://lbeqxarxothkmzqvpudy.supabase.co'), isFalse);
+    });
+
+    test('7. userinfo·query·fragment·명시 port → FAIL', () {
+      expect(_urlOk('https://user@lbeqxarxothkmzqvpudy.supabase.co'), isFalse);
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co?x=1'), isFalse);
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co#frag'), isFalse);
+      expect(_urlOk('https://lbeqxarxothkmzqvpudy.supabase.co:443'), isFalse);
+      expect(_urlOk(''), isFalse);
+    });
   });
 
   test('env 파서 — 주석·빈 줄·따옴표 처리', () {

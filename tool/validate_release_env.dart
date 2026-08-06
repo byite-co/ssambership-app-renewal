@@ -8,30 +8,38 @@
 // 통과 조건(전부 충족 시 exit 0, 아니면 exit 1):
 //   SENTRY_DSN            : 비어 있지 않음
 //   SENTRY_ENVIRONMENT    : 정확히 'production' (빈 값·staging 은 실패)
-//   SUPABASE_URL          : https + 원격(localhost/127.0.0.1/LAN 아님)
+//   SUPABASE_URL          : 출시 정본 URL 과 '정확히' 일치 — 허용 정규화는
+//                           단일 trailing slash 제거 하나뿐. 다른 project ref·
+//                           명시 port(:443 포함)·userinfo·query·fragment·
+//                           http·localhost/LAN 전부 실패.
 //   SUPABASE_ANON_KEY     : 비어 있지 않음
 //
 // 런타임 기본값(staging)은 안전한 비-production 값으로 유지된다 — 이 도구는
 // '출시 빌드에 한해' production 을 강제하는 별도 게이트다.
 import 'dart:io';
 
+/// 출시 Supabase 프로젝트 정본 URL. project URL 은 클라이언트 바이너리에
+/// 포함되는 공개 식별자다(secret 아님) — 정확 일치 비교의 기준값.
+const String kProductionSupabaseUrl =
+    'https://lbeqxarxothkmzqvpudy.supabase.co';
+
 class ReleaseEnvResult {
   const ReleaseEnvResult({
     required this.dsnPresent,
     required this.environmentIsProduction,
-    required this.supabaseUrlIsRemoteHttps,
+    required this.supabaseUrlIsExactProduction,
     required this.anonKeyPresent,
   });
 
   final bool dsnPresent;
   final bool environmentIsProduction;
-  final bool supabaseUrlIsRemoteHttps;
+  final bool supabaseUrlIsExactProduction;
   final bool anonKeyPresent;
 
   bool get ok =>
       dsnPresent &&
       environmentIsProduction &&
-      supabaseUrlIsRemoteHttps &&
+      supabaseUrlIsExactProduction &&
       anonKeyPresent;
 }
 
@@ -55,6 +63,16 @@ Map<String, String> parseEnvFile(String content) {
   return out;
 }
 
+/// SUPABASE_URL 정확 일치 게이트. 허용되는 정규화는 '단일 trailing slash
+/// 제거' 하나뿐이며, 그 결과가 [kProductionSupabaseUrl] 과 문자열로 동일해야
+/// 한다. 문자열 정확 비교이므로 다른 project ref·명시 port(:443 포함)·
+/// userinfo·query·fragment·http·localhost/LAN 은 구조적으로 전부 실패한다.
+bool supabaseUrlIsExactProductionUrl(String rawUrl) {
+  String s = rawUrl.trim();
+  if (s.endsWith('/')) s = s.substring(0, s.length - 1);
+  return s == kProductionSupabaseUrl;
+}
+
 /// 판정 순수 함수 — 테스트가 직접 검증한다. secret 값을 반환하지 않는다.
 ReleaseEnvResult validateReleaseEnv(Map<String, String> env) {
   final String dsn = (env['SENTRY_DSN'] ?? '').trim();
@@ -62,20 +80,10 @@ ReleaseEnvResult validateReleaseEnv(Map<String, String> env) {
   final String url = (env['SUPABASE_URL'] ?? '').trim();
   final String anonKey = (env['SUPABASE_ANON_KEY'] ?? '').trim();
 
-  final Uri? parsed = Uri.tryParse(url);
-  final String host = parsed?.host ?? '';
-  final bool remoteHttps = parsed != null &&
-      parsed.scheme == 'https' &&
-      host.isNotEmpty &&
-      host != 'localhost' &&
-      !host.startsWith('127.') &&
-      !host.startsWith('192.168.') &&
-      !host.startsWith('10.');
-
   return ReleaseEnvResult(
     dsnPresent: dsn.isNotEmpty,
     environmentIsProduction: environment == 'production',
-    supabaseUrlIsRemoteHttps: remoteHttps,
+    supabaseUrlIsExactProduction: supabaseUrlIsExactProductionUrl(url),
     anonKeyPresent: anonKey.isNotEmpty,
   );
 }
@@ -94,7 +102,7 @@ void main(List<String> args) {
   stdout.writeln(
       'SENTRY_ENVIRONMENT_IS_PRODUCTION=${yn(r.environmentIsProduction)}');
   stdout.writeln(
-      'SUPABASE_URL_IS_REMOTE_HTTPS=${yn(r.supabaseUrlIsRemoteHttps)}');
+      'SUPABASE_URL_IS_EXACT_PRODUCTION=${yn(r.supabaseUrlIsExactProduction)}');
   stdout.writeln('SUPABASE_ANON_KEY_PRESENT=${yn(r.anonKeyPresent)}');
   stdout.writeln('RELEASE_ENV_VALIDATION=${r.ok ? 'PASS' : 'FAIL'}');
   exit(r.ok ? 0 : 1);
