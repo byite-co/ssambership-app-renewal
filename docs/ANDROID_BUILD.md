@@ -57,6 +57,39 @@ flutter build apk           # 직접 배포용 .apk (필요 시)
   출력의 인증서 소유자에 `CN=Android Debug` 가 **없어야** 한다. 있으면 key.properties
   없이(또는 `-PallowInsecureSigning=true` 로) 빌드된 것 — 업로드 금지, release 키로 재빌드.
 
+## signed release-candidate workflow (CI 수동 검증)
+
+`.github/workflows/android-signed-release-candidate.yml` — **검증 전용** 수동 workflow.
+release keystore 로 서명한 AAB 를 만들고 서명·manifest·내장 env 를 검증한다.
+**Play Console 업로드는 하지 않는다**(업로드 step 자체가 없다).
+
+- **실행 전제**: `workflow_dispatch` 는 workflow 파일이 **기본 브랜치(master)에
+  병합된 이후에만** 실행할 수 있다(GitHub 제약). PR 단계에서는 실행 불가.
+- **빌드 대상 고정**: `SOURCE_SHA`(PR #51 head, `1.0.0+18`)가 workflow 안에
+  상수로 고정돼 있다 — 임의 SHA 입력 불가. PR #51 head 가 이동하면
+  `BLOCKED_APP_PR_HEAD_MOVED` 로 빌드하지 않는다. 대상 SHA 를 바꾸려면
+  workflow 파일 수정 → 리뷰 → master 병합을 다시 거친다.
+- **수동 확인 입력**(dispatch 시 둘 다 체크해야 job 시작):
+  `confirm_version_code_18_unused`(Play Console 에서 versionCode 18 미사용 직접
+  확인 — API 검증 대체가 아닌 사람 확인 기록), `confirm_no_store_upload`.
+- **GitHub Environment**: `android-release-candidate` — 다음 Environment secrets
+  필요(사람이 등록; 저장소·로그에 값이 남지 않는다):
+  `SUPABASE_URL` `SUPABASE_ANON_KEY` `SENTRY_DSN` `ANDROID_KEYSTORE_BASE64`
+  `ANDROID_KEYSTORE_PASSWORD` `ANDROID_KEY_ALIAS` `ANDROID_KEY_PASSWORD`.
+  Environment 에 required reviewers 를 설정하면 승인 전에는 secret 을 쓸 수 없다.
+  `SENTRY_ENVIRONMENT` 는 workflow 가 `production` 으로 고정 주입한다.
+- **검증 체인**: SOURCE_SHA·PR head 일치 → `.env` 생성(정본 URL 정확 일치) →
+  preflight(`tool/validate_release_env.dart`) → analyze·test(1469) →
+  `flutter build appbundle --release`(keystore 서명, insecure 폴백 없음) →
+  jarsigner + 인증서 fingerprint 대조(debug 인증서 즉시 실패) →
+  bundletool(버전·checksum 고정) manifest 대조(applicationId/1.0.0/18/24/36) →
+  AAB 내장 `.env` 판정(YES/NO 만) → artifact(AAB+요약+sha256, retention 3일) →
+  cleanup(`always()` — .env/key.properties/keystore 제거).
+- **secret 규칙**: 로그에는 YES/NO 판정만 남는다. `printenv`·`set -x`·값/길이/
+  host 출력 금지. `.env`/`key.properties`/keystore 는 artifact 에 포함하지 않는다.
+- 계약 테스트: `test/contracts/android_signed_workflow_contract_test.dart` 가
+  위 금지·고정 사항을 YAML 파싱으로 강제한다.
+
 ## 알려진 상태 / 후속 작업
 - **푸시 알림(FCM)**: 코드·서버 계약 완료, **`WAITING_EXTERNAL_FIREBASE_CONFIG`** — 앱에
   Firebase 설정 파일이 없어서 런타임 비활성 상태로 대기한다(절차: `lib/core/push/HANDOFF.md`).
