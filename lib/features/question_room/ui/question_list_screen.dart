@@ -80,7 +80,12 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
     if (mounted) setState(() => _usage = u);
   }
 
-  bool get _canAsk => widget.sub?.canAsk ?? false;
+  /// N29: '질문하기' 게이트 정본은 서버 get_weekly_question_usage 의 can_ask
+  /// (활성 구독 부재 시 limit=0 → false — 구독+주간 잔여를 모두 포함하는 완전
+  /// 판정, staging 함수 정의 실측 2026-08-05). 이 화면은 진입·답변 확인·복귀
+  /// 마다 usage 를 재조회하므로 게이트가 살아 움직인다. 조회 실패(null)일 때만
+  /// push 시점 구독 스냅샷으로 폴백(fail-closed: 둘 다 없으면 false).
+  bool get _canAsk => _usage?.canAsk ?? (widget.sub?.canAsk ?? false);
 
   @override
   Widget build(BuildContext context) {
