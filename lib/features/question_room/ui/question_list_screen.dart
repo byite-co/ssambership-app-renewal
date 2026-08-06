@@ -73,10 +73,7 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
   /// 주간 사용량 조회(읽기전용). 실패해도 화면 흐름은 막지 않는다.
   Future<void> _loadUsage() async {
-    final WeeklyQuestionUsage? u = await _read.weeklyUsage(
-      studentId: widget.room.studentId,
-      mentorId: widget.room.mentorId,
-    );
+    final WeeklyQuestionUsage? u = await _read.weeklyUsage(mentorId: widget.room.mentorId);
     if (mounted) setState(() => _usage = u);
   }
 

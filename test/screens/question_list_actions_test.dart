@@ -30,10 +30,7 @@ class _FakeRead extends QuestionRoomReadRepository {
   }
 
   @override
-  Future<WeeklyQuestionUsage?> weeklyUsage({
-    required String studentId,
-    required String mentorId,
-  }) async =>
+  Future<WeeklyQuestionUsage?> weeklyUsage({required String mentorId}) async =>
       null;
 }
 

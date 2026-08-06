@@ -140,7 +140,7 @@ class _StudentRoomListState extends State<_StudentRoomList>
       final Set<String> mentorIds = rooms.map((Room r) => r.mentorId).toSet();
       await Future.wait(mentorIds.map((String mentorId) async {
         usageByMentor[mentorId] =
-            await _repo.weeklyUsage(studentId: studentId, mentorId: mentorId);
+            await _repo.weeklyUsage(mentorId: mentorId);
       }));
     }
     // N37: 방별 실제 활동시각 — 스레드 슬림 조회 1회(방·상태·활동시각만).

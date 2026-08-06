@@ -28,7 +28,7 @@ const Set<String> kExpectedRpcNames = <String>{
   'qna_create_free_question_thread',
   'qna_create_question_thread',
   'qna_register_attachment',
-  'get_weekly_question_usage',
+  'weekly_question_usage_self',
   'get_mentor_student_nicknames',
   // 멘토 찾기
   'get_mentor_avg_response_hours',

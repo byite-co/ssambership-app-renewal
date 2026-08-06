@@ -135,22 +135,23 @@ class QuestionRoomReadRepository {
     }
   }
 
-  /// 주간 질문 사용량(읽기 전용 RPC `get_weekly_question_usage`). A2 앱-계층 검사·표시용.
+  /// 주간 질문 사용량. A2 앱-계층 검사·표시용.
   ///
-  /// 반환값(used/limit/remaining/can_ask)이 정본이다. 조회 실패/미인식 형태면 null →
-  /// 호출부는 흐름을 막지 않고(보수적 진행) 검사 없이 넘긴다(DB 미강제 한계 감안).
-  Future<WeeklyQuestionUsage?> weeklyUsage({
-    required String studentId,
-    required String mentorId,
-  }) async {
+  /// N2: 구 `get_weekly_question_usage(p_student_id, p_mentor_id)` 는 임의
+  /// student_id 를 받는 구계약이라 self 봉투 RPC
+  /// `api_web_v1.weekly_question_usage_self(p_mentor_id)` 로 이행 — 학생은
+  /// 서버가 auth.uid() 로 확정한다(타인 사용량 조회 표면 제거).
+  /// 반환값(used/limit/remaining/can_ask)이 정본이다. 실패 봉투({ok:false})/
+  /// 조회 실패/미인식 형태면 null → 호출부는 보수적으로 처리한다.
+  Future<WeeklyQuestionUsage?> weeklyUsage({required String mentorId}) async {
     try {
-      final Object? data = await _client.rpc(
-        'get_weekly_question_usage',
-        params: <String, dynamic>{
-          'p_student_id': studentId,
-          'p_mentor_id': mentorId,
-        },
+      final Object? data = await _client.schema('api_web_v1').rpc(
+        'weekly_question_usage_self',
+        params: <String, dynamic>{'p_mentor_id': mentorId},
       );
+      // 실패 봉투를 fromRpc 에 넘기면 used=0/limit=0 의 날조 소진 상태가
+      // 된다 — ok:true 봉투만 파싱한다.
+      if (data is! Map || data['ok'] != true) return null;
       return WeeklyQuestionUsage.fromRpc(data);
     } catch (_) {
       return null; // 실패 → 판정 불가(호출부가 보수적으로 처리)

@@ -99,7 +99,7 @@ class MyPageRepository {
       _mentors.fetchMany(subs.keys),
       Future.wait(subs.keys.map((String mentorId) async {
         usageByMentor[mentorId] =
-            await _rooms.weeklyUsage(studentId: _uid, mentorId: mentorId);
+            await _rooms.weeklyUsage(mentorId: mentorId);
       })),
     ]);
     final Map<String, MentorPublic> names = nu[0] as Map<String, MentorPublic>;
