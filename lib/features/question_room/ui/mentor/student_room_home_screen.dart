@@ -64,13 +64,15 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
       }
     }
 
-    // 구독 상태(표시만). 멘토는 자기 학생의 구독 행만 RLS 통과 → 첫 요약 사용.
+    // 구독 상태(표시만). N38: '첫 요약'(values.first) 임의 선택 대신 이 방의
+    // 멘토와 매칭되는 요약을 쓴다 — 다중 구독 학생에서 남의 구독 오표시 제거
+    // (멘토 RLS 는 자기 pair 행만 통과하지만, 키 매칭이 정본이다).
     SubscriptionSummary? sub;
     final client = SupabaseInit.clientOrNull;
     if (client != null) {
       final Map<String, SubscriptionSummary> subs =
           await SubscriptionReader.fetchForStudent(client, widget.room.studentId);
-      if (subs.isNotEmpty) sub = subs.values.first;
+      sub = subs[widget.room.mentorId];
     }
 
     return _StudentHomeData(
