@@ -124,8 +124,12 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
     });
   }
 
+  /// C24: 연타 가드 — 목록 화면(_favPending)과 동일하게 in-flight 중 재탭 무시.
+  bool _favPending = false;
+
   /// 하트 탭 — 비로그인이면 로그인 유도, 아니면 낙관적 토글 후 서버 반영(실패 시 되돌림).
   Future<void> _toggleFavorite() async {
+    if (_favPending) return;
     if (!_favRepo.isLoggedIn) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,15 +139,20 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
       return;
     }
     final bool wasFav = _favorited;
+    _favPending = true;
     setState(() => _favorited = !wasFav);
-    final bool ok = wasFav
-        ? await _favRepo.remove(widget.item.id)
-        : await _favRepo.add(widget.item.id);
-    if (!ok && mounted) {
-      setState(() => _favorited = wasFav);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('찜 처리에 실패했어요. 잠시 후 다시 시도해 주세요.')),
-      );
+    try {
+      final bool ok = wasFav
+          ? await _favRepo.remove(widget.item.id)
+          : await _favRepo.add(widget.item.id);
+      if (!ok && mounted) {
+        setState(() => _favorited = wasFav);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('찜 처리에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      _favPending = false;
     }
   }
 
