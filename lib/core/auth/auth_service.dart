@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../deeplink/deep_link_service.dart';
-import '../entitlement/entitlement.dart';
 import '../supabase/supabase_client.dart';
 import '../web_bridge/web_session_hygiene.dart';
 import 'account_status.dart';
@@ -22,11 +21,11 @@ enum AppRole { student, mentor, admin, guest }
 ///   (조회 실패는 재시도 가능 차단 — isRecoverableBlock 참고)
 enum AccessState { loading, loggedOut, guest, full, blocked }
 
-/// 인증 서비스 = 세션 + 프로필(role·계정상태·구독) 오케스트레이션.
+/// 인증 서비스 = 세션 + 프로필(role·계정상태) 오케스트레이션.
 ///
 /// ChangeNotifier 로 두어 GoRouter refreshListenable 로 진입 분기를 갱신한다.
 /// - 세션: Supabase 이메일+비밀번호 로그인 / 로그아웃 / 앱 재시작 시 복원·유지.
-/// - 프로필: 로그인 후 users.role, users.status(account_status), subscriptions(entitlement) read.
+/// - 프로필: 로그인 후 users 본인 행(role·표시명·상태) + 탈퇴 RPC 2종 read.
 class AuthService extends ChangeNotifier {
   AuthService._();
 
@@ -38,7 +37,6 @@ class AuthService extends ChangeNotifier {
   bool _roleFetchFailed = false;
   String _displayName = '';
   AccountState _account = AccountState.fetchFailed;
-  Entitlement _entitlement = Entitlement.none;
   StreamSubscription<AuthState>? _authSub;
 
   // ── 외부 노출 게터 ──
@@ -46,7 +44,6 @@ class AuthService extends ChangeNotifier {
   bool get isGuest => _guest;
   AppRole get currentRole => _role;
   AccountState get accountState => _account;
-  Entitlement get entitlement => _entitlement;
 
   /// 화면 표시용 이름(nickname 우선, 없으면 full_name, 둘 다 없으면 빈 문자열).
   /// 하드코딩하지 않는다 — users 프로필에 없으면 빈 값.
@@ -253,11 +250,9 @@ class AuthService extends ChangeNotifier {
     _role = role ?? AppRole.guest;
     _displayName = _parseDisplayName(userRow);
     _account = account;
-    if (_role == AppRole.student) {
-      _entitlement = await EntitlementReader.fetchForStudent(client, userId);
-    } else {
-      _entitlement = Entitlement.none;
-    }
+    // N31: 종전의 구독 자격 선조회(entitlement 캐시)는 소비처가 0인 죽은
+    // 캐시라 제거 — auth 이벤트마다 subscriptions 왕복 1회가 사라진다.
+    // 구독 여부가 필요한 표면은 각자 서버 정본을 조회한다(멘토 상세 등).
     // '정상 이용 가능' 로드였을 때만 유지 기준점 갱신 — 확정 차단·역할 불명은
     // 기준점을 지워 이후 일시 실패도 종전대로 차단 처리한다.
     final bool usable = !_roleFetchFailed &&
@@ -302,7 +297,6 @@ class AuthService extends ChangeNotifier {
     _roleFetchFailed = false;
     _displayName = '';
     _account = AccountState.fetchFailed;
-    _entitlement = Entitlement.none;
     _lastGoodProfileUid = null; // 계정 전환 시 이전 사용자 프로필 유지 금지(N32).
   }
 
