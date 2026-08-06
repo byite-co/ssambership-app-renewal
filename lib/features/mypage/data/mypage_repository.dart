@@ -8,7 +8,6 @@ import '../../../shared/errors/app_error.dart';
 import '../../question_room/data/mentor_lookup_repository.dart';
 import '../../question_room/data/models/room.dart';
 import '../../question_room/data/question_room_read_repository.dart';
-import '../../question_room/data/student_lookup_repository.dart';
 import '../../question_room/data/thread_status_counts.dart';
 import 'mypage_models.dart';
 
@@ -19,7 +18,6 @@ class MyPageRepository {
 
   final QuestionRoomReadRepository _rooms = const QuestionRoomReadRepository();
   final MentorLookupRepository _mentors = const MentorLookupRepository();
-  final StudentLookupRepository _students = const StudentLookupRepository();
 
   SupabaseClient get _client {
     final SupabaseClient? c = SupabaseInit.clientOrNull;
@@ -219,15 +217,5 @@ class MyPageRepository {
     }
     return settlement;
   }
-
-  /// 멘토: 구독 학생 이름 목록(선택 표시용, 조회만). 화면에서 필요 시 사용.
-  Future<List<String>> mentorStudentNames() async {
-    final List<Room> rooms = await _rooms.myRooms();
-    if (rooms.isEmpty) return const <String>[];
-    final Map<String, StudentPublic> names =
-        await _students.fetchMany(rooms.map((Room r) => r.studentId));
-    return <String>[
-      for (final Room r in rooms) names[r.studentId]?.displayName ?? '학생',
-    ];
-  }
 }
+
