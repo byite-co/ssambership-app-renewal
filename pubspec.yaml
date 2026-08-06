@@ -52,6 +52,9 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   # 런처 아이콘 생성(브랜딩) — 소스 PNG 1개에서 Android/iOS 아이콘 생성.
   flutter_launcher_icons: ^0.14.4
+  # workflow 계약 테스트(test/contracts)의 YAML 구조 파싱용 — 이미 lock 에
+  # transitive(3.1.3)로 존재하는 패키지를 직접 dev 의존으로 승격만 한다.
+  yaml: ^3.1.3
 
 # 앱 로고(확정 브랜드) → Android·iOS 런처 아이콘. 순백 배경(iOS는 alpha 제거).
 flutter_launcher_icons:
