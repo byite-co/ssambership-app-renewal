@@ -7,8 +7,12 @@ import 'package:yaml/yaml.dart';
 /// (`.github/workflows/android-signed-release-candidate.yml`).
 ///
 /// 목적: 서명 workflow 의 보안 불변식이 **의도 없이** 약화되는 회귀를 잡는다.
-/// 문자열 비교만으로 거짓 통과하지 않도록 YAML 을 구조 파싱해 검증하고,
-/// 금지 문자열(secret 유출 경로)은 원문 전체를 별도 스캔한다.
+/// 문자열 비교만으로 거짓 통과하지 않도록 YAML 을 구조 파싱해 검증한다:
+/// - 양성 배선(실행돼야 하는 게이트)은 step `run` 본문 결합 문자열에서 검사
+///   — YAML 주석에 옮겨 적는 변이로는 통과하지 못한다.
+/// - step 검사(checkout/upload-artifact/cleanup)는 **모든** 해당 step 을
+///   순회하고 개수를 고정 — 두 번째 step 추가 변이로는 우회하지 못한다.
+/// - 금지 문자열(secret 유출 경로)은 파일 원문 전체를 스캔(가장 엄격).
 ///
 /// 의도된 변경(대상 SHA 교체, 버전 상향 등)은 이 테스트와 workflow·런북
 /// (docs/ANDROID_BUILD.md '§ signed release-candidate workflow')을 함께
@@ -19,13 +23,32 @@ const String kWorkflowPath =
 /// 빌드 대상 고정 — PR #51 head(1.0.0+18). 전체 40자 SHA 여야 한다.
 const String kSourceSha = '35d7b03afe1f1fc601032e5f2c5218b7040422f5';
 
+/// 출시 Supabase 정본 URL(공개 식별자) — workflow 비교 기준값과 동일해야 한다.
+const String kProductionSupabaseUrl =
+    'https://lbeqxarxothkmzqvpudy.supabase.co';
+
 void main() {
   final String raw = File(kWorkflowPath).readAsStringSync();
   final YamlMap doc = loadYaml(raw) as YamlMap;
+  final YamlMap job =
+      (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
+  final YamlList steps = job['steps'] as YamlList;
 
   // YAML 1.1 호환 파서가 `on:` 키를 bool true 로 읽는 경우까지 흡수한다.
-  Object? triggerKey() =>
-      doc.containsKey('on') ? doc['on'] : (doc.containsKey(true) ? doc[true] : null);
+  Object? triggerKey() => doc.containsKey('on')
+      ? doc['on']
+      : (doc.containsKey(true) ? doc[true] : null);
+
+  // 실행되는 shell 본문만 결합(YAML 주석은 파서가 제거 — scalar 내용만 남는다).
+  final String runBodies = steps
+      .whereType<YamlMap>()
+      .map((YamlMap s) => (s['run'] ?? '').toString())
+      .join('\n');
+
+  List<YamlMap> stepsUsing(String prefix) => steps
+      .whereType<YamlMap>()
+      .where((YamlMap s) => (s['uses'] ?? '').toString().startsWith(prefix))
+      .toList();
 
   group('트리거 계약 — workflow_dispatch 단독', () {
     test('workflow_dispatch 만 존재한다', () {
@@ -36,7 +59,7 @@ void main() {
               '등 자동 트리거 추가 금지 — 서명 작업은 수동 dispatch 만');
     });
 
-    test('수동 확인 입력 2종 — required + default false', () {
+    test('수동 확인 입력 2종 — required + default false + 사람 확인 기록 취지', () {
       final YamlMap on = triggerKey()! as YamlMap;
       final YamlMap inputs =
           (on['workflow_dispatch'] as YamlMap)['inputs'] as YamlMap;
@@ -49,12 +72,12 @@ void main() {
         expect(input['type'], 'boolean', reason: '$name: boolean 타입');
         expect(input['default'], isFalse,
             reason: '$name: 기본값은 false — 실수 실행 방지');
+        expect(input['description'].toString(), contains('사람 확인 기록'),
+            reason: '$name: 자동/API 검증 대체가 아님을 UI 에서 알려야 한다');
       }
     });
 
     test('job 은 두 확인 입력이 모두 true 일 때만 시작한다', () {
-      final YamlMap job =
-          (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
       final String cond = job['if'].toString();
       expect(cond, contains('confirm_version_code_18_unused == true'));
       expect(cond, contains('confirm_no_store_upload == true'));
@@ -71,10 +94,8 @@ void main() {
     });
 
     test('environment=android-release-candidate (approval 게이트 지점)', () {
-      final YamlMap job =
-          (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
-      expect((job['environment'] as YamlMap)['name'],
-          'android-release-candidate');
+      expect(
+          (job['environment'] as YamlMap)['name'], 'android-release-candidate');
     });
 
     test('concurrency 고정 그룹 + cancel-in-progress=false', () {
@@ -82,6 +103,19 @@ void main() {
       expect(conc['group'], 'android-signed-release-candidate-18');
       expect(conc['cancel-in-progress'], isFalse,
           reason: '진행 중 서명 작업 취소는 반쪽 산출물을 남긴다');
+    });
+
+    test('job 수준 env 에서 runner 컨텍스트를 쓰지 않는다(가용 컨텍스트 아님)', () {
+      // jobs.<id>.env 에서 ${{ runner.* }} 는 GitHub Actions 가 거부한다 —
+      // workflow 전체가 실행 불능이 되는 회귀를 잡는다.
+      final Object? jobEnv = job['env'];
+      if (jobEnv is YamlMap) {
+        for (final Object? v in jobEnv.values) {
+          expect(v.toString(), isNot(contains(r'${{ runner.')),
+              reason: 'runner 컨텍스트는 step 수준에서만 유효 — '
+                  'GITHUB_ENV 주입 또는 \$RUNNER_TEMP 셸 변수를 쓸 것');
+        }
+      }
     });
   });
 
@@ -102,7 +136,7 @@ void main() {
       }
     });
 
-    test('버전·패키지 기대값 고정 (1.0.0+18 / versionCode 18 / edu 패키지)', () {
+    test('버전·패키지·URL·테스트수 기대값 고정', () {
       expect(env['EXPECTED_PR'].toString(), '51');
       expect(env['EXPECTED_VERSION'].toString(), '1.0.0+18');
       expect(env['EXPECTED_VERSION_NAME'].toString(), '1.0.0');
@@ -110,16 +144,21 @@ void main() {
       expect(env['EXPECTED_APPLICATION_ID'], 'com.ssambership.edu');
       expect(env['EXPECTED_MIN_SDK'].toString(), '24');
       expect(env['EXPECTED_TARGET_SDK'].toString(), '36');
+      expect(env['EXPECTED_TEST_COUNT'].toString(), '1469');
+      expect(env['EXPECTED_SUPABASE_URL'], kProductionSupabaseUrl,
+          reason: '.env 정확 일치·AAB 내장 판정의 기준값 — 변경은 의도적으로만');
     });
 
-    test('checkout step 은 SOURCE_SHA 를 ref 로 쓴다', () {
-      final YamlMap job =
-          (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
-      final YamlList steps = job['steps'] as YamlList;
-      final YamlMap checkout = steps.whereType<YamlMap>().firstWhere(
-          (YamlMap s) => (s['uses'] ?? '').toString().startsWith('actions/checkout@'));
-      expect((checkout['with'] as YamlMap)['ref'], r'${{ env.SOURCE_SHA }}',
-          reason: 'workflow 정의(master)와 빌드 대상(SOURCE_SHA)을 혼동하지 않는다');
+    test('checkout 은 정확히 1개이고 SOURCE_SHA 를 ref 로 쓴다', () {
+      final List<YamlMap> checkouts = stepsUsing('actions/checkout@');
+      expect(checkouts.length, 1,
+          reason: '두 번째 checkout 은 SHA 검증 이후 임의 코드로 바꿔치기하는 '
+              '우회 경로다 — 금지');
+      final YamlMap w = checkouts.single['with'] as YamlMap;
+      expect(w['ref'], r'${{ env.SOURCE_SHA }}',
+          reason: 'workflow 정의 ref 와 빌드 대상(SOURCE_SHA)을 혼동하지 않는다');
+      expect(w['persist-credentials'], isFalse,
+          reason: '이후 step 은 git 자격증명이 불필요 — 토큰 잔존 금지');
     });
 
     test('bundletool 은 버전+checksum 고정(latest 금지)', () {
@@ -129,19 +168,26 @@ void main() {
           matches(RegExp(r'^[0-9a-f]{64}$')));
       expect(raw, isNot(contains('/latest/')),
           reason: 'latest URL 은 공급망 고정 위반');
-      expect(raw, contains('sha256sum -c'),
-          reason: '다운로드 후 checksum 검증이 있어야 한다');
+      expect(runBodies, contains('sha256sum -c'),
+          reason: '다운로드 후 checksum 검증이 실행 경로에 있어야 한다');
     });
   });
 
-  group('secret·서명 안전 계약 (원문 스캔)', () {
-    test('secret 유출 경로 금지 문자열이 없다', () {
-      expect(raw, isNot(contains('set -x')));
+  group('secret·서명 안전 계약', () {
+    test('금지 문자열이 파일 어디에도 없다(주석 포함 — 가장 엄격)', () {
       expect(raw, isNot(contains('printenv')));
       expect(raw, isNot(contains('cat .env')));
       expect(raw, isNot(contains('cat android/key.properties')));
       expect(raw.contains('allowInsecureSigning'), isFalse,
           reason: 'debug 서명 폴백 옵트인 금지 — keystore 없으면 실패해야 한다');
+    });
+
+    test('shell 트레이스(xtrace) 변형이 실행 본문에 없다', () {
+      // set -x / set -euxo / set -o xtrace / bash -x 전부 — secret 원문이
+      // 트레이스로 노출되는 경로를 변형 포함해 차단한다.
+      expect(runBodies, isNot(matches(RegExp(r'set\s+-[a-zA-Z]*x'))));
+      expect(runBodies, isNot(contains('xtrace')));
+      expect(runBodies, isNot(matches(RegExp(r'bash\s+-x\b'))));
     });
 
     test('Play Console 업로드 step 이 없다', () {
@@ -151,19 +197,18 @@ void main() {
         'androidpublisher',
         'play_store',
         'fastlane',
+        'publishReleaseBundle',
       ]) {
-        expect(raw.toLowerCase(), isNot(contains(marker)),
+        expect(raw.toLowerCase(), isNot(contains(marker.toLowerCase())),
             reason: '이 workflow 는 검증 전용 — 업로드 step 추가 금지($marker)');
       }
     });
 
-    test('artifact 에 secret 파일이 없고 retention 3일이다', () {
-      final YamlMap job =
-          (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
-      final YamlList steps = job['steps'] as YamlList;
-      final YamlMap upload = steps.whereType<YamlMap>().firstWhere((YamlMap s) =>
-          (s['uses'] ?? '').toString().startsWith('actions/upload-artifact@'));
-      final YamlMap w = upload['with'] as YamlMap;
+    test('upload-artifact 는 정확히 1개 — secret 파일 없음·retention 3일', () {
+      final List<YamlMap> uploads = stepsUsing('actions/upload-artifact@');
+      expect(uploads.length, 1,
+          reason: '두 번째 artifact step 은 secret 유출 우회 경로다 — 금지');
+      final YamlMap w = uploads.single['with'] as YamlMap;
       expect(w['retention-days'], 3);
       expect(w['name'], 'ssambership-android-1.0.0-18-35d7b03-signed-aab');
       final String path = w['path'].toString();
@@ -181,16 +226,15 @@ void main() {
       }
     });
 
-    test('cleanup step 은 always() 로 실행되고 secret 파일을 지운다', () {
-      final YamlMap job =
-          (doc['jobs'] as YamlMap)['signed-release-candidate'] as YamlMap;
-      final YamlList steps = job['steps'] as YamlList;
-      final YamlMap cleanup = steps.whereType<YamlMap>().lastWhere(
-          (YamlMap s) => (s['name'] ?? '').toString().contains('cleanup'));
-      expect(cleanup['if'].toString(), contains('always()'),
+    test('cleanup 은 마지막 step 이고 always() 로 secret 파일을 지운다', () {
+      final YamlMap last = steps.whereType<YamlMap>().last;
+      expect((last['name'] ?? '').toString(), contains('cleanup'),
+          reason: 'cleanup 뒤에 step 이 오면 secret 파일이 재생성될 수 있다');
+      expect(last['if'].toString(), contains('always()'),
           reason: '실패 경로에서도 secret 파일이 남으면 안 된다');
-      final String run = cleanup['run'].toString();
-      expect(run, contains('rm -f .env android/key.properties'));
+      final String run = last['run'].toString();
+      expect(run, contains(r'rm -f .env android/key.properties "$KS"'),
+          reason: '.env·key.properties·keystore 삭제 명령이 있어야 한다');
       expect(run, contains('ENV_FILE_CLEANED='));
       expect(run, contains('KEY_PROPERTIES_CLEANED='));
       expect(run, contains('KEYSTORE_CLEANED='));
@@ -209,29 +253,42 @@ void main() {
           reason: 'release candidate 는 dart-define 주입 없이 기본값으로 빌드');
     });
 
-    test('PR head 이동 차단 상태 문자열과 preflight 게이트가 배선돼 있다', () {
-      expect(raw, contains('BLOCKED_APP_PR_HEAD_MOVED'));
-      expect(raw, contains('dart run tool/validate_release_env.dart'));
-      expect(raw, contains('jarsigner -verify'));
-      expect(raw, contains('validate --bundle'));
-      expect(raw, contains('CN=Android Debug'),
-          reason: 'debug 인증서 검출 로직이 있어야 한다');
+    test('게이트가 실행 본문(run)에 실제로 배선돼 있다 — 주석으로는 불충분', () {
+      expect(runBodies, contains('BLOCKED_APP_PR_HEAD_MOVED'));
+      expect(runBodies, contains('dart run tool/validate_release_env.dart'));
+      expect(runBodies, contains('jarsigner -verify'));
+      expect(runBodies, contains('validate --bundle'));
+      expect(runBodies, contains('Android Debug'),
+          reason: 'debug 인증서 검출 로직이 실행 경로에 있어야 한다');
+      expect(runBodies, contains('This jar contains unsigned entries'),
+          reason: 'unsigned entry 게이트(정확 문구 매치)가 있어야 한다');
+      expect(runBodies, contains('cp .env.example .env'),
+          reason: 'analyze·test 는 자리표시 .env 로 실행(운영 secret 은 '
+              '테스트 이후에만 디스크에 존재)');
+      expect(runBodies, contains('flutter build appbundle --release'));
     });
   });
 
   group('문서 정본 계약', () {
-    test('런북에 기본 브랜치 병합 전제와 workflow 절이 있다', () {
+    // 공백 정규화 — 문서 리라핑(줄바꿈 위치 변경)에 과민하지 않게 비교한다.
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ');
+
+    test('런북에 기본 브랜치 병합 전제·Environment 필수 전제가 있다', () {
       final String runbook =
-          File('docs/ANDROID_BUILD.md').readAsStringSync();
+          norm(File('docs/ANDROID_BUILD.md').readAsStringSync());
       expect(runbook, contains('signed release-candidate workflow'));
-      expect(runbook, contains('기본 브랜치(master)에\n  병합된 이후에만'),
+      expect(runbook, contains('기본 브랜치(master)에 병합된 이후에만'),
           reason: 'workflow_dispatch 의 기본 브랜치 전제를 런북에 명시(§C 계약)');
       expect(runbook, contains('android-release-candidate'));
       expect(runbook, contains('BLOCKED_APP_PR_HEAD_MOVED'));
+      expect(runbook, contains('required reviewers'),
+          reason: 'Environment approval 없이는 secret 노출 경로가 열린다');
+      expect(runbook, contains('deployment branch policy'),
+          reason: '임의 ref 의 변형 정의 dispatch 를 막는 필수 전제');
     });
 
     test('workflow 주석에도 기본 브랜치 전제가 명시돼 있다', () {
-      expect(raw, contains('기본 브랜치(master)에 병합된 이후에만'));
+      expect(norm(raw), contains('기본 브랜치(master)에 병합된 이후에만'));
     });
   });
 }

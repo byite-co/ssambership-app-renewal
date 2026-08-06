@@ -4,18 +4,24 @@
 #   실행할 수 있다(GitHub 제약). PR 단계에서는 실행 불가 — 병합 전 검토용.
 #   실행 절차·전제는 docs/ANDROID_BUILD.md '§ signed release-candidate workflow'.
 #
+# ★ dispatch 는 workflow 파일이 존재하는 **임의 ref 의 정의**를 실행할 수 있다.
+#   따라서 android-release-candidate Environment 에 (1) required reviewers 와
+#   (2) deployment branch policy = master 단독 설정이 **필수 전제**다 — 이것이
+#   없으면 사이드 브랜치의 변형 정의가 environment secrets 에 접근할 수 있다.
+#
 # 목적: PR #51 의 고정 commit(SOURCE_SHA)을 release keystore 로 서명한 AAB 를
 #   만들고 서명·manifest·내장 env 를 검증한다. **Play Console 업로드는 하지
 #   않는다** — 산출물은 사람 검증용 artifact 로만 남긴다(retention 3일).
 #
 # 빌드 대상 고정: SOURCE_SHA 는 아래 env 상수다. 임의 SHA 를 넣어 다른 코드를
-#   서명하는 것을 막기 위해 **입력(input)으로 받지 않는다**. workflow 정의는
-#   master 에서 실행되지만 실제 앱 source 는 SOURCE_SHA 를 checkout 한다
-#   (workflow 정의 commit ≠ 빌드 대상 commit — 혼동 금지).
+#   서명하는 것을 막기 위해 **입력(input)으로 받지 않는다**. 실제 앱 source 는
+#   SOURCE_SHA 를 checkout 한다(workflow 정의 commit ≠ 빌드 대상 commit).
 #
 # Secret 절대 규칙: secret 원문·일부·길이·host 를 로그에 남기지 않는다.
 #   판정은 전부 YES/NO 형식. 환경 전체 덤프·shell 트레이스(xtrace) 금지.
 #   .env / key.properties / keystore 는 artifact 에 포함하지 않는다.
+#   analyze·test 는 자리표시 .env(.env.example)로 실행한다 — 운영 .env 와
+#   keystore 는 테스트 스위트 실행 '이후' build 직전에만 디스크에 존재한다.
 #   수동 확인 입력(confirm_*)은 Play Console API 검증을 대체하지 않는다 —
 #   사람이 확인했다는 기록일 뿐이다.
 name: Android Signed Release Candidate
@@ -33,6 +39,7 @@ on:
       confirm_no_store_upload:
         description: >-
           이 workflow는 검증용이며 Play Console 업로드를 하지 않는다는 점을 확인
+          (사람 확인 기록 — 자동 검증 대체 아님)
         required: true
         type: boolean
         default: false
@@ -72,22 +79,24 @@ jobs:
     # Environment approval 이 설정돼 있으면 승인 전에는 아래 secret 을 쓸 수 없다.
     environment:
       name: android-release-candidate
-    env:
-      KEYSTORE_PATH: ${{ runner.temp }}/ssambership-upload-keystore.jks
-      SUMMARY: ${{ runner.temp }}/validation-summary.txt
     steps:
       # ── 1. 앱 source checkout — 반드시 SOURCE_SHA ──────────────────
-      - name: checkout SOURCE_SHA (workflow 정의는 master, 빌드 대상은 이 SHA)
+      - name: checkout SOURCE_SHA (workflow 정의 ref 와 빌드 대상은 별개)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.SOURCE_SHA }}
+          # 이후 어떤 step 도 git 자격증명이 필요 없다(PR 조회는 GH_TOKEN env).
+          persist-credentials: false
 
       - name: SOURCE_SHA 일치·clean 검증 + PR head 이동 확인
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          : > "$SUMMARY"
+          # runner 컨텍스트는 job env 에서 못 쓴다 — 경로 상수를 여기서 주입한다.
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/ssambership-upload-keystore.jks" >> "$GITHUB_ENV"
+          echo "SUMMARY=$RUNNER_TEMP/validation-summary.txt" >> "$GITHUB_ENV"
+          : > "$RUNNER_TEMP/validation-summary.txt"
           ACTUAL_SHA=$(git rev-parse HEAD)
           echo "ACTUAL_SHA=$ACTUAL_SHA"
           git show -s --format=%s HEAD
@@ -103,15 +112,15 @@ jobs:
           PR_HEAD=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${EXPECTED_PR}" --jq .head.sha)
           echo "PR_${EXPECTED_PR}_HEAD=$PR_HEAD"
           if [ "$PR_HEAD" != "$SOURCE_SHA" ]; then
-            echo "BLOCKED_APP_PR_HEAD_MOVED" | tee -a "$SUMMARY"
+            echo "BLOCKED_APP_PR_HEAD_MOVED" | tee -a "$RUNNER_TEMP/validation-summary.txt"
             echo "::error::PR #${EXPECTED_PR} head 가 SOURCE_SHA 에서 이동했다 — 빌드하지 않는다"
             exit 1
           fi
-          echo "SOURCE_SHA_MATCH=YES" >> "$SUMMARY"
-          # 빌드 대상 SHA 의 pubspec 이 기대 버전인지(제3의 교차 확인).
-          grep -q "^version: ${EXPECTED_VERSION}\$" pubspec.yaml \
+          echo "SOURCE_SHA_MATCH=YES" >> "$RUNNER_TEMP/validation-summary.txt"
+          # 빌드 대상 SHA 의 pubspec 이 기대 버전인지(고정 문자열 전체 행 일치).
+          grep -qxF "version: ${EXPECTED_VERSION}" pubspec.yaml \
             || { echo "::error::pubspec version != ${EXPECTED_VERSION}"; exit 1; }
-          echo "PUBSPEC_VERSION_MATCH=YES" >> "$SUMMARY"
+          echo "PUBSPEC_VERSION_MATCH=YES" >> "$RUNNER_TEMP/validation-summary.txt"
 
       # ── 2. Toolchain (저장소 승인 버전 고정 — flutter-ci.yml 과 동일) ──
       - uses: actions/setup-java@v4
@@ -132,8 +141,45 @@ jobs:
           dart --version
           java -version
 
-      # ── 3. 운영 .env 생성(runner 임시) + 정확 일치 preflight ────────
-      - name: .env 생성 및 release preflight (판정만 출력)
+      # ── 3. 빌드 전 검증 — 자리표시 .env 로 analyze·test ─────────────
+      # 운영 secret 은 아직 디스크에 없다. 테스트 스위트(임의 Dart 코드 1469건)
+      # 는 flutter-ci 와 동일하게 자리표시 .env(.env.example)로만 실행된다.
+      - name: flutter clean + pub get + 자리표시 .env
+        run: |
+          set -euo pipefail
+          flutter clean
+          flutter pub get
+          cp .env.example .env
+
+      - name: flutter analyze (에러·경고 0 게이트 — info 비차단, flutter-ci 와 동일 판정)
+        run: |
+          set -euo pipefail
+          flutter analyze > /tmp/analyze.log 2>&1 || true
+          cat /tmp/analyze.log
+          grep -qE "issues found|No issues found" /tmp/analyze.log
+          if grep -qE "^[[:space:]]*(error|warning) •" /tmp/analyze.log; then
+            echo "::error::flutter analyze: error/warning 발견 — 게이트 실패"
+            exit 1
+          fi
+          echo "FLUTTER_ANALYZE=PASS" >> "$SUMMARY"
+
+      - name: flutter test (전체 스위트 — 기대 1469건 전부 통과)
+        run: |
+          set -euo pipefail
+          flutter test 2>&1 | tee /tmp/test.log \
+            || { echo "::error::flutter test 실패"; exit 1; }
+          grep -q "All tests passed!" /tmp/test.log \
+            || { echo "::error::테스트 전부 통과가 아니다"; exit 1; }
+          COUNT=$(grep -oE '\+[0-9]+' /tmp/test.log | tail -1 | tr -d '+')
+          echo "TEST_COUNT=$COUNT"
+          if [ "$COUNT" != "$EXPECTED_TEST_COUNT" ]; then
+            echo "::error::테스트 수 $COUNT != ${EXPECTED_TEST_COUNT} — source SHA 가 맞는지 먼저 확인하라"
+            exit 1
+          fi
+          echo "FLUTTER_TEST=PASS ($COUNT)" >> "$SUMMARY"
+
+      # ── 4. 운영 .env 생성(테스트 이후·build 직전) + 정확 일치 preflight ──
+      - name: 운영 .env 생성 및 release preflight (판정만 출력)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -142,9 +188,9 @@ jobs:
           set -euo pipefail
           umask 077
           FAIL=0
-          # SUPABASE_URL: 정본 URL 정확 일치(단일 trailing slash 만 정규화).
-          # 다른 프로젝트/http/localhost/127.0.0.1/10.0.2.2/사설 LAN/custom port/
-          # userinfo/query/fragment 는 문자열 정확 비교로 전부 거부된다.
+          # SUPABASE_URL: 정본 URL 정확 일치(단일 trailing slash 만 정규화, 셸
+          # 문자열 비교 — regex 아님). 다른 프로젝트/http/localhost/127.0.0.1/
+          # 10.0.2.2/사설 LAN/custom port/userinfo/query/fragment 전부 거부.
           NORM="${SUPABASE_URL%/}"
           if [ "$NORM" = "$EXPECTED_SUPABASE_URL" ]; then
             echo "SUPABASE_URL_VALID=YES" | tee -a "$SUMMARY"
@@ -160,6 +206,7 @@ jobs:
           # SENTRY_ENVIRONMENT 는 workflow 가 production 으로 고정 주입한다.
           echo "SENTRY_ENVIRONMENT_PRODUCTION=YES" | tee -a "$SUMMARY"
           [ "$FAIL" = 0 ] || { echo "::error::secret 판정 실패 — 빌드하지 않는다"; exit 1; }
+          rm -f .env
           {
             printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL"
             printf 'SUPABASE_URL_LAN=\n'
@@ -168,8 +215,12 @@ jobs:
             printf 'SENTRY_ENVIRONMENT=production\n'
           } > .env
           chmod 600 .env
+          # preflight 도구(SOURCE_SHA 정본)는 YES/NO 판정만 출력한다.
+          dart run tool/validate_release_env.dart
+          echo "RELEASE_ENV_PREFLIGHT=PASS" >> "$SUMMARY"
 
-      # ── 4. Keystore 복원(신규 생성 금지 · debug keystore 금지) ──────
+      # ── 5. Keystore 복원(신규 생성 금지 · debug keystore 금지) ──────
+      # 테스트 스위트 실행이 끝난 뒤에만 복원한다(defense-in-depth).
       - name: keystore 복원·alias 검증 (비밀번호는 argv 에 싣지 않음)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -188,14 +239,16 @@ jobs:
             exit 1
           fi
           echo "KEYSTORE_PRESENT=YES" | tee -a "$SUMMARY"
-          # 지정 alias 접근 + 인증서 조회 가능 확인. -storepass:env 로 argv 노출 방지.
+          # 지정 alias 접근 + 인증서 조회 가능 확인. 비밀번호는 -storepass:env 로
+          # argv 미노출(alias 는 argv 에 실린다 — GH 자동 masking 에 의존).
           keytool -list -keystore "$KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" \
             -storepass:env ANDROID_KEYSTORE_PASSWORD > /dev/null \
             || { echo "::error::지정 alias 에 접근할 수 없다"; exit 1; }
           echo "KEYSTORE_ALIAS_ACCESSIBLE=YES" >> "$SUMMARY"
           # Gradle signing loader 계약(android/app/build.gradle.kts):
           # android/key.properties 의 keyAlias/keyPassword/storeFile/storePassword 를
-          # 읽는다. storeFile 은 절대경로로 준다(문서 트러블슈팅 §서명 오류).
+          # java.util.Properties 로 읽는다. storeFile 은 절대경로. 비밀번호에
+          # 백슬래시가 있으면 Properties 이스케이프로 훼손된다(런북에 금지 명시).
           umask 077
           {
             printf 'storeFile=%s\n' "$KEYSTORE_PATH"
@@ -205,44 +258,6 @@ jobs:
           } > android/key.properties
           chmod 600 android/key.properties
           echo "KEY_PROPERTIES_CREATED=YES" >> "$SUMMARY"
-
-      # ── 5. 빌드 전 검증 (clean → pub get → preflight → analyze → test) ──
-      - name: flutter clean + pub get
-        run: |
-          set -euo pipefail
-          flutter clean
-          flutter pub get
-
-      - name: release preflight (tool/validate_release_env.dart — 판정만 출력)
-        run: |
-          set -euo pipefail
-          dart run tool/validate_release_env.dart
-          echo "RELEASE_ENV_PREFLIGHT=PASS" >> "$SUMMARY"
-
-      - name: flutter analyze (에러·경고 0 게이트 — info 비차단, flutter-ci 와 동일 판정)
-        run: |
-          set -euo pipefail
-          flutter analyze > /tmp/analyze.log 2>&1 || true
-          cat /tmp/analyze.log
-          grep -qE "issues found|No issues found" /tmp/analyze.log
-          if grep -qE "^[[:space:]]*(error|warning) •" /tmp/analyze.log; then
-            echo "::error::flutter analyze: error/warning 발견 — 게이트 실패"
-            exit 1
-          fi
-          echo "FLUTTER_ANALYZE=PASS" >> "$SUMMARY"
-
-      - name: flutter test (전체 스위트 — 기대 1469건)
-        run: |
-          set -o pipefail
-          flutter test 2>&1 | tee /tmp/test.log
-          grep -q "All tests passed!" /tmp/test.log
-          COUNT=$(grep -oE '\+[0-9]+' /tmp/test.log | tail -1 | tr -d '+')
-          echo "TEST_COUNT=$COUNT"
-          if [ "$COUNT" != "$EXPECTED_TEST_COUNT" ]; then
-            echo "::error::테스트 수 $COUNT != ${EXPECTED_TEST_COUNT} — source SHA 가 맞는지 먼저 확인하라"
-            exit 1
-          fi
-          echo "FLUTTER_TEST=PASS ($COUNT)" >> "$SUMMARY"
 
       # ── 6. signed release AAB 생성 ─────────────────────────────────
       # 금지: debug/profile · insecure signing · Play upload · versionCode 변경 ·
@@ -269,21 +284,29 @@ jobs:
           grep -q "jar verified" /tmp/jarsigner.log \
             && echo "JARSIGNER_VERIFY=PASS" | tee -a "$SUMMARY" \
             || { echo "JARSIGNER_VERIFY=FAIL" | tee -a "$SUMMARY"; exit 1; }
-          UNSIGNED=$(grep -ci "unsigned" /tmp/jarsigner.log || true)
-          echo "UNSIGNED_ENTRIES=$UNSIGNED" | tee -a "$SUMMARY"
-          [ "$UNSIGNED" = "0" ] || { echo "::error::unsigned entry 존재"; exit 1; }
+          # 'jar verified' 만으로는 부족하다 — unsigned entry 가 섞여도 verified 로
+          # 나온다. jarsigner 의 경고 문구를 게이트로 쓴다(entry 경로에 우연히
+          # 'unsigned' 가 들어간 자산의 오탐을 피하기 위해 정확 문구 매치).
+          if grep -q "This jar contains unsigned entries" /tmp/jarsigner.log; then
+            echo "UNSIGNED_ENTRIES=DETECTED" | tee -a "$SUMMARY"
+            echo "::error::unsigned entry 존재"
+            exit 1
+          fi
+          echo "UNSIGNED_ENTRIES=0" | tee -a "$SUMMARY"
           # 인증서 fingerprint·Subject 는 보고 가능(비밀 아님). private key·비밀번호 미출력.
           keytool -printcert -jarfile "$AAB" > /tmp/aabcert.txt
           grep -E 'Owner:|SHA256:' /tmp/aabcert.txt | head -4
-          if grep -q 'CN=Android Debug' /tmp/aabcert.txt || grep -q 'Android Debug' /tmp/aabcert.txt; then
+          if grep -q 'Android Debug' /tmp/aabcert.txt; then
             echo "DEBUG_CERTIFICATE_PRESENT=YES" | tee -a "$SUMMARY"
-            echo "::error::debug 인증서로 서명됨 — 실패"
+            echo "::error::debug 인증서(CN=Android Debug)로 서명됨 — 실패"
             exit 1
           fi
           echo "DEBUG_CERTIFICATE_PRESENT=NO" >> "$SUMMARY"
           AAB_FPR=$(grep -m1 'SHA256:' /tmp/aabcert.txt | awk '{print $2}')
-          KS_FPR=$(keytool -list -v -keystore "$KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" \
-            -storepass:env ANDROID_KEYSTORE_PASSWORD | grep -m1 'SHA256:' | awk '{print $2}')
+          keytool -list -v -keystore "$KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD > /tmp/kscert.txt
+          KS_FPR=$(grep -m1 'SHA256:' /tmp/kscert.txt | awk '{print $2}')
+          rm -f /tmp/kscert.txt
           echo "AAB_CERT_SHA256=$AAB_FPR"
           echo "KEYSTORE_CERT_SHA256=$KS_FPR"
           if [ -n "$AAB_FPR" ] && [ "$AAB_FPR" = "$KS_FPR" ]; then
@@ -300,7 +323,7 @@ jobs:
           set -euo pipefail
           AAB=build/app/outputs/bundle/release/app-release.aab
           BT="$RUNNER_TEMP/bundletool-all-${BUNDLETOOL_VERSION}.jar"
-          curl -sSL -o "$BT" \
+          curl -fsSL -o "$BT" \
             "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar"
           echo "${BUNDLETOOL_SHA256}  $BT" | sha256sum -c - \
             || { echo "::error::bundletool checksum 불일치"; exit 1; }
@@ -344,7 +367,10 @@ jobs:
           umask 077
           unzip -p "$AAB" "$ENV_ENTRY" > "$EXTRACT_DIR/env_extracted"
           FAIL=0
-          if grep -qE "^SUPABASE_URL=${EXPECTED_SUPABASE_URL}/?\$" "$EXTRACT_DIR/env_extracted"; then
+          # 값 추출 후 셸 문자열 정확 비교(regex 아님 — lookalike 차단).
+          AAB_URL=$(grep -m1 '^SUPABASE_URL=' "$EXTRACT_DIR/env_extracted" | cut -d= -f2- || true)
+          AAB_URL_NORM="${AAB_URL%/}"
+          if [ "$AAB_URL_NORM" = "$EXPECTED_SUPABASE_URL" ]; then
             echo "AAB_SUPABASE_PRODUCTION=YES" | tee -a "$SUMMARY"
           else
             echo "AAB_SUPABASE_PRODUCTION=NO" | tee -a "$SUMMARY"; FAIL=1
@@ -355,7 +381,7 @@ jobs:
           grep -qE '^SENTRY_DSN=.+' "$EXTRACT_DIR/env_extracted" \
             && echo "AAB_SENTRY_DSN_PRESENT=YES" | tee -a "$SUMMARY" \
             || { echo "AAB_SENTRY_DSN_PRESENT=NO" | tee -a "$SUMMARY"; FAIL=1; }
-          grep -qE '^SENTRY_ENVIRONMENT=production$' "$EXTRACT_DIR/env_extracted" \
+          grep -qxF 'SENTRY_ENVIRONMENT=production' "$EXTRACT_DIR/env_extracted" \
             && echo "AAB_SENTRY_ENVIRONMENT_PRODUCTION=YES" | tee -a "$SUMMARY" \
             || { echo "AAB_SENTRY_ENVIRONMENT_PRODUCTION=NO" | tee -a "$SUMMARY"; FAIL=1; }
           if grep -qE 'localhost|127\.0\.0\.1|10\.0\.2\.2|192\.168\.' "$EXTRACT_DIR/env_extracted"; then
@@ -386,14 +412,16 @@ jobs:
             ${{ runner.temp }}/aab-sha256.txt
 
       # ── 11. Cleanup (성공·실패 무관 — secret 파일 전부 제거) ────────
+      # GITHUB_ENV 주입 이전 실패 경로에서도 동작하도록 기본값으로 방어한다.
       - name: cleanup (secret 파일 제거 — 값 미출력, 존재 여부만 확인)
         if: always()
         run: |
           set -euo pipefail
-          rm -f .env android/key.properties "$KEYSTORE_PATH"
+          KS="${KEYSTORE_PATH:-$RUNNER_TEMP/ssambership-upload-keystore.jks}"
+          rm -f .env android/key.properties "$KS" /tmp/test.log
           rm -rf "$RUNNER_TEMP"/aabenv.* 2>/dev/null || true
           [ ! -e .env ] && echo "ENV_FILE_CLEANED=YES" || echo "ENV_FILE_CLEANED=NO"
           [ ! -e android/key.properties ] && echo "KEY_PROPERTIES_CLEANED=YES" || echo "KEY_PROPERTIES_CLEANED=NO"
-          [ ! -e "$KEYSTORE_PATH" ] && echo "KEYSTORE_CLEANED=YES" || echo "KEYSTORE_CLEANED=NO"
+          [ ! -e "$KS" ] && echo "KEYSTORE_CLEANED=YES" || echo "KEYSTORE_CLEANED=NO"
           ls "$RUNNER_TEMP"/aabenv.* > /dev/null 2>&1 \
             && echo "EXTRACTED_ENV_CLEANED=NO" || echo "EXTRACTED_ENV_CLEANED=YES"

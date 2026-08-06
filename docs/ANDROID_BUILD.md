@@ -76,8 +76,15 @@ release keystore 로 서명한 AAB 를 만들고 서명·manifest·내장 env �
   필요(사람이 등록; 저장소·로그에 값이 남지 않는다):
   `SUPABASE_URL` `SUPABASE_ANON_KEY` `SENTRY_DSN` `ANDROID_KEYSTORE_BASE64`
   `ANDROID_KEYSTORE_PASSWORD` `ANDROID_KEY_ALIAS` `ANDROID_KEY_PASSWORD`.
-  Environment 에 required reviewers 를 설정하면 승인 전에는 secret 을 쓸 수 없다.
   `SENTRY_ENVIRONMENT` 는 workflow 가 `production` 으로 고정 주입한다.
+  ★ **필수 전제 2가지**(secret 등록 전에 Environment 설정에서 함께 구성):
+  (1) **required reviewers** — 승인 전에는 job 이 secret 에 접근할 수 없다.
+  (2) **deployment branch policy = master 단독** — workflow_dispatch 는 파일이
+  존재하는 임의 ref 의 정의를 실행할 수 있으므로, 브랜치 제한이 없으면
+  사이드 브랜치의 변형 정의가 secret 에 접근하는 경로가 열린다.
+  ★ keystore·키 비밀번호에 **백슬래시(`\`) 금지** — key.properties 는
+  java.util.Properties 형식이라 백슬래시가 이스케이프로 해석돼 값이 조용히
+  훼손된다(원인 불명 서명 실패의 흔한 원인).
 - **검증 체인**: SOURCE_SHA·PR head 일치 → `.env` 생성(정본 URL 정확 일치) →
   preflight(`tool/validate_release_env.dart`) → analyze·test(1469) →
   `flutter build appbundle --release`(keystore 서명, insecure 폴백 없음) →
