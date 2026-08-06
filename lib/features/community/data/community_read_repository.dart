@@ -62,6 +62,9 @@ class CommunityReadRepository {
   /// 정본 소스는 뷰 `api_web_v1.community_posts_v1` 다(계약 수렴 — anon 허용,
   /// deleted_at IS NULL + (published OR 본인 행)은 서버가 강제). 컬럼명은
   /// 베이스 테이블과 다르다: 본문 `body`, 이미지 `image_refs`.
+  /// ★ N4: 쓰기(api_app_v1 RPC)와 스키마가 갈리는 것은 **의도된 계약**이다 —
+  ///   api_app_v1.community_posts_v1(동일 정의)은 authenticated 전용이라
+  ///   비로그인 열람(anon read 계약 테스트)이 깨진다. 읽기는 여기 유지.
   Future<CommunityPage<BoardPost>> boards(
       {String? category, int? limit, int offset = 0}) async {
     dynamic q = _client
