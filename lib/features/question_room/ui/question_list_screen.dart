@@ -168,7 +168,11 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                 label: '+ 새로운 질문하기',
                 onPressed: _busy ? null : _openNewQuestion,
               ),
-            ] else if (widget.sub?.isActive == true) ...<Widget>[
+            // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
+            // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
+            // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
+            ] else if (widget.sub?.isActive == true ||
+                (_usage != null && _usage!.limit > 0)) ...<Widget>[
               // 구독 중인데 이번 주 소진 — 안내만(구매 유도 아님).
               const Text(
                 '이번 주 질문을 모두 사용했어요.',
