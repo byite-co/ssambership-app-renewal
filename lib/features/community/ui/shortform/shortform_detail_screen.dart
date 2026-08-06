@@ -102,6 +102,10 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
 
   bool _liked = false;
   bool _scrapped = false;
+
+  /// C8: 이 상세에서 목록 표시에 영향 주는 변경(반응·댓글)이 있었는지 —
+  /// 뒤로가기에도 피드에 전달해 재조회시킨다(차단 pop(true)와 동일 계약).
+  bool _changed = false;
   late int _likeCount;
   bool _busy = false;
 
@@ -248,6 +252,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         type: CommunityWriteRepository.reactionLike,
         on: next,
       );
+      _changed = true; // C8: 피드 좋아요 수 stale 방지
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -267,6 +272,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         type: CommunityWriteRepository.reactionScrap,
         on: next,
       );
+      _changed = true; // C8
       _snack(next ? '스크랩했어요.' : '스크랩을 해제했어요.');
     } catch (e) {
       if (!mounted) return;
@@ -356,6 +362,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
     try {
       await widget.write.deleteMyShortformComment(commentId);
       if (!mounted) return;
+      _changed = true; // C8: 피드 댓글 수 stale 방지
       _snack('댓글을 삭제했어요.');
       setState(() {
         _comments = _fetchComments();
@@ -380,6 +387,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
       );
       if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
+      _changed = true; // C8
       setState(() {
         _comments = _fetchComments();
       });
@@ -398,6 +406,17 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final ShortformPost p = widget.post;
+    // C8: 뒤로가기에도 변경 여부(_changed)를 피드에 전달(board 상세와 동일 패턴).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) Navigator.of(context).pop(_changed);
+      },
+      child: _buildScaffold(p),
+    );
+  }
+
+  Widget _buildScaffold(ShortformPost p) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('숏폼'),
