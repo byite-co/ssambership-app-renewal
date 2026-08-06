@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app/app.dart';
 import 'core/auth/auth_service.dart';
+import 'core/observability/crash_reporting.dart';
 import 'core/supabase/supabase_client.dart';
 import 'core/deeplink/deep_link_service.dart';
 import 'core/version_gate/version_gate_controller.dart';
@@ -48,5 +49,9 @@ Future<void> main() async {
   // anon RPC 라 로그인 전에도 동작한다. android/ios 외 플랫폼은 스스로 건너뛴다.
   unawaited(VersionGateController.instance.start());
 
-  runApp(const SsambershipApp());
+  // G3: 크래시 리포팅(Sentry) — SENTRY_DSN 있을 때만 기동, 전역 에러
+  // 핸들러 포함. DSN 이 없으면(개발·CI) 앱만 그대로 켠다.
+  await bootstrapCrashReporting(
+    appRunner: () async => runApp(const SsambershipApp()),
+  );
 }
