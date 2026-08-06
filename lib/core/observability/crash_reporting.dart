@@ -93,7 +93,7 @@ Future<void> bootstrapCrashReporting({
 ///   명시적으로 null 로 둔다.
 /// - release/dist 는 설정하지 않는다 — SDK 의 LoadReleaseIntegration 이
 ///   PackageInfo 로 `<packageName>@<version>+<buildNumber>` / dist=buildNumber
-///   를 자동 구성한다(Android com.ssambership.edu@1.0.0+16 / dist=16 형식).
+///   를 자동 구성한다(Android com.ssambership.edu@1.0.0+18 / dist=18 형식).
 ///   수동 override·버전 하드코딩 금지. PackageInfo 조회 실패는 SDK 가 내부
 ///   로그로 삼켜 부팅에 영향 없다(설치 SDK 소스 확인).
 void applyCrashReportingOptions(
