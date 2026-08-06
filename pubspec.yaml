@@ -46,6 +46,7 @@ dependencies:
   webview_flutter_android: ^4.13.0
   webview_flutter_wkwebview: ^3.26.0
   sentry_flutter: ^9.26.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
