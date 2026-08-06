@@ -161,6 +161,47 @@ void main() {
           reason: '이후 step 은 git 자격증명이 불필요 — 토큰 잔존 금지');
     });
 
+    test('external actions are pinned to immutable full commit SHAs', () {
+      // 모든 job 의 모든 step 을 구조 순회 — raw 문자열 검색이 아니다.
+      // 외부 action 참조는 `owner/action@<40자 소문자 hex SHA>` 만 허용한다
+      // (tag·branch 는 mutable — supply-chain 재지정으로 secret 러너에 임의
+      // 코드가 유입될 수 있다). 실행 정본은 SHA 이고 뒤 주석의 release tag 는
+      // 가독성용이다(YAML 파서가 주석을 제거하므로 여기서는 SHA 만 보인다).
+      final RegExp pinned = RegExp(r'^[^/\s]+/[^@\s]+@[0-9a-f]{40}$');
+      final List<String> external = <String>[];
+      for (final Object? j in (doc['jobs'] as YamlMap).values) {
+        for (final YamlMap s
+            in ((j! as YamlMap)['steps'] as YamlList).whereType<YamlMap>()) {
+          final Object? uses = s['uses'];
+          if (uses == null) continue;
+          final String u = uses.toString();
+          external.add(u);
+          expect(pinned.hasMatch(u), isTrue,
+              reason: '외부 action 은 40자 소문자 hex full SHA 로 고정해야 '
+                  '한다(@vN·@main·@master·@latest·short SHA·대문자 금지): $u');
+          final String ref = u.split('@').last;
+          expect(ref.length, 40, reason: 'short SHA 금지: $u');
+          expect(ref, isNot(matches(RegExp(r'[A-Z]'))),
+              reason: '대문자 hex 금지: $u');
+        }
+      }
+      expect(external.length, 4,
+          reason: '외부 action 은 정확히 4개(checkout·setup-java·'
+              'flutter-action·upload-artifact) — 추가·제거는 의도적 변경으로만');
+      for (final String mutableRef in <String>[
+        '@v4',
+        '@v2',
+        '@main',
+        '@master',
+        '@latest',
+      ]) {
+        for (final String u in external) {
+          expect(u.endsWith(mutableRef), isFalse,
+              reason: 'mutable ref 금지($mutableRef): $u');
+        }
+      }
+    });
+
     test('bundletool 은 버전+checksum 고정(latest 금지)', () {
       expect(env['BUNDLETOOL_VERSION'].toString(),
           matches(RegExp(r'^\d+\.\d+\.\d+$')));

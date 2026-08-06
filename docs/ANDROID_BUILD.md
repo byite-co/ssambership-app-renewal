@@ -94,6 +94,10 @@ release keystore 로 서명한 AAB 를 만들고 서명·manifest·내장 env �
   cleanup(`always()` — .env/key.properties/keystore 제거).
 - **secret 규칙**: 로그에는 YES/NO 판정만 남는다. `printenv`·`set -x`·값/길이/
   host 출력 금지. `.env`/`key.properties`/keystore 는 artifact 에 포함하지 않는다.
+- **외부 GitHub Actions 고정**: 외부 action 참조는 전부 **immutable full commit
+  SHA** 로 고정한다(mutable tag/branch 금지). 뒤에 붙는 release tag 주석(`# v4.x.x`)
+  은 가독성용일 뿐 실행 정본은 SHA 다. SHA 변경(action 업그레이드)은 공식 저장소
+  태그 실측 → PR 리뷰 → 계약 테스트 통과를 함께 거친다.
 - 계약 테스트: `test/contracts/android_signed_workflow_contract_test.dart` 가
   위 금지·고정 사항을 YAML 파싱으로 강제한다.
 
