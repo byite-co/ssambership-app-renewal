@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../core/auth/auth_service.dart';
 import '../core/version_gate/version_gate_controller.dart';
@@ -23,6 +24,15 @@ class SsambershipApp extends StatelessWidget {
           title: AppConstants.appDisplayName,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.build(AuthService.instance.currentRole),
+          // G5: 한국어 단일 앱 — 시스템 위젯 문자열(날짜 선택기·텍스트 메뉴 등)도
+          // 한국어로 고정한다. 기기 언어와 무관하게 ko 하나만 지원.
+          locale: const Locale('ko'),
+          supportedLocales: const <Locale>[Locale('ko')],
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           routerConfig: AppRouter.router,
           // 최소 지원 버전 게이트 — 라우터(Navigator) '위'에 얹는다.
           // 통과 전에는 어떤 라우트(로그인 전·후 무관)로도 들어갈 수 없다.

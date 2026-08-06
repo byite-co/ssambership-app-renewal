@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # 시스템 위젯(달력·복사 메뉴 등) 한국어 표기 — 한국어 단일 앱 (G5)
+  flutter_localizations:
+    sdk: flutter
 
   # 백엔드: 기존 웹과 공유하는 Supabase 1개 (앱은 읽기 중심)
   supabase_flutter: ^2.5.0
