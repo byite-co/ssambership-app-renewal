@@ -105,7 +105,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
       // 순번 계산에 방의 스레드 수를 1회 조회한다(미입력일 때만). '(제목 없음)' 폴백 대신 저장.
       String title = titleInput;
       if (title.isEmpty) {
-        final int existing = (await _read.threads(widget.room.id)).length;
+        // N23: 순번 계산에 전 행(select *) 대신 서버 count 1회.
+        final int existing = await _read.threadCount(widget.room.id);
         title = autoQuestionTitle(existing);
       }
       // P1-8: 생성은 서버 원자 RPC 한 번 — thread+첫 메시지+사용량 소비가 한 트랜잭션.

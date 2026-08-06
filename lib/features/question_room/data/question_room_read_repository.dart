@@ -59,6 +59,15 @@ class QuestionRoomReadRepository {
     return row == null ? null : Room.fromMap(row);
   }
 
+  /// 방의 스레드 개수(N23 — 자동 제목 순번용). 전 행 대신 서버 count 1회.
+  Future<int> threadCount(String roomId) async {
+    final int count = await _client
+        .from('question_threads')
+        .count(CountOption.exact)
+        .eq('mentor_student_room_id', roomId);
+    return count;
+  }
+
   /// 방의 질문 스레드 목록(최근 활동순 = updated_at desc).
   /// 웹 정본(questionRoomQueries: updated_at→created_at→id) 및 앱 threadsForRooms 와 정렬 일치(XV-QUERY-1).
   Future<List<QuestionThread>> threads(String roomId) async {
