@@ -5,6 +5,11 @@ import 'package:ssambership_app/features/question_room/data/attachments/attachme
 
 /// 서명 URL 발급 호출 횟수를 세는 fake 백엔드.
 class _FakeBackend implements AttachmentUrlBackend {
+  @override
+  String? get currentUserId => userId;
+
+  String? userId;
+
   int signCount = 0;
   int lastExpiresIn = 0;
 
@@ -63,6 +68,21 @@ void main() {
     final Uint8List bytes = await resolver.download('r1/t1/a.png');
     expect(bytes, <int>[1, 2, 3]);
     expect(backend.signCount, 0); // 서명 URL 발급과 무관
+  });
+
+  test('사용자가 바뀌면 캐시 미재사용(계정 전환 격리 — N14 전역 공유 안전장치)', () async {
+    final _FakeBackend backend = _FakeBackend()..userId = 'u1';
+    final AttachmentUrlResolver resolver = AttachmentUrlResolver(backend);
+
+    await resolver.signedUrl('r1/t1/a.png');
+    backend.userId = 'u2'; // 계정 전환
+    await resolver.signedUrl('r1/t1/a.png');
+    expect(backend.signCount, 2); // 이전 사용자 캐시 재사용 금지
+  });
+
+  test('supabase() 는 프로세스 전역 공유 인스턴스를 돌려준다(N14)', () {
+    expect(identical(AttachmentUrlResolver.supabase(),
+        AttachmentUrlResolver.supabase()), isTrue);
   });
 
   test('isImageAttachment: image/* 만 true', () {

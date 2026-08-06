@@ -37,9 +37,12 @@ class IqAttachmentUrlResolver {
         _safetyMargin = safetyMargin,
         _now = now ?? DateTime.now;
 
-  /// 운영 기본 구현(Supabase Storage — IQ 첨부 버킷).
+  /// 운영 기본 구현(Supabase Storage — IQ 첨부 버킷) — **프로세스 전역 공유**.
+  /// N14: 화면 State 소유(재진입마다 전 첨부 재발급) 제거 — 캐시를 잇는다.
   factory IqAttachmentUrlResolver.supabase() =>
-      IqAttachmentUrlResolver(const SupabaseIqAttachmentUrlBackend());
+      _shared ??= IqAttachmentUrlResolver(const SupabaseIqAttachmentUrlBackend());
+
+  static IqAttachmentUrlResolver? _shared;
 
   final IqAttachmentUrlBackend _backend;
   final Duration _ttl;

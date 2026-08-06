@@ -9,6 +9,11 @@ import 'package:ssambership_app/features/question_room/ui/widgets/message_image_
 /// 항상 같은(테스트) URL 을 돌려주는 fake 백엔드.
 class _FakeBackend implements AttachmentUrlBackend {
   @override
+  String? get currentUserId => userId;
+
+  String? userId;
+
+  @override
   Future<String> createSignedUrl(String storagePath, int expiresInSeconds) async =>
       'https://example.test/$storagePath';
 
