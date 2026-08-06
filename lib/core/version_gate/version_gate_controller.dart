@@ -101,8 +101,10 @@ class VersionGateController extends ChangeNotifier {
         await _passCache.writeLastPassBuild(currentBuild); // G1
         _set(VersionGateStatus.pass);
       case GateForceUpdate(policy: final VersionPolicy p):
-        // G1: 강제 업데이트 대상 빌드는 캐시를 지운다 — 오프라인 재시작으로
-        // 게이트를 우회하지 못하게 한다.
+        // G1: 강제 업데이트 판정을 받은 빌드는 캐시를 지운다 — 이후 오프라인
+        // 재시작이 이전 통과 캐시로 입장하는 것을 막는다. ★ 판정을 받기 전
+        // 계속 오프라인인 기기까지 막지는 못한다(availability 우선 —
+        // 한계·후속 선택지는 GatePassCache 문서 참조).
         await _passCache.clear();
         _policy = p;
         _set(VersionGateStatus.forceUpdate);
