@@ -35,7 +35,6 @@ const Set<String> kExpectedRpcNames = <String>{
   'get_mentor_avg_response_hours',
   // 개별질문
   'add_individual_question_attachment',
-  'answer_individual_question',
   'claim_individual_question_as_mentor',
   'create_individual_question_as_student',
   'iq_append_message',
@@ -116,7 +115,6 @@ const Set<String> kExpectedTableIdentifiers = <String>{
 /// Storage 버킷 — 전부 상수 경유(리터럴 from 은 0건).
 const Set<String> kExpectedBucketIdentifiers = <String>{
   'bucket',
-  'attachmentBucket',
   'IndividualQuestionRepository.attachmentBucket',
   'SupabaseAttachmentUploader.bucket',
   'InkStoragePaths.annotationBucket',

@@ -116,7 +116,8 @@ class IndividualQuestionRepository {
     return rows.map(IqMessage.fromMap).toList(growable: false);
   }
 
-  /// 첨부 목록(조회 전용 — 표시용 서명 URL 은 [signedAttachmentUrl]).
+  /// 첨부 목록(조회 전용 — 표시용 서명 URL 은 IqAttachmentUrlResolver 가
+  /// 캐시와 함께 담당한다).
   Future<List<IqAttachment>> listAttachments(String questionId) async {
     final List<Map<String, dynamic>> rows = await _client
         .from('individual_question_attachments')
@@ -125,15 +126,6 @@ class IndividualQuestionRepository {
         .order('created_at', ascending: false);
     return rows.map(IqAttachment.fromMap).toList(growable: false);
   }
-
-  /// 첨부 storage_path → 서명 URL(당사자 storage RLS).
-  Future<String> signedAttachmentUrl(
-    String storagePath, {
-    int expiresInSeconds = 3600,
-  }) =>
-      _client.storage
-          .from(attachmentBucket)
-          .createSignedUrl(storagePath, expiresInSeconds);
 
   /// 멘토 지정형 가격. 미설정이면 null.
   Future<IqPricing?> fetchMentorPricing(String mentorId) async {
@@ -202,29 +194,10 @@ class IndividualQuestionRepository {
     return _escrowResult(res);
   }
 
-  /// 멘토: 답변 등록(메시지 + answered 전이, 원자적).
-  /// 신규 오류 코드(NOT_ANSWERABLE_STATUS:* 등)는 매퍼가 한글 문구로 변환한다.
-  Future<IndividualQuestion> answer(String questionId, String body) async {
-    final dynamic res;
-    try {
-      res = await _client.rpc(
-        'answer_individual_question',
-        params: <String, dynamic>{
-          'p_question_id': questionId,
-          'p_body': body,
-        },
-      );
-    } catch (e) {
-      throw mapIqError(e);
-    }
-    if (res is List && res.isNotEmpty && res.first is Map<String, dynamic>) {
-      return IndividualQuestion.fromMap(res.first as Map<String, dynamic>);
-    }
-    throw const AppError('답변 결과를 확인하지 못했어요.');
-  }
-
   /// 양 당사자 공용 메시지 전송(`iq_append_message`) — 학생 후속 질문과 멘토
-  /// 추가 답글이 모두 이 경로다(멘토 '첫 답변'만 [answer] 유지 — 원자 전이).
+  /// 답변(첫 답변 포함 — answered 전이는 서버 봉투 answered_transition)이
+  /// 모두 이 경로다. C20: 구 answer_individual_question 배선은 호출 0건이라
+  /// 제거(서버 함수는 서버 레인 N6 정리 대상).
   ///
   /// 서버 계약(6): {ok, message_id, answered_transition}. 오류는
   /// raise exception 'CODE' — [mapIqError] 가 한글 문구로 변환한다.
