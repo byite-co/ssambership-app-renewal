@@ -118,8 +118,13 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
   void _reloadExtras() {
     if (!mounted) return;
     final int gen = ++_extrasGeneration;
+    // C26: 목록 항목이 이미 가진 평점·리뷰 수를 넘겨 뷰 단건 재조회를 생략.
     final Future<MentorDetailExtras> next = (widget.extrasLoaderOverride ??
-        () => _repo.fetchExtras(widget.item.id))();
+        () => _repo.fetchExtras(
+              widget.item.id,
+              knownAvgRating: widget.item.avgRating,
+              knownReviewCount: widget.item.reviewCount,
+            ))();
     next.then((MentorDetailExtras data) {
       if (!mounted || gen != _extrasGeneration) return; // 늦은 이전 응답 폐기
       setState(() {
