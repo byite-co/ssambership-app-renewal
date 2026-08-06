@@ -34,7 +34,7 @@ class NotificationDeepLinkTarget {
     this.eventId = '',
   });
 
-  /// 정본 17종(목록 밖은 unknown — 이동 없음).
+  /// 정본 18종(목록 밖은 unknown — 이동 없음).
   final NotificationEventType type;
 
   /// 상세 딥링크용 내부 id(UUID 검증 후에만 상세를 연다).

@@ -41,7 +41,7 @@ int appendNotificationsDeduped(
 /// ★ 조회·읽음 중심. 알림 '생성'은 서버/푸시 몫. 환불·미지 타입은 노출하고
 ///   목록 밖 타입은 '기타'로 일반 표시한다. 맞춤의뢰(CR) 2종은 게이트 OFF
 ///   (2026-07 출시)로 레포 쿼리 단계에서 제외돼 표시·필터·딥링크에 나타나지
-///   않는다(서버 계약 17종은 불변 — notification_types 참조).
+///   않는다(서버 계약 18종은 불변 — notification_types 참조).
 ///   이동은 [notificationDestinationOf] 허용 목적지(탭 수준)만 — stay 타입
 ///   (unknown 등)은 읽음 처리만 하고 이동하지 않는다.
 class NotificationsScreen extends StatefulWidget {

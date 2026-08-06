@@ -1,9 +1,9 @@
 /// 알림 도메인 모델.
 ///
 /// ★ 타입 판별은 키워드 포함 매칭이 아니라 [NotificationEventType.fromCode]
-///   (정확 일치 17종)만 쓴다. 목록 밖 타입은 unknown → 기타(kind other)로
+///   (정확 일치 18종)만 쓴다. 목록 밖 타입은 unknown → 기타(kind other)로
 ///   '일반 알림'으로 표시하되 숨기지 않는다(환불 포함). 맞춤의뢰 2종만
-///   CR 게이트 OFF 로 레포 쿼리 단계에서 제외된다(서버 계약 17종 불변 —
+///   CR 게이트 OFF 로 레포 쿼리 단계에서 제외된다(서버 계약 18종 불변 —
 ///   notification_types.kGatedNotificationTypeCodes 참조).
 ///   type 원문(영문 코드)은 화면에 노출하지 않고, 한글 유형 라벨/본문만 쓴다.
 library;
