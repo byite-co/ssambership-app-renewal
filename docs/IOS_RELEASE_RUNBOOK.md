@@ -85,6 +85,8 @@ Linux/CI 에서는 §9 의 정적 검증까지만 가능하다. 이하 macOS 에
 
 ```bash
 flutter clean && flutter pub get
+# ★ 필수 preflight — production .env 검증(secret 미출력, FAIL 이면 빌드 중단)
+dart run tool/validate_release_env.dart
 open -a Simulator && flutter run    # 시뮬레이터 스모크
 flutter build ios --release --no-codesign   # 서명 없이 릴리스 빌드 완주 확인
 ```
