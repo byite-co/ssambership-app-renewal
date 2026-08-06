@@ -12,6 +12,7 @@ class ThreadStatusCounts {
     required this.inProgress,
     required this.confirmed,
     this.completed = 0,
+    this.unknown = 0,
   });
 
   /// 스레드 총 개수(unknown 포함 — '전체' 탭의 개수).
@@ -30,11 +31,19 @@ class ThreadStatusCounts {
   /// closed/archived 를 confirmed 와 분리 유지해 summaryLine 의미는 안 바꾼다.
   final int completed;
 
-  factory ThreadStatusCounts.from(Iterable<QuestionThread> threads) {
-    int p = 0, ip = 0, c = 0, done = 0, t = 0;
-    for (final QuestionThread th in threads) {
+  /// 알 수 없는 상태(스키마 변경 등 폴백) 개수 — 요약 문구 오표시 방지용(N39).
+  final int unknown;
+
+  factory ThreadStatusCounts.from(Iterable<QuestionThread> threads) =>
+      ThreadStatusCounts.fromStatuses(
+          threads.map((QuestionThread t) => t.status));
+
+  /// 상태 값만으로 집계(N20 — 슬림 조회 행 지원). from 과 동일 규칙.
+  factory ThreadStatusCounts.fromStatuses(Iterable<ThreadStatus> statuses) {
+    int p = 0, ip = 0, c = 0, done = 0, t = 0, u = 0;
+    for (final ThreadStatus status in statuses) {
       t++;
-      switch (th.status) {
+      switch (status) {
         case ThreadStatus.pending:
           p++;
           break;
@@ -51,11 +60,17 @@ class ThreadStatusCounts {
           done++; // 완료 탭에는 포함(요약 라인에서는 기존대로 제외).
           break;
         case ThreadStatus.unknown:
-          break; // 알 수 없는 상태 — total(전체)에만 포함
+          u++; // 알 수 없는 상태 — total(전체)에 포함 + 별도 집계(N39).
+          break;
       }
     }
     return ThreadStatusCounts(
-        total: t, pending: p, inProgress: ip, confirmed: c, completed: done);
+        total: t,
+        pending: p,
+        inProgress: ip,
+        confirmed: c,
+        completed: done,
+        unknown: u);
   }
 
   /// 멘토 주의 필요(답할 게 있음).
@@ -69,7 +84,12 @@ class ThreadStatusCounts {
       if (pending > 0) '답변 대기 $pending',
       if (inProgress > 0) '진행 중 $inProgress',
     ];
-    if (parts.isEmpty) return '모두 답변 완료';
+    if (parts.isEmpty) {
+      // N39: 알 수 없는 상태만 있으면 '모두 답변 완료' 로 날조하지 않는다 —
+      // 완료가 실제로 1건 이상일 때만 성공 문구.
+      if (completed == 0 && unknown > 0) return '질문 $total';
+      return '모두 답변 완료';
+    }
     return parts.join(' · ');
   }
 }

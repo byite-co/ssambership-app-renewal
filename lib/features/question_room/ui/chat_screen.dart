@@ -49,6 +49,7 @@ class ChatScreen extends StatefulWidget {
     this.realtimeFactory = _defaultRealtime,
     this.safety = const SupabaseRoomSafetyRepository(),
     this.currentUserIdOverride,
+    this.readRepository = const QuestionRoomReadRepository(),
   });
 
   final QuestionThread thread;
@@ -79,6 +80,9 @@ class ChatScreen extends StatefulWidget {
   /// ★ 상대 도출은 이 값과 [room] 참여자 데이터로만 한다 — 화면 문자열/메시지 추정 금지.
   final String? currentUserIdOverride;
 
+  /// 읽기 레포 주입 seam(테스트 전용 — N21 페이지 계약 검증).
+  final QuestionRoomReadRepository readRepository;
+
   static ThreadRealtimePort _defaultRealtime(String threadId) =>
       SupabaseThreadRealtime(threadId);
 
@@ -91,7 +95,7 @@ const String _blockedNotice = '차단한 사용자예요. 새 메시지·첨부�
     ' 지난 대화는 그대로 볼 수 있고, 해제는 설정 > 차단 사용자 관리에서 할 수 있어요.';
 
 class _ChatScreenState extends State<ChatScreen> {
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
+  QuestionRoomReadRepository get _read => widget.readRepository;
   final QuestionRoomWriteRepository _write =
       const QuestionRoomWriteRepository();
   final TextEditingController _input = TextEditingController();
@@ -180,12 +184,26 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// N21 완결: 메시지 1페이지 크기 — 무제한 전량 조회 제거.
+  static const int _messagesPageSize = 200;
+
+  /// 이전 페이지가 더 있을 수 있는지(마지막 페이지가 한도만큼 꽉 찼는지).
+  bool _hasEarlierMessages = false;
+
   Future<void> _load() async {
     try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      final List<QuestionAttachment> atts = await _loadAttachments();
+      // N21: 메시지·첨부는 독립 조회 — 병렬(종전 순차 2왕복 벽시계 절감).
+      // 메시지는 최근 페이지만 — 이전 대화는 상단 버튼으로 명시 확장.
+      final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+        _read.recentMessages(widget.thread.id, limit: _messagesPageSize),
+        _loadAttachments(),
+      ]);
+      final List<QuestionMessage> msgs = loaded[0] as List<QuestionMessage>;
+      final List<QuestionAttachment> atts =
+          loaded[1] as List<QuestionAttachment>;
       if (!mounted) return;
       setState(() {
+        _hasEarlierMessages = msgs.length >= _messagesPageSize;
         _messages = ThreadMessagesController(msgs);
         _attachments = atts;
         _loading = false;
@@ -196,6 +214,27 @@ class _ChatScreenState extends State<ChatScreen> {
         _loadError = e;
         _loading = false;
       });
+    }
+  }
+
+  /// '이전 대화 불러오기' — 현재 가장 오래된 메시지 이전 1페이지를 합친다.
+  Future<void> _loadEarlierMessages() async {
+    final ThreadMessagesController? ctrl = _messages;
+    if (ctrl == null || ctrl.isEmpty) return;
+    try {
+      // N21: 복합 커서(created_at, id) — 동일 시각 경계에서도 누락·중복 0.
+      final List<QuestionMessage> older = await _read.messagesBefore(
+        widget.thread.id,
+        cursor: MessageCursor.oldestOf(ctrl.items),
+        limit: _messagesPageSize,
+      );
+      // 일괄 병합(notify 1회) — 행별 notify 는 앵커 보정을 깨뜨린다.
+      ctrl.upsertAllFromServer(older);
+      if (mounted) {
+        setState(() => _hasEarlierMessages = older.length >= _messagesPageSize);
+      }
+    } catch (_) {
+      // 실패 시 조용히 유지 — 버튼이 남아 재시도 가능.
     }
   }
 
@@ -236,13 +275,17 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _refresh() async {
     final ThreadMessagesController? ctrl = _messages;
     if (ctrl == null) return;
-    try {
-      final List<QuestionMessage> msgs = await _read.messages(widget.thread.id);
-      ctrl.resetTo(msgs);
-    } catch (_) {
-      // 조용히 무시 — 기존 목록 유지.
-    }
-    final List<QuestionAttachment> atts = await _loadAttachments();
+    // N21: 메시지·첨부 재조회 병렬화(메시지 실패는 조용히 무시 — 기존 목록 유지).
+    // 최근 페이지를 merge(upsert)로 합친다 — resetTo 는 이미 불러온 이전
+    // 페이지를 버리므로 금지(메시지는 삭제 경로가 없어 merge 가 안전).
+    final Future<void> msgsF = _read
+        .recentMessages(widget.thread.id, limit: _messagesPageSize)
+        .then((List<QuestionMessage> msgs) {
+      ctrl.upsertAllFromServer(msgs); // 일괄 병합(notify ≤1회)
+    }).catchError((Object _) {});
+    final Future<List<QuestionAttachment>> attsF = _loadAttachments();
+    await msgsF;
+    final List<QuestionAttachment> atts = await attsF;
     if (mounted) setState(() => _attachments = atts);
   }
 
@@ -313,7 +356,8 @@ class _ChatScreenState extends State<ChatScreen> {
         messageId: messageId,
         image: image,
       );
-      await _refresh(); // 첨부 반영.
+      // N21: 본문은 전송 시 서버 반환 행으로 이미 반영 — 첨부만 재조회.
+      await _reloadAttachments();
       return true;
     } catch (e) {
       _showError('이미지 첨부에 실패했어요. ${friendlyError(e)}');
@@ -460,6 +504,8 @@ class _ChatScreenState extends State<ChatScreen> {
       onOpenImage: _openImage,
       onOpenFile: _openFile,
       onAttachmentInsert: _reloadAttachments,
+      hasEarlier: _hasEarlierMessages,
+      onLoadEarlier: _loadEarlierMessages,
     );
   }
 }

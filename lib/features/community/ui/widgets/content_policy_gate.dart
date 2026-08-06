@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
@@ -9,18 +10,33 @@ import '../../../../design/typography_tokens.dart';
 ///   '불쾌·불법·음란 콘텐츠 무관용' 정책에 **능동 동의**하도록 요구된다.
 ///   가입이 웹 전용이라 인앱 EULA 접점이 없으므로, 최초 게시 동선에서 1회 동의를 받는다.
 ///
-/// 저장은 세션 스코프(인메모리) — 앱 실행마다 최초 1회 노출된다. 별도 저장 패키지
-/// 의존성을 추가하지 않기 위한 선택이며, 심사 관점(게시 전 동의 노출)에는 충분하다.
+/// C13: 동의는 **기기에 영속화**된다(shared_preferences) — 앱 재실행마다
+/// 재동의를 요구하던 인메모리 한계 제거. 저장 실패는 조용히 무시(그 실행은
+/// 인메모리로만 기억 — 다음 실행에 다시 노출될 뿐, 게시 흐름은 안 막는다).
 class ContentPolicyGate {
   ContentPolicyGate._();
 
-  /// 이번 실행에서 동의했는지(중복 노출 방지). 테스트에서 리셋 가능.
+  /// 영속 키(규정 문구가 실질 변경되면 버전을 올려 재동의를 받는다).
+  static const String prefsKey = 'content_policy_agreed_v1';
+
+  /// 이번 실행에서 동의 확인됨(중복 노출·중복 디스크 읽기 방지). 테스트에서 리셋 가능.
   static bool agreedThisSession = false;
 
   /// 게시 전 정책 동의를 보장한다. 이미 동의했으면 즉시 true.
   /// 다이얼로그에서 '동의' → true, 취소/바깥 탭 → false.
   static Future<bool> ensureAgreed(BuildContext context) async {
     if (agreedThisSession) return true;
+    // 기기 저장분 확인 — 있으면 노출 없이 통과.
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(prefsKey) ?? false) {
+        agreedThisSession = true;
+        return true;
+      }
+    } catch (_) {
+      // 저장소 접근 실패 → 인메모리 게이트로만 진행.
+    }
+    if (!context.mounted) return false;
     final bool? ok = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -28,6 +44,12 @@ class ContentPolicyGate {
     );
     if (ok == true) {
       agreedThisSession = true;
+      try {
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(prefsKey, true);
+      } catch (_) {
+        // 영속화 실패 — 이번 실행은 인메모리로 기억, 다음 실행에 재노출.
+      }
       return true;
     }
     return false;

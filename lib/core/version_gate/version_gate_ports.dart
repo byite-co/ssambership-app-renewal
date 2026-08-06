@@ -14,3 +14,21 @@ typedef BuildNumberProvider = Future<int?> Function();
 /// 게이트 대상 플랫폼 결정자(테스트 주입용).
 /// 'android' | 'ios' 를 반환하고, 그 외(web/desktop)는 null = 게이트 건너뜀.
 typedef GatePlatformResolver = String? Function();
+
+/// G1: 마지막 게이트 통과 빌드 저장소(오프라인 콜드스타트 완화).
+///
+/// 통과(pass/recommend)한 빌드를 기억해 두고, 정책 조회 실패 시 같은 빌드면
+/// 재시도 화면 대신 입장을 허용한다. forceUpdate 판정을 **수신하면** 지운다.
+///
+/// ★ 정책 한계(availability 우선 — 제품 결정 2026-08-06): 캐시 삭제는
+///   forceUpdate 판정을 온라인에서 한 번 받아온 뒤에만 일어난다. 통과 이력이
+///   있는 빌드가 그 후 **계속 오프라인이면** 서버가 최소 빌드를 올려도 이전
+///   통과 캐시로 계속 실행된다 — 완전한 오프라인 강제 차단이 아니다.
+///   보안상 원격 킬스위치가 필요해지면 캐시에 유효기간(TTL)을 부여해 만료
+///   후 fail-closed 로 전환하는 것이 후속 선택지다.
+/// 모든 구현은 실패를 안에서 흡수한다(캐시는 보조 수단 — 게이트를 못 막는다).
+abstract class GatePassCache {
+  Future<int?> readLastPassBuild();
+  Future<void> writeLastPassBuild(int build);
+  Future<void> clear();
+}

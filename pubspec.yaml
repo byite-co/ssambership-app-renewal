@@ -1,7 +1,7 @@
 name: ssambership_app
 description: "쌤버십 모바일 앱 — 기존 웹(Next.js)의 컴패니언. 읽기 중심·Commerce-Zero(앱 내 결제 없음)."
 publish_to: "none"
-version: 1.0.0+16
+version: 1.0.0+18
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -9,6 +9,9 @@ environment:
 
 dependencies:
   flutter:
+    sdk: flutter
+  # 시스템 위젯(달력·복사 메뉴 등) 한국어 표기 — 한국어 단일 앱 (G5)
+  flutter_localizations:
     sdk: flutter
 
   # 백엔드: 기존 웹과 공유하는 Supabase 1개 (앱은 읽기 중심)
@@ -42,6 +45,8 @@ dependencies:
   webview_flutter: ^4.14.1
   webview_flutter_android: ^4.13.0
   webview_flutter_wkwebview: ^3.26.0
+  sentry_flutter: ^9.26.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

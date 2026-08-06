@@ -34,15 +34,32 @@ class NotificationBadgeController {
   /// 늦게 도착한 이전 조회 응답 폐기용 세대 토큰.
   int _generation = 0;
 
+  /// N24: 버스트 코얼레싱 — 실시간 INSERT 가 연달아 와도 진행 중 조회 1개 +
+  /// 종료 후 후행 1개로 수렴한다(수신 건수만큼 RPC 를 쏘지 않는다).
+  bool _refreshing = false;
+  bool _refreshQueued = false;
+
   /// 서버 정본 재조회. 실패는 조용히 무시(마지막 값 유지 — 값 날조 금지).
+  /// 진행 중이면 후행 1회로 합쳐진다(N24) — 호출 즉시 반환될 수 있다.
   Future<void> refresh() async {
-    final int gen = ++_generation;
+    if (_refreshing) {
+      _refreshQueued = true;
+      return;
+    }
+    _refreshing = true;
     try {
-      final int value = await _repository.unreadCount();
-      if (gen != _generation) return; // 낡은 응답 폐기.
-      count.value = value;
-    } catch (_) {
-      // 실패 — 기존 값 유지. 배지가 목록 이용을 막지 않는다.
+      do {
+        _refreshQueued = false;
+        final int gen = ++_generation;
+        try {
+          final int value = await _repository.unreadCount();
+          if (gen == _generation) count.value = value;
+        } catch (_) {
+          // 실패 — 기존 값 유지. 배지가 목록 이용을 막지 않는다.
+        }
+      } while (_refreshQueued);
+    } finally {
+      _refreshing = false;
     }
   }
 

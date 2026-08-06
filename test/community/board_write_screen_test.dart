@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssambership_app/core/scan/picked_image.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 import 'package:ssambership_app/features/community/ui/board/board_write_screen.dart';
@@ -101,6 +102,9 @@ void main() {
     // P0-3(UGC): 첫 게시 전 커뮤니티 이용 규정 동의 다이얼로그가 뜬다.
     // 게이트 자체의 상세 동작은 content_policy_gate_test 에서 검증.
     ContentPolicyGate.agreedThisSession = false;
+    // C13: 호스트 테스트에선 순수 Dart 구현(shared_preferences_linux)이 실제
+    // 파일을 읽는다 — mock 저장소로 격리해야 다이얼로그 노출이 결정적이다.
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     final FakeCommunityWrite fake = FakeCommunityWrite();
     bool? popResult;
 

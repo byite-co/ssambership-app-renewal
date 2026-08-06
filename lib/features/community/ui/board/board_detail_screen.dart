@@ -9,6 +9,8 @@ import '../../../../design/widgets/app_badge.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
+import '../../data/board_post_create_gateway.dart'
+    show newBoardPostIdempotencyKey;
 import '../../data/community_models.dart';
 import '../../data/community_post_image_url_resolver.dart';
 import '../../data/community_read_repository.dart';
@@ -50,6 +52,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
+  /// N18: 댓글 1페이지 크기 — 무제한 전량 조회 제거. '더 보기'가 한도를
+  /// 페이지씩 늘려 재조회한다(정렬 안정 — offset 병합 대신 한도 확장).
+  static const int _commentsPageSize = 100;
+  int _commentsLimit = _commentsPageSize;
+
+  /// 마지막 조회가 한도만큼 꽉 찼는지(= 더 있을 수 있음 → '더 보기' 노출).
+  bool _commentsMaybeMore = false;
+
   bool _liked = false;
   bool _scrapped = false;
   late int _likeCount;
@@ -62,14 +72,26 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   /// §4: 댓글 수 최신값(목록 스냅샷 p.commentCount 의 상세 내 stale 해소).
   int? _commentCountOverride;
 
+  /// N40: 본인 진입 조회수 증분(서버 실제 가산 시 1) — 표시에만 가산.
+  int _viewCountBump = 0;
+
+  /// C7: 조회 기록 v2 이벤트 키 — **화면 노출(초기 진입) 1회당 1개**(UUID v4).
+  /// late final 이라 리빌드에도 재생성되지 않는다(멱등 계약 — 중복 가산 0).
+  late final String _viewEventKey = newBoardPostIdempotencyKey();
+
   @override
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
-    _comments = widget.read.comments(CommunityPostType.board, widget.post.id);
+    _comments = _fetchCommentsPage();
     _loadReactionState();
-    // 상세 진입 시 조회수 +1(진입당 1회). RPC 부재 시 조용히 무시.
-    widget.write.incrementBoardView(widget.post.id);
+    // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
+    // N40: 서버가 실제 가산했을 때만 본인 진입 +1 을 표시에 반영.
+    widget.write
+        .incrementBoardView(widget.post.id, eventKey: _viewEventKey)
+        .then((bool ok) {
+      if (ok && mounted) setState(() => _viewCountBump = 1);
+    });
   }
 
   @override
@@ -80,14 +102,17 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   Future<void> _loadReactionState() async {
     try {
-      final Set<String> liked = await widget.read
-          .myBoardReactionIds(CommunityWriteRepository.reactionLike);
-      final Set<String> scrap = await widget.read
-          .myBoardReactionIds(CommunityWriteRepository.reactionScrap);
+      // C9: 이 글 1건으로 서버 필터 + 좋아요·스크랩 병렬 조회.
+      final List<Set<String>> rs = await Future.wait(<Future<Set<String>>>[
+        widget.read.myBoardReactionIds(CommunityWriteRepository.reactionLike,
+            postId: widget.post.id),
+        widget.read.myBoardReactionIds(CommunityWriteRepository.reactionScrap,
+            postId: widget.post.id),
+      ]);
       if (!mounted) return;
       setState(() {
-        _liked = liked.contains(widget.post.id);
-        _scrapped = scrap.contains(widget.post.id);
+        _liked = rs[0].contains(widget.post.id);
+        _scrapped = rs[1].contains(widget.post.id);
       });
     } catch (_) {
       // 반응 상태 조회 실패는 화면을 막지 않는다(기본 미반응).
@@ -173,13 +198,45 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (updated == true && mounted) Navigator.of(context).pop(true);
   }
 
-  /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
-  Future<void> _blockPostAuthor() async {
-    final bool blocked = await confirmAndBlockAuthor(
-      context,
-      table: 'community_posts',
-      contentId: widget.post.id,
+  /// 내 글 삭제 — 서버 소프트삭제 RPC 단일 경로(N3). 성공 시 상세를 닫아
+  /// 목록을 새로고침시킨다(deleted_at 이 찍힌 행은 뷰에서 사라진다).
+  Future<void> _deleteMyPost() async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('글을 삭제할까요?'),
+        content: const Text('삭제한 글은 다시 볼 수 없어요.'),
+        actions: <Widget>[
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('삭제')),
+        ],
+      ),
     );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.write.deleteMyPost(widget.post.id);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      _snack('글 삭제에 실패했어요. ${friendlyError(e)}');
+    }
+  }
+
+  /// 글 작성자 차단 → 성공 시 상세를 닫아 목록으로(목록은 재조회 시 숨겨짐).
+  /// C10: author_id 는 이미 뷰(community_posts_v1) 행에 있으므로 재조회 없이
+  /// 그대로 쓴다 — community_posts 베이스 테이블 접근 0건 계약.
+  Future<void> _blockPostAuthor() async {
+    final String? authorId = widget.post.authorId;
+    if (authorId == null) {
+      // 뷰 행에 작성자 id 가 없으면 차단 불가(베이스 재조회로 우회하지 않는다).
+      _snack('차단에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    final bool blocked = await confirmAndBlockAuthor(context, authorId: authorId);
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 
@@ -215,11 +272,19 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     }
   }
 
+  /// 현재 한도까지의 댓글 1회 조회 + '더 있음' 판정 갱신(N18).
+  Future<List<CommunityComment>> _fetchCommentsPage() async {
+    final List<CommunityComment> list = await widget.read
+        .comments(CommunityPostType.board, widget.post.id,
+            limit: _commentsLimit);
+    _commentsMaybeMore = list.length >= _commentsLimit;
+    return list;
+  }
+
   /// 댓글 재조회 + 댓글 수 동기화. Future 교체 방식이라 FutureBuilder 가
   /// 최신 future 만 반영(늦은 응답이 덮지 않음), 콜백은 mounted 가드.
   void _reloadComments() {
-    final Future<List<CommunityComment>> next =
-        widget.read.comments(CommunityPostType.board, widget.post.id);
+    final Future<List<CommunityComment>> next = _fetchCommentsPage();
     // ★ 블록 바디: 화살표로 Future 를 대입하면 'setState callback returned a
     //   Future' 로 리빌드가 취소된다(§4 공통 함정).
     setState(() {
@@ -227,9 +292,33 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     });
     next.then((List<CommunityComment> list) {
       if (!mounted) return;
-      setState(() => _commentCountOverride = list.length);
+      // 한도 미만이면 전체를 다 본 것 — 그때만 개수 정본으로 승격.
+      if (list.length < _commentsLimit) {
+        setState(() => _commentCountOverride = list.length);
+      }
     }).catchError((Object _) {
       // 재조회 실패 시 기존 표시값 유지(정상 데이터를 지우지 않는다).
+    });
+  }
+
+  /// '더 보기' — 한도를 1페이지 늘려 재조회.
+  void _loadMoreComments() {
+    _commentsLimit += _commentsPageSize;
+    _reloadComments();
+  }
+
+  /// 등록 직후 내 댓글을 로컬로 덧붙인다(N18 — 등록마다 전량 재조회 제거).
+  /// 대화순(asc) 끝에 붙는 게 서버 정렬과 동일하고, 본인 댓글이라 차단
+  /// 필터도 무관하다.
+  void _appendLocalComment(CommunityComment created) {
+    final Future<List<CommunityComment>> next = _comments
+        .then((List<CommunityComment> l) => <CommunityComment>[...l, created])
+        .catchError((Object _) => <CommunityComment>[created]);
+    setState(() {
+      _comments = next;
+      final int? cur = _commentCountOverride;
+      // 전체 미확인(잘린 목록) 상태면 서버 스냅샷 +1 근사로 표시.
+      _commentCountOverride = (cur ?? widget.post.commentCount) + 1;
     });
   }
 
@@ -241,7 +330,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (!mounted) return;
     setState(() => _busy = true);
     try {
-      await widget.write.addComment(
+      final CommunityComment created = await widget.write.addComment(
         postType: CommunityPostType.board,
         postId: widget.post.id,
         body: body,
@@ -249,7 +338,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
       _changed = true;
-      _reloadComments();
+      _appendLocalComment(created);
     } catch (e) {
       _snack('댓글 등록에 실패했어요. ${friendlyError(e)}');
     } finally {
@@ -284,12 +373,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             tooltip: '더보기',
             onSelected: (String v) {
               if (v == 'edit') _editMyPost();
+              if (v == 'delete') _deleteMyPost();
               if (v == 'block') _blockPostAuthor();
             },
             itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
-              // 수정은 내 글에만 노출(타인 글 수정 UI 미노출 — 서버도 거부).
+              // 수정·삭제는 내 글에만 노출(타인 글 UI 미노출 — 서버도 거부).
               if (_isMyPost)
                 const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+              if (_isMyPost)
+                const PopupMenuItem<String>(value: 'delete', child: Text('삭제')),
               const PopupMenuItem<String>(
                   value: 'block', child: Text('이 사용자 차단')),
             ],
@@ -322,7 +414,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                     const SizedBox(width: 8),
                     Text(p.authorName, style: AppType.caption),
                     const SizedBox(width: 10),
-                    Text('조회 ${p.viewCount}', style: AppType.caption),
+                    Text('조회 ${p.viewCount + _viewCountBump}', style: AppType.caption),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s16),
@@ -379,11 +471,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         }
         final List<CommunityComment> comments =
             snap.data ?? <CommunityComment>[];
+        // N18: 잘린 목록이면 length 는 과소 표기 — 서버 스냅샷 개수로 보정.
+        final int headerCount = _commentCountOverride ??
+            (_commentsMaybeMore && widget.post.commentCount > comments.length
+                ? widget.post.commentCount
+                : comments.length);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // 헤더: "댓글 {개수}"(동적 — 현재 리스트 length). 스타일 title.
-            Text('댓글 ${comments.length}', style: AppType.title),
+            // 헤더: "댓글 {개수}". 스타일 title.
+            Text('댓글 $headerCount', style: AppType.title),
             const SizedBox(height: AppSpacing.titleBody),
             if (comments.isEmpty)
               Text('첫 댓글을 남겨보세요.', style: AppType.caption)
@@ -399,6 +496,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   onBlock: () => _blockCommentAuthor(comments[i].id),
                 ),
               ],
+            // N18: 페이지 한도까지 꽉 찼으면 더 있을 수 있다 — 명시 확장.
+            if (_commentsMaybeMore)
+              Center(
+                child: TextButton(
+                  onPressed: _loadMoreComments,
+                  child: const Text('댓글 더 보기'),
+                ),
+              ),
           ],
         );
       },

@@ -62,6 +62,9 @@ class CommunityReadRepository {
   /// 정본 소스는 뷰 `api_web_v1.community_posts_v1` 다(계약 수렴 — anon 허용,
   /// deleted_at IS NULL + (published OR 본인 행)은 서버가 강제). 컬럼명은
   /// 베이스 테이블과 다르다: 본문 `body`, 이미지 `image_refs`.
+  /// ★ N4: 쓰기(api_app_v1 RPC)와 스키마가 갈리는 것은 **의도된 계약**이다 —
+  ///   api_app_v1.community_posts_v1(동일 정의)은 authenticated 전용이라
+  ///   비로그인 열람(anon read 계약 테스트)이 깨진다. 읽기는 여기 유지.
   Future<CommunityPage<BoardPost>> boards(
       {String? category, int? limit, int offset = 0}) async {
     dynamic q = _client
@@ -102,8 +105,9 @@ class CommunityReadRepository {
 
   /// 글/숏폼의 댓글(대화순=오름차순). [limit]/[offset] 로 페이징(하위 호환: null=전체).
   ///
-  /// v16 정본 전환 — 게시판: 정본 `comments` 에서 post_id 로만 조회
-  /// (삭제 댓글 제외 is_deleted=false 는 서버 RLS 가 보장, 앱 필터 불필요).
+  /// N5 뷰 이행 — 게시판: `api_web_v1.community_comments_v1`(invoker 뷰,
+  /// is_deleted=false 를 뷰가 보장)에서 post_id 로만 조회. 쓰기(INSERT)는
+  /// 종전대로 정본 `comments` 베이스다(뷰는 읽기 전용 표면).
   /// 숏폼: 기존 `community_comments`(post_type='shortform', status='visible') 유지.
   Future<List<CommunityComment>> comments(
     CommunityPostType type,
@@ -111,7 +115,8 @@ class CommunityReadRepository {
     int? limit,
     int offset = 0,
   }) async {
-    final Map<String, Object> filters = type == CommunityPostType.board
+    final bool board = type == CommunityPostType.board;
+    final Map<String, Object> filters = board
         ? <String, Object>{'post_id': postId}
         : <String, Object>{
             'post_type': type.code,
@@ -120,7 +125,8 @@ class CommunityReadRepository {
           };
     final Future<Set<String>> blockedF = _blocks.myBlockedIds();
     final List<Map<String, dynamic>> rows = await _gateway.selectComments(
-      table: type.commentsTable,
+      table: board ? 'community_comments_v1' : type.commentsTable,
+      schema: board ? 'api_web_v1' : null,
       filters: filters,
       limit: limit,
       offset: offset,
@@ -131,14 +137,21 @@ class CommunityReadRepository {
   }
 
   /// 내가 특정 반응(type: like|scrap)을 남긴 게시판 글 id 집합(반응 상태 표시용).
-  Future<Set<String>> myBoardReactionIds(String reactionType) async {
+  ///
+  /// [postId] 를 주면 그 글 1건으로 서버에서 필터한다(C9 — 상세 화면이 내 반응
+  /// 전체를 내려받아 contains 하던 전체 스캔 제거). 내 활동 탭처럼 전체 집합이
+  /// 필요한 곳만 postId 없이 부른다.
+  Future<Set<String>> myBoardReactionIds(String reactionType,
+      {String? postId}) async {
     final String? uid = _uid;
     if (uid == null) return <String>{};
-    final List<Map<String, dynamic>> rows = await _client
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> q = _client
         .from('post_reactions')
         .select('post_id')
         .eq('user_id', uid)
         .eq('type', reactionType);
+    if (postId != null) q = q.eq('post_id', postId);
+    final List<Map<String, dynamic>> rows = await q;
     return <String>{
       for (final Map<String, dynamic> r in rows)
         if (r['post_id'] != null) r['post_id'] as String,
@@ -146,14 +159,18 @@ class CommunityReadRepository {
   }
 
   /// 내가 특정 반응(type: like|scrap)을 남긴 숏폼 id 집합(숏폼 반응 상태 표시용).
-  Future<Set<String>> myShortformReactionIds(String reactionType) async {
+  /// [shortformId] 를 주면 그 숏폼 1건으로 서버에서 필터한다(C9).
+  Future<Set<String>> myShortformReactionIds(String reactionType,
+      {String? shortformId}) async {
     final String? uid = _uid;
     if (uid == null) return <String>{};
-    final List<Map<String, dynamic>> rows = await _client
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> q = _client
         .from('shortform_reactions')
         .select('shortform_id')
         .eq('user_id', uid)
         .eq('type', reactionType);
+    if (shortformId != null) q = q.eq('shortform_id', shortformId);
+    final List<Map<String, dynamic>> rows = await q;
     return <String>{
       for (final Map<String, dynamic> r in rows)
         if (r['shortform_id'] != null) r['shortform_id'] as String,
@@ -167,18 +184,36 @@ class CommunityReadRepository {
     final String? uid = _uid;
     if (uid == null) return const MyActivity();
 
-    final List<Map<String, dynamic>> mineRows = await _client
-        .schema('api_web_v1')
-        .from('community_posts_v1')
-        .select('*')
-        .eq('author_id', uid)
-        .order('created_at', ascending: false);
-    final List<BoardPost> myPosts = mineRows.map(BoardPost.fromMap).toList();
+    // N22: ① 내 글·좋아요 id·스크랩 id 를 병렬 조회하고 ② 좋아요∪스크랩
+    // 본문을 한 번에 조회해 나눠 담는다(양쪽에 겹치는 글 이중 조회 제거).
+    // 종전 5회 순차 왕복 → 병렬 3 + 통합 1 의 2단계.
+    final List<dynamic> first = await Future.wait(<Future<dynamic>>[
+      _client
+          .schema('api_web_v1')
+          .from('community_posts_v1')
+          .select('*')
+          .eq('author_id', uid)
+          .order('created_at', ascending: false),
+      myBoardReactionIds('like'),
+      myBoardReactionIds('scrap'),
+    ]);
+    final List<BoardPost> myPosts = (first[0] as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(BoardPost.fromMap)
+        .toList();
+    final Set<String> likedIds = first[1] as Set<String>;
+    final Set<String> scrapIds = first[2] as Set<String>;
 
-    final Set<String> likedIds = await myBoardReactionIds('like');
-    final Set<String> scrapIds = await myBoardReactionIds('scrap');
-    final List<BoardPost> liked = await _postsByIds(likedIds);
-    final List<BoardPost> scrapped = await _postsByIds(scrapIds);
+    final List<BoardPost> union =
+        await _postsByIds(<String>{...likedIds, ...scrapIds});
+    final List<BoardPost> liked = <BoardPost>[
+      for (final BoardPost p in union)
+        if (likedIds.contains(p.id)) p,
+    ];
+    final List<BoardPost> scrapped = <BoardPost>[
+      for (final BoardPost p in union)
+        if (scrapIds.contains(p.id)) p,
+    ];
 
     return MyActivity(myPosts: myPosts, liked: liked, scrapped: scrapped);
   }

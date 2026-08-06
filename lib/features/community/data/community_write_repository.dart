@@ -90,13 +90,28 @@ class CommunityWriteRepository {
     }
   }
 
-  /// 게시글 조회수 +1(상세 진입 시). 기존 RPC 사용. ★ RPC 부재/실패 시 조용히 무시(조회수만 안 오름).
-  Future<void> incrementBoardView(String postId) async {
+  /// 게시글 조회 기록 v2(상세 진입 시) — (post, event_key) 멱등(C7).
+  ///
+  /// 구 `increment_community_post_view` 는 멱등키가 없어 재시도·재진입마다
+  /// 무한 가산됐다 — 숏폼 v2 와 같은 규약으로 전환. [eventKey] 는 **화면
+  /// 노출 1회당 1개**(UUID v4, initState 에서 생성)를 재사용한다: 실패해도
+  /// 새 키로 재시도하지 않는다(중복 가산 0).
+  /// N40: 서버가 실제 가산했는지(incremented)를 돌려줘 화면이 본인 진입
+  /// +1 을 표시에 반영한다(실패·중복 키는 false — 표시 가산 없음).
+  Future<bool> incrementBoardView(String postId,
+      {required String eventKey}) async {
     try {
-      await _client.rpc('increment_community_post_view',
-          params: <String, dynamic>{'p_post_id': postId});
+      final Object? data = await _client
+          .rpc('community_post_view_record_v2', params: <String, dynamic>{
+        'p_post_id': postId,
+        'p_event_key': eventKey,
+      });
+      return data is Map &&
+          data['ok'] == true &&
+          data['incremented'] == true;
     } catch (_) {
-      // 증분 RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
+      // RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
+      return false;
     }
   }
 
@@ -200,6 +215,55 @@ class CommunityWriteRepository {
     final Object? code = data is Map ? data['code'] : null;
     throw shortformCommentDeleteError(code is String ? code : '') ??
         const AppError('댓글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+
+  /// 게시판 글 **본인** 소프트삭제 — 서버 RPC 단일 경로(N3).
+  ///
+  /// 서버 계약: api_app_v1.community_post_soft_delete(p_post_id uuid)
+  ///   성공: {ok:true, contract_version:1, post_id, deleted_at[, already_deleted]}
+  ///   실패 코드: AUTH_REQUIRED · POST_NOT_FOUND_OR_NOT_OWNED ·
+  ///     ACCOUNT_BANNED · ACCOUNT_SUSPENDED · ACCOUNT_DELETION_IN_PROGRESS
+  /// 이미 삭제(already_deleted)는 정상 성공으로 취급한다(이중 탭 안전).
+  /// 행·이미지 참조는 서버가 보존한다(soft delete) — 앱은 Storage 를 건드리지
+  /// 않는다.
+  Future<void> deleteMyPost(String postId) async {
+    final Object? data;
+    try {
+      // ★ 작성·수정과 같은 api_app_v1 스키마 — 생략 시 public 으로 나가 PGRST202.
+      data = await _client.schema(kBoardPostCreateSchema).rpc(
+          'community_post_soft_delete',
+          params: <String, dynamic>{'p_post_id': postId});
+    } catch (e) {
+      final AppError? friendly = postDeleteError(e.toString());
+      if (friendly != null) throw friendly;
+      rethrow;
+    }
+    ensurePostSoftDeleteOk(data);
+  }
+
+  /// 삭제 봉투 검증 — 성공 봉투가 아니면 던진다(성공 위장 금지).
+  static void ensurePostSoftDeleteOk(Object? data) {
+    if (data is Map && data['ok'] == true) {
+      if (data['contract_version'] != 1) {
+        throw const AppError('삭제 결과를 확인하지 못했어요. 다시 시도해 주세요.');
+      }
+      return; // 성공(already_deleted 멱등 히트 포함).
+    }
+    final Object? code = data is Map ? data['code'] : null;
+    throw postDeleteError(code is String ? code : '') ??
+        const AppError('글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+
+  /// 글 삭제 서버 오류 코드 → 사용자용 한글 문구(코드·원문 비노출).
+  /// ACCOUNT_*/AUTH 공통 코드는 댓글 삭제 매퍼를 재사용한다.
+  static AppError? postDeleteError(String raw) {
+    if (raw.contains('POST_NOT_FOUND_OR_NOT_OWNED')) {
+      return const AppError('내가 쓴 글만 삭제할 수 있어요. 이미 삭제된 글일 수도 있어요.');
+    }
+    if (raw.contains('AUTH_REQUIRED')) {
+      return const AppError('로그인이 필요해요.');
+    }
+    return shortformCommentDeleteError(raw);
   }
 
   /// 숏폼 댓글 삭제 서버 오류 코드 → 사용자용 한글 문구(코드·원문 비노출).

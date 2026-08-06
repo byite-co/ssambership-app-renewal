@@ -24,6 +24,7 @@ import '../../../shared/widgets/commerce_notice_card.dart';
 import '../../../core/web_bridge/web_bridge.dart';
 import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../../individual_question/iq_flags.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 상세(열람 전용). 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
 /// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](웹 브릿지).
@@ -62,7 +63,8 @@ class MentorDetailScreen extends StatefulWidget {
 }
 
 class _MentorDetailScreenState extends State<MentorDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final MentorDirectoryRepository _repo = const MentorDirectoryRepository();
   final MentorFavoritesRepository _favRepo = const MentorFavoritesRepository();
   late bool _favorited = widget.initialFavorited;
@@ -89,7 +91,13 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _reloadExtras();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _reloadExtras();
   }
 
   @override
@@ -110,8 +118,13 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
   void _reloadExtras() {
     if (!mounted) return;
     final int gen = ++_extrasGeneration;
+    // C26: 목록 항목이 이미 가진 평점·리뷰 수를 넘겨 뷰 단건 재조회를 생략.
     final Future<MentorDetailExtras> next = (widget.extrasLoaderOverride ??
-        () => _repo.fetchExtras(widget.item.id))();
+        () => _repo.fetchExtras(
+              widget.item.id,
+              knownAvgRating: widget.item.avgRating,
+              knownReviewCount: widget.item.reviewCount,
+            ))();
     next.then((MentorDetailExtras data) {
       if (!mounted || gen != _extrasGeneration) return; // 늦은 이전 응답 폐기
       setState(() {
@@ -124,8 +137,12 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
     });
   }
 
+  /// C24: 연타 가드 — 목록 화면(_favPending)과 동일하게 in-flight 중 재탭 무시.
+  bool _favPending = false;
+
   /// 하트 탭 — 비로그인이면 로그인 유도, 아니면 낙관적 토글 후 서버 반영(실패 시 되돌림).
   Future<void> _toggleFavorite() async {
+    if (_favPending) return;
     if (!_favRepo.isLoggedIn) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,15 +152,20 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
       return;
     }
     final bool wasFav = _favorited;
+    _favPending = true;
     setState(() => _favorited = !wasFav);
-    final bool ok = wasFav
-        ? await _favRepo.remove(widget.item.id)
-        : await _favRepo.add(widget.item.id);
-    if (!ok && mounted) {
-      setState(() => _favorited = wasFav);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('찜 처리에 실패했어요. 잠시 후 다시 시도해 주세요.')),
-      );
+    try {
+      final bool ok = wasFav
+          ? await _favRepo.remove(widget.item.id)
+          : await _favRepo.add(widget.item.id);
+      if (!ok && mounted) {
+        setState(() => _favorited = wasFav);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('찜 처리에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      _favPending = false;
     }
   }
 

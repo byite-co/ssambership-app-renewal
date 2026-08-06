@@ -22,14 +22,15 @@ import 'package:flutter_test/flutter_test.dart';
 /// vc16: release-prebuild 수렴(2026-08-05) — PR #44(IQ 미디어 귀속·첨삭·브랜딩)와
 /// PR #43(iOS 출시 설정)이 master 에 통합된 뒤의 출시 후보.
 /// versionName 을 **1.0.0** 으로 올린다(첫 정식 출시 표기).
+/// vc18: Play Console 실측(2026-08-06, 오너 확인) — versionCode **16과 17은
+/// 이미 사용됨**. 코드 변경 없이 번호만 18 로 올린 release candidate.
 ///
-/// ⚠️ 외부 스토어 이력은 이 컨테이너에서 조회할 수 없다
-/// (App Store Connect / Play Console 접근 없음). 저장소 증거상 소모된 최대
-/// versionCode 는 14 이고 15 는 업로드되지 않은 후보였으므로 16 은 안전하게
-/// 그보다 크다. **이미 16 이상이 업로드돼 있다면 그보다 큰 최소값으로 올리고
-/// 이 테스트도 함께 갱신해야 한다** — 확인 책임은 업로드 직전 오너에게 있다.
+/// ⚠️ 외부 스토어 이력은 이 컨테이너에서 조회할 수 없다 — 위 vc18 근거는
+/// 오너가 Play Console 에서 직접 확인해 전달한 값이다. **이미 18 이상이
+/// 업로드돼 있다면 그보다 큰 최소값으로 올리고 이 테스트도 함께 갱신해야
+/// 한다** — 확인 책임은 업로드 직전 오너에게 있다.
 void main() {
-  test('pubspec version = 1.0.0+16 (versionName 1.0.0 / versionCode 16)', () {
+  test('pubspec version = 1.0.0+18 (versionName 1.0.0 / versionCode 18)', () {
     final String pubspec = File('pubspec.yaml').readAsStringSync();
     final RegExpMatch? m = RegExp(
       r'^version:\s*(\d+\.\d+\.\d+)\+(\d+)\s*$',
@@ -39,9 +40,9 @@ void main() {
     expect(m, isNotNull, reason: 'pubspec.yaml 에 version: x.y.z+N 이 없다');
     expect(m!.group(1), '1.0.0',
         reason: 'release-prebuild 수렴에서 versionName 을 1.0.0 으로 올린다');
-    expect(int.parse(m.group(2)!), 16,
-        reason: 'versionCode 15 는 수렴 릴리즈 후보였고 16 이 이번 출시 후보다 '
-            '(저장소 증거상 소모된 최대값 14 + 후보 15 → 16)');
+    expect(int.parse(m.group(2)!), 18,
+        reason: 'Play Console 실측(2026-08-06)상 16·17 은 이미 사용됐다 — '
+            '18 이 이번 출시 후보다(재상향 규칙은 파일 상단 주석)');
   });
 
   test('앱 표시 버전 상수가 pubspec versionName 과 일치한다', () {

@@ -68,7 +68,9 @@ class MentorFavoritesRepository {
       });
       return true;
     } catch (e) {
-      // 유니크 위반(이미 찜)은 성공으로 간주.
+      // 유니크 위반(이미 찜)은 성공으로 간주 — C25: PostgREST 오류코드(23505)
+      // 정본 판정. 문자열 매칭은 코드가 없는 드라이버 예외 대비 폴백으로만.
+      if (e is PostgrestException && e.code == '23505') return true;
       final String m = e.toString().toLowerCase();
       return m.contains('duplicate') || m.contains('unique');
     }

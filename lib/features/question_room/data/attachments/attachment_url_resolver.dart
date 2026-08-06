@@ -11,6 +11,10 @@ import 'attachment_upload.dart';
 /// ★ 캐시/만료 로직은 [AttachmentUrlResolver] 가 갖고, Supabase 구체 호출은 이
 ///   포트 뒤로 숨긴다 → 테스트는 fake 포트 + 가짜 시계로 캐시·만료를 검증한다.
 abstract class AttachmentUrlBackend {
+  /// 캐시 키 분리용 현재 사용자 id(계정 전환 시 이전 사용자 캐시 미재사용).
+  /// 미로그인이면 null. (N14: 리졸버가 프로세스 전역 공유가 되면서 필요해졌다.)
+  String? get currentUserId;
+
   /// storage_path → 서명 URL(만료 [expiresInSeconds]).
   Future<String> createSignedUrl(String storagePath, int expiresInSeconds);
 
@@ -30,9 +34,15 @@ class AttachmentUrlResolver {
   })  : _ttl = ttl,
         _now = now ?? DateTime.now;
 
-  /// 운영 기본 구현(Supabase Storage).
+  /// 운영 기본 구현(Supabase Storage) — **프로세스 전역 공유 인스턴스**.
+  ///
+  /// N14: 화면 State 가 리졸버를 각자 소유하면 재진입마다 캐시가 비어 전
+  /// 첨부의 서명 URL 을 재발급하고, URL(토큰)이 바뀌어 이미지 캐시까지
+  /// 무효화됐다. 같은 인스턴스를 돌려줘 화면 간·재진입 간 캐시를 잇는다.
   factory AttachmentUrlResolver.supabase() =>
-      AttachmentUrlResolver(const SupabaseAttachmentUrlBackend());
+      _shared ??= AttachmentUrlResolver(const SupabaseAttachmentUrlBackend());
+
+  static AttachmentUrlResolver? _shared;
 
   final AttachmentUrlBackend _backend;
   final Duration _ttl;
@@ -41,14 +51,17 @@ class AttachmentUrlResolver {
   final Map<String, _CachedUrl> _cache = <String, _CachedUrl>{};
 
   /// 서명 URL(만료 전이면 캐시 재사용). 만료 시각 이후엔 재발급.
+  /// 캐시 키에 사용자 id 를 포함한다 — 전역 공유 인스턴스에서 계정이 바뀌면
+  /// 이전 사용자 키로 발급한 URL 을 재사용하지 않는다(storage RLS 와 일관).
   Future<String> signedUrl(String storagePath) async {
-    final _CachedUrl? cached = _cache[storagePath];
+    final String key = '${_backend.currentUserId ?? ''}::$storagePath';
+    final _CachedUrl? cached = _cache[key];
     if (cached != null && _now().isBefore(cached.expiresAt)) {
       return cached.url;
     }
     final int seconds = _ttl.inSeconds;
     final String url = await _backend.createSignedUrl(storagePath, seconds);
-    _cache[storagePath] = _CachedUrl(url, _now().add(_ttl));
+    _cache[key] = _CachedUrl(url, _now().add(_ttl));
     return url;
   }
 
@@ -66,6 +79,9 @@ class _CachedUrl {
 /// Supabase Storage 백엔드(첨부 버킷).
 class SupabaseAttachmentUrlBackend implements AttachmentUrlBackend {
   const SupabaseAttachmentUrlBackend();
+
+  @override
+  String? get currentUserId => SupabaseInit.clientOrNull?.auth.currentUser?.id;
 
   SupabaseClient get _client {
     final SupabaseClient? c = SupabaseInit.clientOrNull;

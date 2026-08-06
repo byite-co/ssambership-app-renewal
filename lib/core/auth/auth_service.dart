@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../deeplink/deep_link_service.dart';
-import '../entitlement/entitlement.dart';
 import '../supabase/supabase_client.dart';
 import '../web_bridge/web_session_hygiene.dart';
 import 'account_status.dart';
@@ -22,11 +21,11 @@ enum AppRole { student, mentor, admin, guest }
 ///   (조회 실패는 재시도 가능 차단 — isRecoverableBlock 참고)
 enum AccessState { loading, loggedOut, guest, full, blocked }
 
-/// 인증 서비스 = 세션 + 프로필(role·계정상태·구독) 오케스트레이션.
+/// 인증 서비스 = 세션 + 프로필(role·계정상태) 오케스트레이션.
 ///
 /// ChangeNotifier 로 두어 GoRouter refreshListenable 로 진입 분기를 갱신한다.
 /// - 세션: Supabase 이메일+비밀번호 로그인 / 로그아웃 / 앱 재시작 시 복원·유지.
-/// - 프로필: 로그인 후 users.role, users.status(account_status), subscriptions(entitlement) read.
+/// - 프로필: 로그인 후 users 본인 행(role·표시명·상태) + 탈퇴 RPC 2종 read.
 class AuthService extends ChangeNotifier {
   AuthService._();
 
@@ -38,7 +37,6 @@ class AuthService extends ChangeNotifier {
   bool _roleFetchFailed = false;
   String _displayName = '';
   AccountState _account = AccountState.fetchFailed;
-  Entitlement _entitlement = Entitlement.none;
   StreamSubscription<AuthState>? _authSub;
 
   // ── 외부 노출 게터 ──
@@ -46,7 +44,6 @@ class AuthService extends ChangeNotifier {
   bool get isGuest => _guest;
   AppRole get currentRole => _role;
   AccountState get accountState => _account;
-  Entitlement get entitlement => _entitlement;
 
   /// 화면 표시용 이름(nickname 우선, 없으면 full_name, 둘 다 없으면 빈 문자열).
   /// 하드코딩하지 않는다 — users 프로필에 없으면 빈 값.
@@ -187,7 +184,27 @@ class AuthService extends ChangeNotifier {
     unawaited(_loadProfile().then((_) => notifyListeners()));
   }
 
-  Future<void> _loadProfile() async {
+  /// 진행 중인 프로필 로드(single-flight). 부팅의 직접 로드와 initialSession
+  /// 이벤트 로드, 로그인 직후 명시 로드와 signedIn 이벤트 로드가 각각 겹쳐
+  /// 같은 왕복을 두 번 하던 것을 하나로 합친다(C1).
+  Future<void>? _profileLoad;
+
+  Future<void> _loadProfile() {
+    final Future<void>? inFlight = _profileLoad;
+    if (inFlight != null) return inFlight;
+    final Future<void> load = _loadProfileOnce().whenComplete(() {
+      _profileLoad = null;
+    });
+    _profileLoad = load;
+    return load;
+  }
+
+  /// 마지막으로 '정상 이용 가능' 프로필을 로드한 사용자 id(N32).
+  /// 같은 사용자의 백그라운드 재로드(토큰 갱신 등)가 일시 조회 실패해도
+  /// 이 값이 일치하면 마지막 정상 프로필을 유지해 전면 차단 전이를 막는다.
+  String? _lastGoodProfileUid;
+
+  Future<void> _loadProfileOnce() async {
     final SupabaseClient? client = _client;
     final Session? session = _session;
     if (client == null || session == null) {
@@ -195,17 +212,84 @@ class AuthService extends ChangeNotifier {
       return;
     }
     final String userId = session.user.id;
-    // role 조회 '실패'(네트워크 등)는 '역할 없음(guest)'과 구분해 재시도 가능 차단으로.
-    final AppRole? role = await _readRole(client, userId);
+    // users 본인 행 1회 통합 조회(C1) — role·표시명·계정상태 판정이 같은 행을
+    // 나눠 쓴다(종전 3회 SELECT). 조회 '실패'(네트워크 등)는 '역할 없음(guest)'
+    // 과 구분해 재시도 가능 차단으로.
+    Map<String, dynamic>? userRow;
+    bool userRowFetchFailed = false;
+    try {
+      userRow = await client
+          .from('users')
+          .select('role, nickname, full_name, status, suspended_until')
+          .eq('id', userId)
+          .maybeSingle();
+    } catch (_) {
+      userRowFetchFailed = true;
+    }
+    final AppRole? role =
+        userRowFetchFailed ? null : _parseRole(userRow?['role'] as String?);
+    final AccountState account = await AccountStatusReader.resolve(
+      PrefetchedUserRowGateway(
+        inner: SupabaseAccountStatusGateway(client),
+        userRow: userRow,
+        userRowFetchFailed: userRowFetchFailed,
+      ),
+      userId,
+    );
+    // N32: 이미 정상 이용 중인 같은 사용자의 '일시 조회 실패'는 마지막 정상
+    // 프로필을 유지한다(사용 중 화면이 순간 차단 화면으로 튀지 않게).
+    // 서버가 '확정'한 차단(banned/suspended/탈퇴 — 조회 성공)은 즉시 반영되고,
+    // 최초 로드(부팅·로그인)의 실패는 종전대로 fail-closed 차단이다.
+    if (shouldRetainLastGoodProfile(
+      transientFetchFailure: role == null || account.isRetryable,
+      sameUserAsLastGood: _lastGoodProfileUid == userId,
+    )) {
+      return;
+    }
     _roleFetchFailed = role == null;
     _role = role ?? AppRole.guest;
-    _displayName = await _readDisplayName(client, userId);
-    _account = await AccountStatusReader.fetch(client, userId);
-    if (_role == AppRole.student) {
-      _entitlement = await EntitlementReader.fetchForStudent(client, userId);
-    } else {
-      _entitlement = Entitlement.none;
+    _displayName = _parseDisplayName(userRow);
+    _account = account;
+    // N31: 종전의 구독 자격 선조회(entitlement 캐시)는 소비처가 0인 죽은
+    // 캐시라 제거 — auth 이벤트마다 subscriptions 왕복 1회가 사라진다.
+    // 구독 여부가 필요한 표면은 각자 서버 정본을 조회한다(멘토 상세 등).
+    // '정상 이용 가능' 로드였을 때만 유지 기준점 갱신 — 확정 차단·역할 불명은
+    // 기준점을 지워 이후 일시 실패도 종전대로 차단 처리한다.
+    final bool usable = !_roleFetchFailed &&
+        account.allowsAppUse &&
+        (_role == AppRole.student || _role == AppRole.mentor);
+    _lastGoodProfileUid = usable ? userId : null;
+  }
+
+  /// N32 유지 판정(단위 테스트 진입점) — '일시 조회 실패' + '같은 사용자의
+  /// 정상 프로필이 이미 있음'일 때만 true. 확정 차단(조회 성공)은 해당 없음.
+  @visibleForTesting
+  static bool shouldRetainLastGoodProfile({
+    required bool transientFetchFailure,
+    required bool sameUserAsLastGood,
+  }) =>
+      transientFetchFailure && sameUserAsLastGood;
+
+  /// role 파싱. 값 없음/미지 값 → guest(비복구 차단). (조회 실패는 호출부에서
+  /// null 로 구분한다 — 재시도 가능 차단.)
+  static AppRole _parseRole(String? raw) {
+    switch (raw?.trim()) {
+      case 'student':
+        return AppRole.student;
+      case 'mentor':
+        return AppRole.mentor;
+      case 'admin':
+        return AppRole.admin;
+      default:
+        return AppRole.guest;
     }
+  }
+
+  /// 표시용 이름 파싱(nickname 우선, 없으면 full_name, 둘 다 없으면 '').
+  static String _parseDisplayName(Map<String, dynamic>? row) {
+    final String nickname = (row?['nickname'] as String?)?.trim() ?? '';
+    if (nickname.isNotEmpty) return nickname;
+    return (row?['full_name'] as String?)?.trim() ?? '';
   }
 
   void _resetProfile() {
@@ -213,46 +297,7 @@ class AuthService extends ChangeNotifier {
     _roleFetchFailed = false;
     _displayName = '';
     _account = AccountState.fetchFailed;
-    _entitlement = Entitlement.none;
-  }
-
-  /// role read. 값 없음 → guest(비복구 차단), 조회 실패 → null(재시도 가능 차단).
-  Future<AppRole?> _readRole(SupabaseClient client, String userId) async {
-    try {
-      final Map<String, dynamic>? row = await client
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle();
-      switch ((row?['role'] as String?)?.trim()) {
-        case 'student':
-          return AppRole.student;
-        case 'mentor':
-          return AppRole.mentor;
-        case 'admin':
-          return AppRole.admin;
-        default:
-          return AppRole.guest;
-      }
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// 표시용 이름 read(RLS: 본인 행만). nickname 우선, 없으면 full_name, 둘 다 없으면 ''.
-  Future<String> _readDisplayName(SupabaseClient client, String userId) async {
-    try {
-      final Map<String, dynamic>? row = await client
-          .from('users')
-          .select('nickname, full_name')
-          .eq('id', userId)
-          .maybeSingle();
-      final String nickname = (row?['nickname'] as String?)?.trim() ?? '';
-      if (nickname.isNotEmpty) return nickname;
-      return (row?['full_name'] as String?)?.trim() ?? '';
-    } catch (_) {
-      return '';
-    }
+    _lastGoodProfileUid = null; // 계정 전환 시 이전 사용자 프로필 유지 금지(N32).
   }
 
   /// 이메일+비밀번호 로그인. 실패 시 AuthException 전파(화면에서 안내).

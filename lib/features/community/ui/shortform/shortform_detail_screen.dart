@@ -84,6 +84,17 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
+  /// C6: ReactionBar 표시용 실개수(로드 완료 시 갱신 — 0 하드코딩 제거).
+  int _commentCount = 0;
+
+  Future<List<CommunityComment>> _fetchComments() =>
+      widget.read.comments(CommunityPostType.shortform, widget.post.id).then(
+        (List<CommunityComment> list) {
+          if (mounted) setState(() => _commentCount = list.length);
+          return list;
+        },
+      );
+
   /// 조회 기록 v2 의 이벤트 키 — **화면 노출(초기 진입) 1회당 1개**(UUID v4).
   /// late final 필드라 리빌드·setState 에도 재생성되지 않는다. 실패해도 새
   /// 키로 재시도하지 않는다(멱등 계약 — 중복 가산 0). 테스트 검증용 공개.
@@ -91,6 +102,10 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
 
   bool _liked = false;
   bool _scrapped = false;
+
+  /// C8: 이 상세에서 목록 표시에 영향 주는 변경(반응·댓글)이 있었는지 —
+  /// 뒤로가기에도 피드에 전달해 재조회시킨다(차단 pop(true)와 동일 계약).
+  bool _changed = false;
   late int _likeCount;
   bool _busy = false;
 
@@ -109,8 +124,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
-    _comments =
-        widget.read.comments(CommunityPostType.shortform, widget.post.id);
+    _comments = _fetchComments();
     _loadReactionState();
     _loadMedia();
     // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
@@ -187,14 +201,19 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   /// 현재 사용자의 기존 숏폼 반응(좋아요/스크랩)을 로드해 초기 상태에 반영(게시판과 동일 패턴).
   Future<void> _loadReactionState() async {
     try {
-      final Set<String> liked = await widget.read
-          .myShortformReactionIds(CommunityWriteRepository.reactionLike);
-      final Set<String> scrap = await widget.read
-          .myShortformReactionIds(CommunityWriteRepository.reactionScrap);
+      // C9: 이 숏폼 1건으로 서버 필터 + 좋아요·스크랩 병렬 조회.
+      final List<Set<String>> rs = await Future.wait(<Future<Set<String>>>[
+        widget.read.myShortformReactionIds(
+            CommunityWriteRepository.reactionLike,
+            shortformId: widget.post.id),
+        widget.read.myShortformReactionIds(
+            CommunityWriteRepository.reactionScrap,
+            shortformId: widget.post.id),
+      ]);
       if (!mounted) return;
       setState(() {
-        _liked = liked.contains(widget.post.id);
-        _scrapped = scrap.contains(widget.post.id);
+        _liked = rs[0].contains(widget.post.id);
+        _scrapped = rs[1].contains(widget.post.id);
       });
     } catch (_) {
       // 반응 상태 조회 실패는 화면을 막지 않는다(기본 미반응).
@@ -233,6 +252,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         type: CommunityWriteRepository.reactionLike,
         on: next,
       );
+      _changed = true; // C8: 피드 좋아요 수 stale 방지
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -252,6 +272,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
         type: CommunityWriteRepository.reactionScrap,
         on: next,
       );
+      _changed = true; // C8
       _snack(next ? '스크랩했어요.' : '스크랩을 해제했어요.');
     } catch (e) {
       if (!mounted) return;
@@ -312,8 +333,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
     );
     if (blocked && mounted) {
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     }
   }
@@ -342,10 +362,10 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
     try {
       await widget.write.deleteMyShortformComment(commentId);
       if (!mounted) return;
+      _changed = true; // C8: 피드 댓글 수 stale 방지
       _snack('댓글을 삭제했어요.');
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     } catch (e) {
       _snack('댓글 삭제에 실패했어요. ${friendlyError(e)}');
@@ -367,9 +387,9 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
       );
       if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
+      _changed = true; // C8
       setState(() {
-        _comments =
-            widget.read.comments(CommunityPostType.shortform, widget.post.id);
+        _comments = _fetchComments();
       });
     } catch (e) {
       _snack('댓글 등록에 실패했어요. ${friendlyError(e)}');
@@ -386,6 +406,17 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final ShortformPost p = widget.post;
+    // C8: 뒤로가기에도 변경 여부(_changed)를 피드에 전달(board 상세와 동일 패턴).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) Navigator.of(context).pop(_changed);
+      },
+      child: _buildScaffold(p),
+    );
+  }
+
+  Widget _buildScaffold(ShortformPost p) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('숏폼'),
@@ -438,7 +469,7 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
                         liked: _liked,
                         scrapped: _scrapped,
                         likeCount: _likeCount,
-                        commentCount: 0,
+                        commentCount: _commentCount,
                         onToggleLike: _toggleLike,
                         onToggleScrap: _toggleScrap,
                         onReport: _report,

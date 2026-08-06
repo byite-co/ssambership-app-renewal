@@ -14,6 +14,7 @@ import '../../shared/errors/friendly_error.dart';
 import 'data/app_notification.dart';
 import 'data/notification_badge_controller.dart';
 import 'data/notifications_realtime.dart';
+import '../../shared/widgets/screen_visibility.dart';
 import 'data/notifications_repository.dart';
 import 'ui/notification_target_opener.dart';
 import 'ui/widgets/notification_card.dart';
@@ -41,7 +42,7 @@ int appendNotificationsDeduped(
 /// ★ 조회·읽음 중심. 알림 '생성'은 서버/푸시 몫. 환불·미지 타입은 노출하고
 ///   목록 밖 타입은 '기타'로 일반 표시한다. 맞춤의뢰(CR) 2종은 게이트 OFF
 ///   (2026-07 출시)로 레포 쿼리 단계에서 제외돼 표시·필터·딥링크에 나타나지
-///   않는다(서버 계약 17종은 불변 — notification_types 참조).
+///   않는다(서버 계약 18종은 불변 — notification_types 참조).
 ///   이동은 [notificationDestinationOf] 허용 목적지(탭 수준)만 — stay 타입
 ///   (unknown 등)은 읽음 처리만 하고 이동하지 않는다.
 class NotificationsScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
   static const int _pageSize = 20;
 
   /// 필터 칩 구성('기타' 는 전용 칩 없이 전체에서만 노출).
@@ -131,9 +132,18 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 앱 복귀 — 백그라운드 동안의 수신 공백을 첫 페이지 + 개수 재조회로 메운다.
     if (state == AppLifecycleState.resumed) {
-      _load();
+      // ★ 배지 refresh 는 가시성 게이트 밖 — 탭 아이콘 배지는 어느 탭에
+      //   있어도 보이는 전역 표시라 복귀 즉시 갱신한다(N24 코얼레싱·
+      //   single-flight 라 중복 호출 안전).
       _badge.refresh();
+      handleResumed();
     }
+  }
+
+  // N12: 목록 재조회는 보일 때만(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _load();
   }
 
   void _onRefreshSignal() {
@@ -235,7 +245,15 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
-  int get _unreadCount => _items.where((AppNotification n) => !n.isRead).length;
+  /// 로드된 목록 기준 로컬 미읽음(첫 페이지 범위) — 서버 값 폴백 전용.
+  int get _localUnreadCount =>
+      _items.where((AppNotification n) => !n.isRead).length;
+
+  /// N27: 미읽음 정본은 서버 배지 개수(notification_unread_count_self)다.
+  /// 목록은 키셋 첫 페이지만 들고 있어 로컬 계산은 페이지 밖 미읽음을 놓치고,
+  /// '모두 읽음' 버튼이 사라지는 상태가 생겼다 — 서버 값 미확인(null)일 때만
+  /// 로컬로 폴백한다(하단 탭 배지와 단일 소스).
+  int _effectiveUnread(int? server) => server ?? _localUnreadCount;
 
   List<AppNotification> get _filtered => _items.where((AppNotification n) {
         if (_kind != null && n.kind != _kind) return false;
@@ -258,7 +276,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   Future<void> _markAll() async {
-    if (_unreadCount == 0) return;
+    if (_effectiveUnread(_badge.count.value) == 0) return;
     try {
       // 서버 RPC 가 본인 미읽음 전체를 갱신 — id 목록을 보내지 않는다.
       await _repo.markAllRead();
@@ -338,21 +356,30 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             AppSpacing.s8,
             AppSpacing.s12,
           ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                // D1-D: 미읽음 수를 카운트 배지로(스캔성↑). 0이면 배지 숨김.
-                child: Row(
-                  children: <Widget>[
-                    const Text('안 읽음', style: AppType.title),
-                    const SizedBox(width: 8),
-                    CountBadge(count: _unreadCount),
-                  ],
-                ),
-              ),
-              if (_unreadCount > 0)
-                TextButton(onPressed: _markAll, child: const Text('모두 읽음')),
-            ],
+          // N27: 헤더 카운트·'모두 읽음' 노출을 서버 배지 정본으로(탭 배지와
+          // 단일 소스). 서버 미확인일 때만 로컬(첫 페이지) 폴백.
+          child: ValueListenableBuilder<int?>(
+            valueListenable: _badge.count,
+            builder: (BuildContext context, int? server, Widget? _) {
+              final int unread = _effectiveUnread(server);
+              return Row(
+                children: <Widget>[
+                  Expanded(
+                    // D1-D: 미읽음 수를 카운트 배지로(스캔성↑). 0이면 배지 숨김.
+                    child: Row(
+                      children: <Widget>[
+                        const Text('안 읽음', style: AppType.title),
+                        const SizedBox(width: 8),
+                        CountBadge(count: unread),
+                      ],
+                    ),
+                  ),
+                  if (unread > 0)
+                    TextButton(
+                        onPressed: _markAll, child: const Text('모두 읽음')),
+                ],
+              );
+            },
           ),
         ),
         Padding(

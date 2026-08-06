@@ -18,10 +18,11 @@ const String kPbxprojPath = 'ios/Runner.xcodeproj/project.pbxproj';
 const String kPodfilePath = 'ios/Podfile';
 const String kRunbookPath = 'docs/IOS_RELEASE_RUNBOOK.md';
 
-/// 버전 고정(§7 런북 버전 규약). release-prebuild 수렴(2026-08-05)에서 출시 후보
-/// `1.0.0+16` 으로 올렸다 — 근거와 재상향 규칙은 `test/app/build_version_test.dart`
-/// 주석 참조. 실제 업로드용 release 커밋에서 다시 올릴 때 이 상수를 함께 갱신한다.
-const String kPinnedPubspecVersion = 'version: 1.0.0+16';
+/// 버전 고정(§7 런북 버전 규약). Play Console 실측(2026-08-06)상 build 16·17 이
+/// 이미 사용돼 출시 후보를 `1.0.0+18` 로 올렸다 — 근거와 재상향 규칙은
+/// `test/app/build_version_test.dart` 주석 참조. 실제 업로드용 release 커밋에서
+/// 다시 올릴 때 이 상수를 함께 갱신한다.
+const String kPinnedPubspecVersion = 'version: 1.0.0+18';
 
 /// iOS 번들 ID 계약(HANDOFF §3-6, 2026-07-22 패키지 계약).
 /// App Store Connect 첫 업로드 후 변경 불가 — 변경은 오너 결정으로만(런북 §3).
@@ -156,9 +157,26 @@ void main() {
           reason: 'ATS 전면 해제는 심사 사유 요구 대상 — 도입 금지');
     });
 
-    test('권한 문구(사진·카메라)는 유지', () {
-      expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
-      expect(plist, contains('<key>NSCameraUsageDescription</key>'));
+    test('권한 문구(사진·카메라·마이크)는 유지 — 키+비어있지 않은 문구 쌍으로 검사', () {
+      // ★ contains(키) 단독 검사는 주석 처리·빈 <string/> 회귀를 못 잡는다
+      //   (PrivacyInfo 테스트의 '주석 오탐 차단'과 동일 원칙). 키 바로 다음
+      //   줄의 <string> 값이 비어 있지 않은 '실제 선언'만 인정한다.
+      for (final String key in <String>[
+        'NSPhotoLibraryUsageDescription',
+        'NSCameraUsageDescription',
+        // 숏폼 WebView 영상 촬영은 마이크 권한을 함께 요구한다 — 키가 빠지면
+        // '촬영' 선택 순간 TCC 강제 종료(2026-08 실기기 크래시 교정, 런북 §2).
+        'NSMicrophoneUsageDescription',
+      ]) {
+        expect(
+          RegExp('^\\t<key>$key</key>\\n\\t<string>[^<]+</string>',
+                  multiLine: true)
+              .hasMatch(plist),
+          isTrue,
+          reason: '$key: 주석 밖 + 비어있지 않은 사용 사유 문구가 필요하다'
+              '(빈 문구는 심사·런타임 문제, 키 부재는 해당 기능 진입 시 크래시)',
+        );
+      }
     });
   });
 

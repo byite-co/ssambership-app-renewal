@@ -44,6 +44,10 @@ flutter run
 
 ## 출시 빌드
 ```bash
+# ★ 필수 preflight — production .env 검증(secret 미출력, FAIL 이면 빌드 중단)
+#   SENTRY_DSN 존재 · SENTRY_ENVIRONMENT=production · Supabase 정본 URL 정확 일치 · anon key
+dart run tool/validate_release_env.dart
+
 flutter build appbundle     # Play Store 업로드용 .aab → build/app/outputs/bundle/release/
 flutter build apk           # 직접 배포용 .apk (필요 시)
 ```

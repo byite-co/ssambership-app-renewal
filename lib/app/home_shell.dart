@@ -12,6 +12,7 @@ import '../features/notifications/data/notification_badge_controller.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
@@ -37,6 +38,12 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   late int _index;
 
+  /// N13: 방문한 탭만 실제 화면을 빌드한다(lazy). IndexedStack 이 5개 탭을
+  /// 기동 즉시 전부 마운트해 각 탭의 initState 로드(질문방 체인·커뮤니티
+  /// 3종·알림 목록+실시간 구독 등)가 한꺼번에 발화하던 시작 팬아웃을 없앤다.
+  /// 한 번 방문한 탭은 계속 살아 있어(IndexedStack) 상태·스크롤이 유지된다.
+  final List<bool> _built = List<bool>.filled(_pages.length, false);
+
   static const List<Widget> _pages = <Widget>[
     QuestionRoomScreen(),
     CommunityScreen(),
@@ -59,6 +66,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     // 게스트는 접근 가능한 탭(멘토 찾기=2)에서 시작.
     _index = AuthService.instance.isGuest ? 2 : 0;
+    _built[_index] = true; // N13: 시작 탭만 빌드.
     // 알림 딥링크 등 앱 내 탭 전환 요청 수신.
     TabNavigator.request.addListener(_onTabRequest);
     // 로그인 사용자 — 알림 배지 서버 개수 1회 조회(이후는 실시간·화면이 갱신).
@@ -96,7 +104,12 @@ class _HomeShellState extends State<HomeShell> {
     }
     // 알림 탭 선택(재선택 포함) — 살아 있는 알림 화면에 재조회 신호.
     if (i == AppTab.notifications) DataRefreshBus.bumpNotifications();
-    setState(() => _index = i);
+    // 질문방 탭 선택(재선택 포함) — 학생 목록·멘토 인박스 재조회 신호(N35).
+    if (i == AppTab.questionRoom) DataRefreshBus.bumpQuestionRooms();
+    setState(() {
+      _index = i;
+      _built[i] = true; // N13: 첫 방문 시점에 빌드.
+    });
   }
 
   /// 우측 상단 프로필(원형) → 마이페이지 push. 게스트는 로그인 안내로 보낸다.
@@ -137,7 +150,22 @@ class _HomeShellState extends State<HomeShell> {
       body: Column(
         children: <Widget>[
           const WithdrawalPendingBanner(),
-          Expanded(child: IndexedStack(index: _index, children: _pages)),
+          Expanded(
+            child: IndexedStack(
+              index: _index,
+              children: <Widget>[
+                // N13: 미방문 탭은 빈 자리표시자 — 첫 방문 때 실제 화면으로
+                // 교체되고 이후에는 계속 살아 있다(상태 유지).
+                // N12: 활성 탭 여부를 ScreenVisibility 로 알려 복귀(resumed)
+                // 재조회가 보이는 탭에서만 즉시 돌게 한다(나머지는 재방문 시).
+                for (int i = 0; i < _pages.length; i++)
+                  ScreenVisibility(
+                    visible: i == _index,
+                    child: _built[i] ? _pages[i] : const SizedBox.shrink(),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

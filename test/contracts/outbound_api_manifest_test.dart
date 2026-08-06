@@ -22,18 +22,19 @@ const Set<String> kExpectedRpcNames = <String>{
   // 프로필
   'user_profile_update_self',
   // 질문방(qna_*)
+  'ensure_free_question_room', // api_app_v1 — 무료질문 첫 진입 시 방 보장(N1)
   'qna_append_message',
   'qna_confirm_thread',
   'qna_create_free_question_thread',
   'qna_create_question_thread',
   'qna_register_attachment',
-  'get_weekly_question_usage',
+  'weekly_question_usage_self',
+  'weekly_question_usage_self_batch',
   'get_mentor_student_nicknames',
   // 멘토 찾기
   'get_mentor_avg_response_hours',
   // 개별질문
   'add_individual_question_attachment',
-  'answer_individual_question',
   'claim_individual_question_as_mentor',
   'create_individual_question_as_student',
   'iq_append_message',
@@ -42,7 +43,8 @@ const Set<String> kExpectedRpcNames = <String>{
   'release_individual_question',
   // 커뮤니티
   'community_comment_soft_delete_self',
-  'increment_community_post_view',
+  'community_post_soft_delete',
+  'community_post_view_record_v2',
   'shortform_view_record_v2',
   // 알림
   'mark_all_notifications_read',
@@ -64,6 +66,7 @@ const Set<String> kExpectedSchemas = <String>{'api_app_v1', 'api_web_v1'};
 
 const Set<String> kExpectedSchemaIdentifiers = <String>{
   'kBoardPostCreateSchema',
+  'schema', // comments_gateway seam 파라미터(N5 — api_web_v1 뷰 읽기)
 };
 
 /// DB 테이블/뷰(문자열 리터럴 from) — 읽기/쓰기 표면 전체.
@@ -72,8 +75,9 @@ const Set<String> kExpectedTables = <String>{
   'users', // ★ SELECT 전용 — update 체인 금지는 아래 별도 테스트.
   'subscriptions',
   'subscription_settlement_items',
-  'cash_wallets',
-  'cash_ledger',
+  // N5: 지갑·캐시내역 읽기는 본인 한정 invoker 뷰(api_web_v1)로 이행.
+  'my_wallet_v1',
+  'my_cash_ledger_v1',
   'notifications',
   // 질문방
   'mentor_student_rooms',
@@ -93,6 +97,8 @@ const Set<String> kExpectedTables = <String>{
   'mentor_individual_question_pricing',
   // 커뮤니티(계약 수렴: 게시판 읽기는 뷰)
   'community_posts_v1',
+  // ★ community_comments_v1(N5 게시판 댓글 읽기 뷰)은 comments_gateway 의
+  //   table seam 파라미터로 넘어가므로 from-리터럴 집합엔 나타나지 않는다.
   'shortform_posts',
   'post_reactions',
   'shortform_reactions',
@@ -109,7 +115,6 @@ const Set<String> kExpectedTableIdentifiers = <String>{
 /// Storage 버킷 — 전부 상수 경유(리터럴 from 은 0건).
 const Set<String> kExpectedBucketIdentifiers = <String>{
   'bucket',
-  'attachmentBucket',
   'IndividualQuestionRepository.attachmentBucket',
   'SupabaseAttachmentUploader.bucket',
   'InkStoragePaths.annotationBucket',

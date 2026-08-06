@@ -67,7 +67,8 @@ class _MutableRead extends CommunityReadRepository {
       List<CommunityComment>.of(commentsData);
 
   @override
-  Future<Set<String>> myBoardReactionIds(String reactionType) async =>
+  Future<Set<String>> myBoardReactionIds(String reactionType,
+          {String? postId}) async =>
       <String>{};
 }
 

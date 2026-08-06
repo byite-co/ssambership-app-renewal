@@ -8,6 +8,11 @@ import 'package:ssambership_app/features/question_room/ui/attachment_viewer_scre
 
 class _FakeBackend implements AttachmentUrlBackend {
   @override
+  String? get currentUserId => userId;
+
+  String? userId;
+
+  @override
   Future<String> createSignedUrl(String storagePath, int expiresInSeconds) async =>
       'https://example.test/$storagePath';
 

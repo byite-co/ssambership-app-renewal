@@ -20,6 +20,7 @@ import 'ui/sections/student_subscription_section.dart';
 import 'ui/sections/support_section.dart';
 import '../../shared/errors/friendly_error.dart';
 import '../../shared/widgets/withdrawal_pending_banner.dart';
+import '../../shared/widgets/screen_visibility.dart';
 
 /// 마이페이지(보강) — 조회 중심 대시보드. role(student/mentor)별로 내용이 다르다.
 /// ★ Commerce-Zero: 결제·충전·정산 출금은 앱에서 실행하지 않고 '웹'으로만 연결한다.
@@ -50,7 +51,8 @@ class MyPageScreen extends StatefulWidget {
 }
 
 class _MyPageScreenState extends State<MyPageScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final MyPageRepository _repo = const MyPageRepository();
 
   /// v19 보정1: 마지막 '정상 완료' MyPageData 스냅샷 — 이후 재조회가 어떤
@@ -84,7 +86,13 @@ class _MyPageScreenState extends State<MyPageScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _reload();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _reload();
   }
 
   @override

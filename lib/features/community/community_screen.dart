@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design/role_accent.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
+import '../../shared/widgets/screen_visibility.dart';
 import 'data/community_read_repository.dart';
 import 'data/community_write_repository.dart';
 import 'ui/activity/my_activity_view.dart';
@@ -31,7 +32,10 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with
+        SingleTickerProviderStateMixin,
+        WidgetsBindingObserver,
+        ResumeVisibilityGate {
   static const int _boardTab = 1;
 
   late final TabController _tab;
@@ -56,14 +60,18 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // 세대 토큰이 있는 paginator.refresh 라 무한 새로고침·stale 덮어쓰기 없음.
-      // §4-3: 관리자 숨김·복구는 board 만의 일이 아니다 — 3개 탭을 모두 재조회한다
-      // (살아 있는 탭만 반응: currentState 가 null 이면 다음 진입 시 어차피 fresh).
-      _boardKey.currentState?.reload();
-      _shortformKey.currentState?.reload();
-      _activityKey.currentState?.reload();
-    }
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    // 세대 토큰이 있는 paginator.refresh 라 무한 새로고침·stale 덮어쓰기 없음.
+    // §4-3: 관리자 숨김·복구는 board 만의 일이 아니다 — 3개 탭을 모두 재조회한다
+    // (살아 있는 탭만 반응: currentState 가 null 이면 다음 진입 시 어차피 fresh).
+    _boardKey.currentState?.reload();
+    _shortformKey.currentState?.reload();
+    _activityKey.currentState?.reload();
   }
 
   @override

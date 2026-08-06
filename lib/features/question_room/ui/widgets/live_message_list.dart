@@ -29,6 +29,8 @@ class LiveMessageList extends StatefulWidget {
     this.onOpenImage,
     this.onOpenFile,
     this.onAttachmentInsert,
+    this.hasEarlier = false,
+    this.onLoadEarlier,
   });
 
   final ThreadMessagesController controller;
@@ -54,6 +56,13 @@ class LiveMessageList extends StatefulWidget {
   /// 첨부 행 insert 실시간 수신 시(부모가 첨부 재조회). publication 에
   /// question_attachments 가 포함돼 있을 때만 도착한다(웹 117 마이그레이션).
   final VoidCallback? onAttachmentInsert;
+
+  /// N21: 이전 페이지가 더 있을 수 있으면 목록 상단에 '이전 대화 불러오기'
+  /// 를 노출한다. [onLoadEarlier] 가 null 이면 미노출(하위호환).
+  final bool hasEarlier;
+
+  /// '이전 대화 불러오기' 탭 — 부모가 이전 페이지를 controller 에 합친다.
+  final Future<void> Function()? onLoadEarlier;
 
   @override
   State<LiveMessageList> createState() => _LiveMessageListState();
@@ -85,10 +94,59 @@ class _LiveMessageListState extends State<LiveMessageList> {
     super.dispose();
   }
 
+  /// N21: 이전 페이지 prepend 시 '맨 아래 점프'를 막고 **실제 스크롤 앵커를
+  /// 보존**한다 — prepend 직전 좌표(pixels·maxScrollExtent)를 notify 시점에
+  /// 실측하고, 다음 프레임에서 늘어난 extent 만큼(offset + extentDelta) 보정
+  /// 점프한다. 이 리스트는 non-reverse(ListView 기본 좌표계)다 — 위쪽 삽입은
+  /// maxScrollExtent 증가로 나타나므로 델타 가산이 viewport 를 유지시킨다.
+  bool _suppressNextJump = false;
+  bool _loadingEarlier = false;
+
   void _onChanged() {
     if (!mounted) return;
+    if (_suppressNextJump) {
+      _suppressNextJump = false;
+      // prepend 리빌드 '직전' 실측 — 로드 대기 중 사용자가 스크롤했어도
+      // 이 시점 좌표가 사용자가 보고 있던 진짜 위치다.
+      final bool hasClients = _scroll.hasClients;
+      final double oldOffset = hasClients ? _scroll.position.pixels : 0;
+      final double oldMax = hasClients ? _scroll.position.maxScrollExtent : 0;
+      setState(() {});
+      if (hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scroll.hasClients) return;
+          final ScrollPosition pos = _scroll.position;
+          final double extentDelta = pos.maxScrollExtent - oldMax;
+          if (extentDelta <= 0) return; // 삽입 없음 — 보정 불요.
+          final double target = (oldOffset + extentDelta)
+              .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+          // 애니메이션 대신 결정론적 jumpTo — 접근성 포커스·후속 제스처와
+          // 경합하지 않는다.
+          pos.jumpTo(target);
+        });
+      }
+      return;
+    }
     setState(() {});
     _jumpToEndSoon();
+  }
+
+  Future<void> _loadEarlier() async {
+    final Future<void> Function()? load = widget.onLoadEarlier;
+    if (load == null || _loadingEarlier) return;
+    setState(() => _loadingEarlier = true);
+    _suppressNextJump = true;
+    try {
+      await load();
+    } catch (_) {
+      // 로드 실패 — 기존 목록 유지, 버튼이 남아 재시도 가능(호출부가 별도
+      // 안내를 하지 않아도 크래시로 새지 않는다).
+    } finally {
+      // 로드가 행을 못 붙였으면(실패·빈 페이지) notify 가 없어 플래그가
+      // 남는다 — 다음 정상 수신이 점프를 건너뛰지 않게 해제한다.
+      _suppressNextJump = false;
+      if (mounted) setState(() => _loadingEarlier = false);
+    }
   }
 
   void _jumpToEndSoon() {
@@ -107,12 +165,24 @@ class _LiveMessageListState extends State<LiveMessageList> {
         child: Text(widget.emptyHint, style: AppType.caption),
       );
     }
+    // N21: 상단 '이전 대화 불러오기'(이전 페이지가 있을 수 있을 때만).
+    final bool showEarlier = widget.hasEarlier && widget.onLoadEarlier != null;
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
-      itemCount: rows.length,
-      itemBuilder: (BuildContext context, int i) => rows[i].child,
+      itemCount: rows.length + (showEarlier ? 1 : 0),
+      itemBuilder: (BuildContext context, int i) {
+        if (showEarlier && i == 0) {
+          return Center(
+            child: TextButton(
+              onPressed: _loadingEarlier ? null : _loadEarlier,
+              child: Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+            ),
+          );
+        }
+        return rows[i - (showEarlier ? 1 : 0)].child;
+      },
     );
   }
 
@@ -124,9 +194,8 @@ class _LiveMessageListState extends State<LiveMessageList> {
     final List<QuestionMessage> messages = widget.controller.items;
     final AttachmentUrlResolver? resolver = widget.resolver;
 
-    final List<QuestionAttachment> atts = resolver == null
-        ? const <QuestionAttachment>[]
-        : widget.attachments;
+    final List<QuestionAttachment> atts =
+        resolver == null ? const <QuestionAttachment>[] : widget.attachments;
     final Set<String> msgIds =
         messages.map((QuestionMessage m) => m.id).toSet();
     final Map<String, List<QuestionAttachment>> linked =
@@ -146,7 +215,8 @@ class _LiveMessageListState extends State<LiveMessageList> {
       final bool mine =
           widget.currentUid != null && m.authorId == widget.currentUid;
       final List<Widget> chips = <Widget>[
-        for (final QuestionAttachment a in linked[m.id] ?? const <QuestionAttachment>[])
+        for (final QuestionAttachment a
+            in linked[m.id] ?? const <QuestionAttachment>[])
           _attachmentWidget(a, resolver!),
       ];
       rows.add(_Row(

@@ -7,7 +7,6 @@ import 'package:ssambership_app/core/ink/ink_document.dart';
 import 'package:ssambership_app/core/scan/picked_image.dart';
 import 'package:ssambership_app/core/scan/scan_source_picker.dart';
 import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
-import 'package:ssambership_app/features/individual_question/data/iq_annotation_repository.dart';
 import 'package:ssambership_app/features/individual_question/data/iq_attachments_repository.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_create_screen.dart';
@@ -237,7 +236,11 @@ void main() {
     });
   });
 
-  group('멘토 · 상세 화면 첨삭하기(§4-1·§4-3)', () {
+  group('멘토 · 상세 화면 첨삭하기 — 폐쇄(2026-08)', () {
+    // ★ 첨삭 기능이 제품에서 닫혀 있는 동안 진입 버튼을 노출하지 않는다
+    //   (버튼만 남고 기능이 막힌 반쪽 상태 금지). 재개 시 _canAnnotateGroup
+    //   게이트 원복과 함께 과거 흐름 테스트(git 이력 이 파일 2026-08 이전)를
+    //   되살릴 것.
     IqDetailData data({
       IndividualQuestionStatus status = IndividualQuestionStatus.claimed,
       List<IqAttachment> attachments = const <IqAttachment>[_studentImage],
@@ -248,15 +251,25 @@ void main() {
           attachments: attachments,
         );
 
-    testWidgets('멘토에게만 첨삭하기가 보인다(학생은 비노출)', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async => data(),
-      )));
-      await tester.pumpAndSettle();
-      expect(find.text('첨삭하기'), findsOneWidget);
+    testWidgets('멘토에게도 첨삭하기가 보이지 않는다(활성 상태·학생 첨부 포함)',
+        (WidgetTester tester) async {
+      for (final IndividualQuestionStatus status in <IndividualQuestionStatus>[
+        IndividualQuestionStatus.claimed,
+        IndividualQuestionStatus.answered,
+      ]) {
+        await tester.pumpWidget(_wrap(IqDetailScreen(
+          questionId: 'q-1',
+          roleOverride: AppRole.mentor,
+          loaderOverride: () async => data(status: status),
+        )));
+        await tester.pumpAndSettle();
+        expect(find.text('첨삭하기'), findsNothing, reason: '$status');
+        // 조회·저장(다운로드)은 폐쇄와 무관하게 유지된다.
+        expect(find.text('저장'), findsOneWidget, reason: '$status');
+      }
+    });
 
+    testWidgets('학생에게도 첨삭하기 비노출(기존과 동일)', (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(IqDetailScreen(
         questionId: 'q-1',
         roleOverride: AppRole.student,
@@ -264,166 +277,6 @@ void main() {
       )));
       await tester.pumpAndSettle();
       expect(find.text('첨삭하기'), findsNothing);
-    });
-
-    testWidgets('작성자 미확인 레거시 첨부에는 첨삭하기가 열리지 않는다(추측 금지)',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async => data(attachments: const <IqAttachment>[
-          IqAttachment(
-            id: 'legacy-1',
-            storagePath: 'q-1/legacy.png',
-            fileName: '레거시.png',
-            mimeType: 'image/png',
-          ),
-        ]),
-      )));
-      await tester.pumpAndSettle();
-
-      expect(find.text('첨삭하기'), findsNothing);
-      expect(find.text('저장'), findsOneWidget); // 조회·저장은 유지.
-    });
-
-    testWidgets('answered 에서도 첨삭하기 유지 — 완료 결과는 대기 첨부로만 추가(즉시 등록 0)',
-        (WidgetTester tester) async {
-      final _FakeStore store = _FakeStore();
-      final _FakeIqAttachments uploads = _FakeIqAttachments();
-
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async =>
-            data(status: IndividualQuestionStatus.answered),
-        attachmentsOverride: uploads,
-        annotationsOverride: IqAnnotationRepository(store: store),
-        annotateLauncherOverride: (IqAnnotateRequest r) async =>
-            AnnotationResult(document: _doc(), flattenedPng: _flatPng()),
-      )));
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(find.text('첨삭하기'));
-      await tester.tap(find.text('첨삭하기'));
-      await tester.pumpAndSettle();
-
-      // 즉시 업로드·등록 0 — 대기 첨부로만 추가된다.
-      expect(uploads.uploaded, isEmpty);
-      expect(find.textContaining('문제-ink.png'), findsOneWidget);
-      // ink.json 은 원본 첨부 id 경로에 저장(이어 그리기 유지).
-      expect(store.objects.containsKey('q-1/annotations/src-1.json'), isTrue);
-    });
-
-    testWidgets('첫 답변 등록 → 첨삭본이 반환된 멘토 message_id 로 등록된다(§4-3)',
-        (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1080, 3200);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-      final _FakeStore store = _FakeStore();
-      final _FakeIqAttachments uploads = _FakeIqAttachments();
-      final List<(String, String)> appendLog = <(String, String)>[];
-
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async => data(),
-        repositoryOverride: _AppendRepo(appendLog),
-        attachmentsOverride: uploads,
-        annotationsOverride: IqAnnotationRepository(store: store),
-        annotateLauncherOverride: (IqAnnotateRequest r) async =>
-            AnnotationResult(document: _doc(), flattenedPng: _flatPng()),
-      )));
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(find.text('첨삭하기'));
-      await tester.tap(find.text('첨삭하기'));
-      await tester.pumpAndSettle();
-      expect(uploads.uploaded, isEmpty); // 전송 전 — 등록 0.
-
-      // 안내 스낵바가 하단 버튼을 가리지 않게 만료를 기다린다.
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-          find.widgetWithText(TextField, '학생이 이해할 수 있게 풀이 과정을 함께 적어 주세요.'),
-          '이렇게 풀어요');
-      await tester.ensureVisible(find.text('답변 등록'));
-      await tester.tap(find.text('답변 등록'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('답변 등록').last); // 확인 다이얼로그.
-      await tester.pumpAndSettle();
-
-      // 메시지 1회 생성 + 반환 id 로 첨부 등록(§2-2 — 최근접 조회 금지).
-      expect(appendLog, <(String, String)>[('q-1', '이렇게 풀어요')]);
-      expect(uploads.uploaded.single.fileName, '문제-ink.png');
-      expect(uploads.messageIds, <String?>['srv-msg-1']);
-    });
-
-    testWidgets('기존 ink.json 없음 → 바로 새로 시작으로 진입', (WidgetTester tester) async {
-      final _FakeStore store = _FakeStore();
-      IqAnnotateRequest? request;
-
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async => data(),
-        annotationsOverride: IqAnnotationRepository(store: store),
-        annotateLauncherOverride: (IqAnnotateRequest r) async {
-          request = r;
-          return null; // 취소 — 대기 첨부 추가 없음.
-        },
-      )));
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(find.text('첨삭하기'));
-      await tester.tap(find.text('첨삭하기'));
-      await tester.pumpAndSettle();
-
-      expect(request, isNotNull);
-      expect(request!.initial, isNull); // ink.json 없음 → 새로 시작.
-      expect(request!.sourceAttachmentId, 'src-1');
-      expect(request!.background, isNotEmpty);
-      // 취소 → 대기열·ink.json 무변화.
-      expect(find.textContaining('-ink.png'), findsNothing);
-      expect(store.objects, isEmpty);
-    });
-
-    testWidgets('기존 ink.json 있음 → 불러오기/새로 시작 선택 다이얼로그 분기',
-        (WidgetTester tester) async {
-      final _FakeStore store = _FakeStore();
-      store.seedDocument('q-1/annotations/src-1.json', _doc(width: 77));
-      final List<InkDocument?> initials = <InkDocument?>[];
-
-      await tester.pumpWidget(_wrap(IqDetailScreen(
-        questionId: 'q-1',
-        roleOverride: AppRole.mentor,
-        loaderOverride: () async => data(),
-        annotationsOverride: IqAnnotationRepository(store: store),
-        annotateLauncherOverride: (IqAnnotateRequest r) async {
-          initials.add(r.initial);
-          return null; // 취소로 닫힘(대기 첨부 없음).
-        },
-      )));
-      await tester.pumpAndSettle();
-
-      // ① '불러오기' → 기존 스트로크로 이어 그리기.
-      await tester.ensureVisible(find.text('첨삭하기'));
-      await tester.tap(find.text('첨삭하기'));
-      await tester.pumpAndSettle();
-      expect(find.text('이전 첨삭이 있어요'), findsOneWidget);
-      await tester.tap(find.text('불러오기'));
-      await tester.pumpAndSettle();
-      expect(initials.single, isNotNull);
-      expect(initials.single!.canvasWidth, 77);
-
-      // ② '새로 시작' → 빈 캔버스.
-      await tester.ensureVisible(find.text('첨삭하기'));
-      await tester.tap(find.text('첨삭하기'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('새로 시작'));
-      await tester.pumpAndSettle();
-      expect(initials.length, 2);
-      expect(initials.last, isNull);
     });
   });
 
@@ -482,29 +335,4 @@ void main() {
       expect(uploads.messageIds, <String?>['srv-msg-1']);
     });
   });
-}
-
-/// 상세 화면용 스토리지 fake — 시드 가능한 인메모리 오브젝트.
-class _FakeStore implements IqAnnotationStore {
-  final Map<String, Uint8List> objects = <String, Uint8List>{};
-
-  void seedDocument(String path, InkDocument doc) {
-    objects[path] = Uint8List.fromList(doc.toJsonString().codeUnits);
-  }
-
-  @override
-  Future<void> upsertDocument({
-    required String path,
-    required Uint8List bytes,
-  }) async {
-    objects[path] = bytes;
-  }
-
-  @override
-  Future<Uint8List?> downloadDocumentOrNull({required String path}) async =>
-      objects[path];
-
-  @override
-  Future<Uint8List> downloadAttachment({required String storagePath}) async =>
-      Uint8List.fromList(<int>[1, 2, 3]);
 }

@@ -296,4 +296,48 @@ void main() {
       expect(s.isRetryable, isTrue);
     });
   });
+
+  group('C1: PrefetchedUserRowGateway(선조회 행 재사용)', () {
+    test('선조회 행을 users 재조회 없이 그대로 반환하고 RPC 는 내부에 위임한다',
+        () async {
+      final AccountState s = await AccountStatusReader.resolve(
+        PrefetchedUserRowGateway(
+          inner: _FakeGateway(userRow: null), // inner 행은 쓰이면 안 됨
+          userRow: <String, dynamic>{'status': 'active'},
+          userRowFetchFailed: false,
+        ),
+        'u-1',
+      );
+      expect(s.kind, AccountStatusKind.active);
+    });
+
+    test('통합 조회 실패 플래그 → 기존 fetchUserRow throw 와 동일하게 fetchFailed',
+        () async {
+      final AccountState s = await AccountStatusReader.resolve(
+        PrefetchedUserRowGateway(
+          inner: _FakeGateway(userRow: <String, dynamic>{'status': 'active'}),
+          userRow: null,
+          userRowFetchFailed: true,
+        ),
+        'u-1',
+      );
+      expect(s.kind, AccountStatusKind.fetchFailed);
+      expect(s.isRetryable, isTrue);
+    });
+
+    test('RPC 실패는 내부 게이트웨이 경유로 fail-closed 유지', () async {
+      final AccountState s = await AccountStatusReader.resolve(
+        PrefetchedUserRowGateway(
+          inner: _FakeGateway(
+            userRow: <String, dynamic>{'status': 'active'},
+            writeBlockedThrows: true,
+          ),
+          userRow: <String, dynamic>{'status': 'active'},
+          userRowFetchFailed: false,
+        ),
+        'u-1',
+      );
+      expect(s.kind, AccountStatusKind.fetchFailed);
+    });
+  });
 }

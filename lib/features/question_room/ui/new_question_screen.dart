@@ -78,10 +78,7 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
       // 최종 판정은 생성 RPC(서버 트랜잭션)가 한다.
       // ★ fail-closed(P2-13): 조회 실패(usage==null)=판정 불가면 제출을 막고
       //   재시도를 안내한다(과거 fail-open 제거).
-      final WeeklyQuestionUsage? usage = await _read.weeklyUsage(
-        studentId: widget.room.studentId,
-        mentorId: widget.room.mentorId,
-      );
+      final WeeklyQuestionUsage? usage = await _read.weeklyUsage(mentorId: widget.room.mentorId);
       if (usage == null) {
         if (mounted) {
           setState(() => _busy = false);
@@ -105,7 +102,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
       // 순번 계산에 방의 스레드 수를 1회 조회한다(미입력일 때만). '(제목 없음)' 폴백 대신 저장.
       String title = titleInput;
       if (title.isEmpty) {
-        final int existing = (await _read.threads(widget.room.id)).length;
+        // N23: 순번 계산에 전 행(select *) 대신 서버 count 1회.
+        final int existing = await _read.threadCount(widget.room.id);
         title = autoQuestionTitle(existing);
       }
       // P1-8: 생성은 서버 원자 RPC 한 번 — thread+첫 메시지+사용량 소비가 한 트랜잭션.

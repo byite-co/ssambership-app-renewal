@@ -11,6 +11,7 @@ import '../data/models/individual_question_models.dart';
 import 'iq_detail_screen.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 화면에 함께 담는 데이터(대기 공개 질문 + 내 질문).
 class MentorIqListData {
@@ -44,7 +45,9 @@ class MentorIqListScreen extends StatefulWidget {
   State<MentorIqListScreen> createState() => _MentorIqListScreenState();
 }
 
-class _MentorIqListScreenState extends State<MentorIqListScreen> {
+class _MentorIqListScreenState extends State<MentorIqListScreen>
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final IndividualQuestionRepository _repo =
       const IndividualQuestionRepository();
   late Future<MentorIqListData> _future;
@@ -57,13 +60,39 @@ class _MentorIqListScreenState extends State<MentorIqListScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N34: 공개 질문 등록이 웹에서 일어나므로 앱 복귀 시 수락 대기 목록이
+    // 낡은 채였다 — resume 재조회 추가(질문방 탭과 동일 패턴).
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<MentorIqListData> _load() async {
     if (widget.loaderOverride != null) return widget.loaderOverride!();
-    final List<OpenIndividualQuestion> open = await _repo.listOpenForMentor();
-    final List<IndividualQuestion> mine = await _repo.listForMentor();
-    return MentorIqListData(open: open, mine: mine);
+    // C22: 두 목록은 독립 — 병렬 조회(종전 순차 await).
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.listOpenForMentor(),
+      _repo.listForMentor(),
+    ]);
+    return MentorIqListData(
+      open: loaded[0] as List<OpenIndividualQuestion>,
+      mine: loaded[1] as List<IndividualQuestion>,
+    );
   }
 
   void _refresh() {

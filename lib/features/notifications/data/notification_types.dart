@@ -4,7 +4,7 @@
 /// 정확한 문자열 일치만 사용하고, 목록 밖 타입은 [unknown](일반 알림 표시 ·
 /// 이동 없음)으로 다룬다. 내부 영문 코드는 화면에 노출하지 않는다.
 ///
-/// ★ 서버 계약 vs 앱 출시 표면(2026-07 CR 게이트 OFF): 정본 17종 enum·서버
+/// ★ 서버 계약 vs 앱 출시 표면(2026-07 CR 게이트 OFF): 정본 18종 enum·서버
 ///   producer·DB 이벤트 계약은 그대로다. 다만 이번 출시에서 맞춤의뢰 CR 게이트가
 ///   OFF 이므로 앱 '표시 표면'은 [kGatedNotificationTypeCodes] 2종을 목록 쿼리
 ///   단계에서 제외한다(부분 문자열 아님 — exact code). 두 개념을 혼동하지 말 것.
@@ -140,7 +140,7 @@ enum NotificationDestination {
   stay,
 }
 
-/// 타입 → 허용 목적지 정본 매핑(17종 전부 명시).
+/// 타입 → 허용 목적지 정본 매핑(18종 전부 명시).
 NotificationDestination notificationDestinationOf(NotificationEventType type) {
   switch (type) {
     case NotificationEventType.questionAnswered:

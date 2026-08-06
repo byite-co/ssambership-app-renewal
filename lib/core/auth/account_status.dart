@@ -168,6 +168,44 @@ class SupabaseAccountStatusGateway implements AccountStatusGateway {
   }
 }
 
+/// 이미 조회해 둔 users 본인 행을 재사용하는 게이트웨이(C1 왕복 축소).
+///
+/// AuthService 프로필 로드가 role·표시명·계정상태에 필요한 컬럼을 users 에서
+/// **1회** 통합 SELECT 한 뒤, 그 결과(또는 조회 실패 사실)를 이 게이트웨이로
+/// 판정기에 넘긴다 — 판정 로직(fail-closed)은 그대로, users 재조회만 없앤다.
+/// RPC 2종(write_blocked·status_self)은 내부 게이트웨이에 그대로 위임한다.
+class PrefetchedUserRowGateway implements AccountStatusGateway {
+  PrefetchedUserRowGateway({
+    required AccountStatusGateway inner,
+    required Map<String, dynamic>? userRow,
+    required bool userRowFetchFailed,
+  })  : _inner = inner,
+        _row = userRow,
+        _failed = userRowFetchFailed;
+
+  final AccountStatusGateway _inner;
+  final Map<String, dynamic>? _row;
+  final bool _failed;
+
+  @override
+  Future<Map<String, dynamic>?> fetchUserRow(String userId) {
+    if (_failed) {
+      // 통합 조회 실패 = 기존 fetchUserRow throw 와 동일 의미(→ fetchFailed).
+      return Future<Map<String, dynamic>?>.error(
+          StateError('users row fetch failed'));
+    }
+    return Future<Map<String, dynamic>?>.value(_row);
+  }
+
+  @override
+  Future<bool> fetchWriteBlocked(String userId) =>
+      _inner.fetchWriteBlocked(userId);
+
+  @override
+  Future<Map<String, dynamic>> fetchDeletionSelfStatus() =>
+      _inner.fetchDeletionSelfStatus();
+}
+
 /// 계정 유효 상태 판정기.
 class AccountStatusReader {
   AccountStatusReader._();

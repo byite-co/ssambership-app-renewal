@@ -28,6 +28,8 @@ void main() {
       port: port,
       buildNumber: () async => build,
       platformResolver: () => 'android',
+      // 테스트 격리(G1) — 운영 shared_preferences 구현 미접촉.
+      passCache: FakeGatePassCache(),
     );
   }
 
@@ -103,6 +105,7 @@ void main() {
       port: FakeVersionPolicyPort(policy: policyOf(min: 1, latest: 1)),
       buildNumber: () => buildGate.future,
       platformResolver: () => 'android',
+      passCache: FakeGatePassCache(),
     );
 
     final Future<void> started = c.start();
@@ -132,6 +135,7 @@ void main() {
       port: port,
       buildNumber: () async => 1,
       platformResolver: () => null, // kIsWeb 등
+      passCache: FakeGatePassCache(),
     );
     await skipped.start();
     await tester.pumpWidget(host(skipped));

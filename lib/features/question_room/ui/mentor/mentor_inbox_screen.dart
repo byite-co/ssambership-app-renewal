@@ -9,13 +9,14 @@ import '../../../../design/widgets/empty_state.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../design/widgets/status_pill.dart';
 import '../../../../shared/format/formatters.dart';
-import '../../data/models/question_thread.dart';
 import '../../data/models/room.dart';
 import '../../data/question_room_read_repository.dart';
 import '../../data/student_lookup_repository.dart';
 import '../../data/thread_status_counts.dart';
 import 'student_room_home_screen.dart';
+import '../../../../core/refresh/data_refresh_bus.dart';
 import '../../../../shared/errors/friendly_error.dart';
+import '../../../../shared/widgets/screen_visibility.dart';
 
 /// 멘토 질문방 1뎁스 = '받은 학생' 목록(카카오톡식 리스트). 본문만(셸이 AppBar/탭 제공).
 ///
@@ -45,7 +46,9 @@ class _StudentItem {
   String get studentName => student?.displayName ?? '학생';
 }
 
-class _MentorInboxScreenState extends State<MentorInboxScreen> {
+class _MentorInboxScreenState extends State<MentorInboxScreen>
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final StudentLookupRepository _students = const StudentLookupRepository();
 
@@ -56,6 +59,29 @@ class _MentorInboxScreenState extends State<MentorInboxScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N33: 학생 탭(질문방 목록)은 resume 재조회가 있는데 멘토 인박스는 없어
+    // 같은 질문방 탭이 역할에 따라 신선도가 달랐다 — 동일 패턴으로 정렬.
+    WidgetsBinding.instance.addObserver(this);
+    // N35: 탭 전환·재선택 등 질문방 표면 신호 수신(학생 목록과 동일 배선).
+    DataRefreshBus.questionRoomsGeneration.addListener(_refresh);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    DataRefreshBus.questionRoomsGeneration.removeListener(_refresh);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<_StudentItem>> _load() async {
@@ -63,31 +89,38 @@ class _MentorInboxScreenState extends State<MentorInboxScreen> {
     if (rooms.isEmpty) return <_StudentItem>[];
 
     final List<String> roomIds = rooms.map((Room r) => r.id).toList();
-    final List<QuestionThread> threads = await _repo.threadsForRooms(roomIds);
-    final Map<String, List<QuestionThread>> byRoom =
-        <String, List<QuestionThread>>{};
-    for (final QuestionThread t in threads) {
-      (byRoom[t.roomId] ??= <QuestionThread>[]).add(t);
-    }
-
+    // N20: 집계에 필요한 방·상태·활동시각만 슬림 조회(제목·본문 전량 수신 제거).
+    // 학생 표시명 조회는 스레드 조회와 독립 — 병렬.
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.threadStatusRowsForRooms(roomIds),
+      _students.fetchMany(rooms.map((Room r) => r.studentId)),
+    ]);
+    final List<ThreadStatusRow> statusRows = loaded[0] as List<ThreadStatusRow>;
     final Map<String, StudentPublic> names =
-        await _students.fetchMany(rooms.map((Room r) => r.studentId));
+        loaded[1] as Map<String, StudentPublic>;
+
+    final Map<String, List<ThreadStatusRow>> byRoom =
+        <String, List<ThreadStatusRow>>{};
+    for (final ThreadStatusRow t in statusRows) {
+      (byRoom[t.roomId] ??= <ThreadStatusRow>[]).add(t);
+    }
 
     return <_StudentItem>[
       for (final Room r in rooms)
         _StudentItem(
           room: r,
           student: names[r.studentId],
-          counts:
-              ThreadStatusCounts.from(byRoom[r.id] ?? const <QuestionThread>[]),
+          counts: ThreadStatusCounts.fromStatuses(
+              (byRoom[r.id] ?? const <ThreadStatusRow>[])
+                  .map((ThreadStatusRow t) => t.status)),
           lastActivity: _lastActivity(byRoom[r.id], r),
         ),
     ];
   }
 
-  DateTime _lastActivity(List<QuestionThread>? threads, Room room) {
+  DateTime _lastActivity(List<ThreadStatusRow>? threads, Room room) {
     DateTime last = room.updatedAt;
-    for (final QuestionThread t in threads ?? const <QuestionThread>[]) {
+    for (final ThreadStatusRow t in threads ?? const <ThreadStatusRow>[]) {
       if (t.updatedAt.isAfter(last)) last = t.updatedAt;
     }
     return last;
@@ -127,7 +160,10 @@ class _MentorInboxScreenState extends State<MentorInboxScreen> {
     return FutureBuilder<List<_StudentItem>>(
       future: _future,
       builder: (BuildContext context, AsyncSnapshot<List<_StudentItem>> snap) {
-        if (snap.connectionState != ConnectionState.done) {
+        // R1(20건 리뷰): future 교체형 새로고침(N35 탭 신호·resume) 동안
+        // 이전 데이터가 스냅샷에 유지되므로, 데이터가 있으면 스피너 대신
+        // 기존 목록을 계속 보여준다(탭 전환마다 번쩍임 제거).
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {

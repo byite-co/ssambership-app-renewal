@@ -35,6 +35,7 @@ import '../data/iq_realtime.dart';
 import '../data/models/individual_question_models.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/app_error.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 import '../../../shared/errors/friendly_error.dart';
 
 /// 상세 화면 데이터 묶음(질문 + 메시지 + 첨부 + 멘토 표시명).
@@ -169,7 +170,7 @@ class IqAnnotateRequest {
 }
 
 class _IqDetailScreenState extends State<IqDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
   IndividualQuestionRepository get _repo =>
       widget.repositoryOverride ?? const IndividualQuestionRepository();
   IqAttachmentsPort get _attachments =>
@@ -244,8 +245,14 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다.
-    if (state == AppLifecycleState.resumed) _refresh();
+    // 앱 복귀 — 백그라운드 동안의 이벤트 공백을 전체 재조회로 메운다(N19 코얼레싱).
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(첨부 뷰어 등이 덮여 있으면 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _coalescedRefresh();
   }
 
   /// 로그아웃/계정 전환 — 이전 사용자 채널을 정리한다(구독 누수·오배달 방지).
@@ -272,20 +279,29 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       onMessageInsert: (IqMessage m) {
         if (!mounted) return;
         _messages.upsertFromServer(m);
+        // N36: 귀속 그룹은 로드 스냅샷에서 1회 계산이라 스스로 안 움직인다 —
+        // 이 메시지 귀속인데 '연결 메시지 미확인'에 남은 첨부가 있으면
+        // 재조회로 재귀속한다(N19 코얼레싱 경유 — 폭주 없음).
+        final IqDetailData? d = _lastData;
+        if (d != null &&
+            d.groups.unresolvedMessage
+                .any((IqAttachment a) => a.messageId == m.id)) {
+          _coalescedRefresh();
+        }
       },
-      // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회.
+      // 질문 행 변경(answered 전이 등) → 상태·액션 게이트 재조회(N19 코얼레싱).
       onQuestionUpdate: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
       // 첨부 행 생성 → 첨부 목록 서버 재조회(실시간 payload 를 정본으로 쓰지
       // 않는다 — 서명 URL·귀속 그룹·정렬은 재조회가 담당. 재조회는 그룹을
-      // 통째로 다시 만들므로 중복 표시 0).
+      // 통째로 다시 만들므로 중복 표시 0). N19 코얼레싱.
       onAttachmentInsert: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
-      // 재연결 — 끊긴 사이 공백을 전체 재조회로 메운다.
+      // 재연결 — 끊긴 사이 공백을 전체 재조회로 메운다(N19 코얼레싱).
       onReconnected: () {
-        if (mounted) _refresh();
+        if (mounted) _coalescedRefresh();
       },
     );
   }
@@ -302,22 +318,34 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     super.dispose();
   }
 
+  /// 마지막으로 로드된 스냅샷(N36 — 실시간 메시지 도착 시 미해결 첨부
+  /// 재귀속 판정용). 표시는 여전히 FutureBuilder(_future)가 정본이다.
+  IqDetailData? _lastData;
+
   Future<IqDetailData> _load() async {
     final IqDetailData data = await _loadRaw();
     // 서버 목록이 대화 정본 — 실시간 수신분과 id 로 합쳐진 뷰를 갱신한다.
     // (notify 는 FutureBuilder 리빌드가 대신한다 — build 중 재통지 방지.)
     _messages.resetTo(data.messages, notify: false);
+    _lastData = data;
     return data;
   }
 
   Future<IqDetailData> _loadRaw() async {
     if (widget.loaderOverride != null) return widget.loaderOverride!();
-    final IndividualQuestion? q = await _repo.fetch(widget.questionId);
+    // C22: 질문·메시지·첨부는 전부 questionId 로 독립 조회 — 병렬로 묶는다
+    // (RT 수신·재연결·앱 복귀마다 재실행되는 경로라 벽시계 절감 폭이 크다).
+    final List<dynamic> loaded = await Future.wait(<Future<dynamic>>[
+      _repo.fetch(widget.questionId),
+      _repo.listMessages(widget.questionId),
+      _repo.listAttachments(widget.questionId),
+    ]);
+    final IndividualQuestion? q = loaded[0] as IndividualQuestion?;
     if (q == null) {
       throw Exception('질문을 찾을 수 없어요.');
     }
-    final List<IqMessage> messages = await _repo.listMessages(q.id);
-    final List<IqAttachment> attachments = await _repo.listAttachments(q.id);
+    final List<IqMessage> messages = loaded[1] as List<IqMessage>;
+    final List<IqAttachment> attachments = loaded[2] as List<IqAttachment>;
     String? mentorName;
     final String? mentorId = q.mentorId;
     if (mentorId != null && _role == AppRole.student) {
@@ -344,6 +372,32 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (!mounted) return; // await 뒤 호출 경로 대비(P3-4).
     if (scrollToLatest) _scrollToLatestOnData = true;
     final Future<IqDetailData> next = _load();
+    setState(() {
+      _future = next;
+    });
+  }
+
+  // N19: 실시간 이벤트 버스트(질문 UPDATE + 첨부 INSERT 연쇄·재연결 등)마다
+  // 3쿼리 전체 재조회가 중첩 발화하지 않게 — 진행 중 1 + 종료 후 후행 1 로
+  // 수렴한다. 사용자 액션(해결완료·환불·전송 후) 재조회는 즉시성 우선이라
+  // 기존 _refresh 그대로.
+  bool _rtRefreshing = false;
+  bool _rtRefreshQueued = false;
+
+  void _coalescedRefresh() {
+    if (!mounted) return;
+    if (_rtRefreshing) {
+      _rtRefreshQueued = true;
+      return;
+    }
+    _rtRefreshing = true;
+    final Future<IqDetailData> next = _load().whenComplete(() {
+      _rtRefreshing = false;
+      if (_rtRefreshQueued) {
+        _rtRefreshQueued = false;
+        _coalescedRefresh();
+      }
+    });
     setState(() {
       _future = next;
     });
@@ -910,14 +964,15 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     );
   }
 
-  /// 멘토가 이 첨부에 첨삭할 수 있는가 — 담당 멘토 + 활성 상태(assigned/
-  /// claimed/answered) + **학생 작성 첨부**만(§4-1). 작성자 미확인 레거시는
-  /// 추측으로 열지 않는다. (이미지 여부는 첨부 그룹 위젯이 항목별로 거른다.)
+  /// 멘토 첨삭 진입 게이트 — **항상 false(2026-08 폐쇄)**.
+  ///
+  /// 첨삭 기능이 제품에서 닫혀 있는 동안 진입 버튼('첨삭하기')을 노출하지
+  /// 않는다 — 버튼만 남고 기능이 막힌 반쪽 상태 금지(iOS 멘토 실기기 실측).
+  /// 재개 시 이 게이트만 원복하면 된다. 원래 조건(§4-1): 담당 멘토 + 활성
+  /// 상태(iqCanMentorAnnotate) + 학생 작성 첨부만. S18 기계 부품
+  /// (_annotateAttachment·IqAnnotationRepository·오버라이드 주입점)은 유지.
   bool _canAnnotateGroup(IndividualQuestion q, IqMessageAuthor groupAuthor) =>
-      _role == AppRole.mentor &&
-      !_busy &&
-      iqCanMentorAnnotate(q.status) &&
-      groupAuthor == IqMessageAuthor.student;
+      false;
 
   /// 원본 질문 = 타임라인의 첫 대화 항목. 제목·본문·작성시각·**학생 첨부**가 한
   /// 말풍선 그룹이다(별도 질문 카드·첨부 섹션 금지).

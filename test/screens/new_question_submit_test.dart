@@ -30,10 +30,10 @@ class _FakeRead extends QuestionRoomReadRepository {
       <QuestionThread>[];
 
   @override
-  Future<WeeklyQuestionUsage?> weeklyUsage({
-    required String studentId,
-    required String mentorId,
-  }) async =>
+  Future<int> threadCount(String roomId) async => 0; // N23: 자동 제목 순번용.
+
+  @override
+  Future<WeeklyQuestionUsage?> weeklyUsage({required String mentorId}) async =>
       usageFails ? null : usage;
 }
 

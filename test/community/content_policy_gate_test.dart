@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 import 'package:ssambership_app/features/community/ui/widgets/comment_tile.dart';
 import 'package:ssambership_app/features/community/ui/widgets/content_policy_gate.dart';
 
 /// UGC 심사 요건 검증(P0-3):
 ///  - 게시 전 커뮤니티 이용 규정 '동의' 게이트가 최초 1회 노출·저장된다.
+///  - C13: 동의는 기기 영속(shared_preferences) — 재실행 재동의 없음.
 ///  - 댓글 항목의 ⋯ 메뉴에 '신고' 동선이 노출된다.
 void main() {
-  setUp(() => ContentPolicyGate.agreedThisSession = false);
+  setUp(() {
+    ContentPolicyGate.agreedThisSession = false;
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
 
   Widget _host(Future<void> Function(BuildContext) onTap) => MaterialApp(
         home: Scaffold(
@@ -38,6 +43,25 @@ void main() {
 
     expect(result, isTrue);
     expect(ContentPolicyGate.agreedThisSession, isTrue);
+    // C13: 기기 영속 — 저장소에도 기록된다.
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(ContentPolicyGate.prefsKey), isTrue);
+  });
+
+  testWidgets('C13: 저장소에 동의 기록이 있으면(재실행) 다이얼로그 없이 통과',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(
+        <String, Object>{ContentPolicyGate.prefsKey: true});
+    bool? result;
+    await tester.pumpWidget(_host((BuildContext c) async {
+      result = await ContentPolicyGate.ensureAgreed(c);
+    }));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('커뮤니티 이용 규정'), findsNothing);
+    expect(result, isTrue);
+    expect(ContentPolicyGate.agreedThisSession, isTrue); // 세션 캐시 승격
   });
 
   testWidgets('동의 후 재게시: 다이얼로그 없이 즉시 true',

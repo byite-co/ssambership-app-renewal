@@ -38,11 +38,58 @@ class UserBlocksRepository {
   String? get _uid => _client?.auth.currentUser?.id;
   bool get isLoggedIn => _uid != null;
 
+  // ── 차단 목록 캐시(N15) ──
+  // 커뮤니티 목록·댓글·질문방 입장이 조회마다 user_blocks 를 재조회하던 것을
+  // 사용자별 짧은 TTL 캐시 + single-flight 로 줄인다. 차단/해제 성공 시 즉시
+  // 무효화하므로 사용자 가시 지연은 TTL 이 아니라 0 이고, 계정 전환은 uid
+  // 키 불일치로 자연 무효화된다. 실패 결과(빈 집합 폴백)는 캐시하지 않는다.
+  static String? _cacheUid;
+  static Set<String>? _cachedIds;
+  static DateTime? _cachedAt;
+  static Future<Set<String>>? _inFlight;
+  static const Duration _cacheTtl = Duration(seconds: 30);
+
+  /// 캐시 무효화 — 차단/해제 성공 직후, 그리고 테스트에서 호출한다.
+  static void invalidateBlockedIdsCache() {
+    _cacheUid = null;
+    _cachedIds = null;
+    _cachedAt = null;
+    _inFlight = null;
+  }
+
   /// 내가 차단한 사용자 id 집합(비로그인/실패 시 빈 집합).
-  Future<Set<String>> myBlockedIds() async {
+  Future<Set<String>> myBlockedIds() {
     final SupabaseClient? c = _client;
     final String? uid = _uid;
-    if (c == null || uid == null) return <String>{};
+    if (c == null || uid == null) {
+      return Future<Set<String>>.value(<String>{});
+    }
+    final DateTime now = DateTime.now();
+    if (_cacheUid == uid &&
+        _cachedIds != null &&
+        _cachedAt != null &&
+        now.difference(_cachedAt!) < _cacheTtl) {
+      return Future<Set<String>>.value(<String>{..._cachedIds!});
+    }
+    final Future<Set<String>>? inFlight = _inFlight;
+    if (inFlight != null && _cacheUid == uid) return inFlight;
+    _cacheUid = uid;
+    final Future<Set<String>> load = _fetchBlockedIds(c, uid).then(
+      (Set<String> ids) {
+        if (_cacheUid == uid) {
+          _cachedIds = ids;
+          _cachedAt = DateTime.now();
+        }
+        return <String>{...ids};
+      },
+    ).whenComplete(() {
+      if (_cacheUid == uid) _inFlight = null;
+    });
+    _inFlight = load;
+    return load;
+  }
+
+  Future<Set<String>> _fetchBlockedIds(SupabaseClient c, String uid) async {
     try {
       final List<Map<String, dynamic>> rows =
           await c.from(_table).select('blocked_id').eq('blocker_id', uid);
@@ -51,6 +98,11 @@ class UserBlocksRepository {
           if (r['blocked_id'] != null) r['blocked_id'] as String,
       };
     } catch (_) {
+      // 실패 폴백은 캐시하지 않는다 — 다음 호출이 다시 시도한다.
+      if (_cacheUid == uid) {
+        _cachedIds = null;
+        _cachedAt = null;
+      }
       return <String>{};
     }
   }
@@ -120,9 +172,12 @@ class UserBlocksRepository {
         'blocker_id': uid,
         'blocked_id': blockedId,
       });
+      invalidateBlockedIdsCache(); // N15: 차단 즉시 목록 캐시 무효화.
       return true;
     } catch (e) {
-      return isAlreadyBlockedError(e);
+      final bool already = isAlreadyBlockedError(e);
+      if (already) invalidateBlockedIdsCache();
+      return already;
     }
   }
 
@@ -137,15 +192,32 @@ class UserBlocksRepository {
           .delete()
           .eq('blocker_id', uid)
           .eq('blocked_id', blockedId);
+      invalidateBlockedIdsCache(); // N15: 해제 즉시 목록 캐시 무효화.
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  /// 콘텐츠(글/댓글/숏폼) 작성자를 차단 — id 로 author_id 를 조회해 차단한다.
-  /// [table] 예: 'community_posts' | 'comments'(게시판 댓글 — v16 정본) |
+  /// 이미 알고 있는 작성자 id 를 차단(자기 자신 차단 불가 판정 포함).
+  ///
+  /// 게시판 글처럼 화면이 이미 정본 뷰 행에서 author_id 를 갖고 있는 경우
+  /// 추가 조회 없이 이 경로를 쓴다(C10 — community_posts 베이스 테이블
+  /// 접근 0건 계약을 코드로도 참이 되게 한다).
+  Future<BlockResult> blockAuthor(String authorId) async {
+    final SupabaseClient? c = _client;
+    final String? uid = _uid;
+    if (c == null || uid == null) return BlockResult.notLoggedIn;
+    if (authorId == uid) return BlockResult.self; // 자기 자신은 차단 불가.
+    final bool ok = await block(authorId);
+    return ok ? BlockResult.blocked : BlockResult.failed;
+  }
+
+  /// 콘텐츠(댓글/숏폼) 작성자를 차단 — id 로 author_id 를 조회해 차단한다.
+  /// [table] 예: 'comments'(게시판 댓글 — v16 정본) |
   /// 'community_comments'(숏폼 댓글) | 'shortform_posts'.
+  /// ★ 'community_posts' 는 금지(베이스 접근 0건 계약) — 게시판 글은
+  ///   뷰 행의 author_id 로 [blockAuthor] 를 쓴다.
   Future<BlockResult> blockAuthorOf({
     required String table,
     required String contentId,
@@ -165,8 +237,6 @@ class UserBlocksRepository {
       return BlockResult.failed;
     }
     if (authorId == null) return BlockResult.failed;
-    if (authorId == uid) return BlockResult.self; // 자기 자신은 차단 불가.
-    final bool ok = await block(authorId);
-    return ok ? BlockResult.blocked : BlockResult.failed;
+    return blockAuthor(authorId);
   }
 }

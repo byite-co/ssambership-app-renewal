@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'gate_platform.dart';
+import 'shared_prefs_gate_pass_cache.dart';
 import 'supabase_version_policy_port.dart';
 import 'version_gate_decision.dart';
 import 'version_gate_ports.dart';
@@ -35,9 +36,11 @@ class VersionGateController extends ChangeNotifier {
     VersionPolicyPort? port,
     BuildNumberProvider? buildNumber,
     GatePlatformResolver? platformResolver,
+    GatePassCache? passCache,
   })  : _port = port ?? const SupabaseVersionPolicyPort(),
         _buildNumber = buildNumber ?? _packageInfoBuildNumber,
-        _platformResolver = platformResolver ?? resolveGatePlatform;
+        _platformResolver = platformResolver ?? resolveGatePlatform,
+        _passCache = passCache ?? const SharedPrefsGatePassCache();
 
   /// 프로덕션 싱글턴(main/app 배선용). 테스트는 생성자로 fake 를 주입한다.
   static final VersionGateController instance = VersionGateController();
@@ -45,6 +48,7 @@ class VersionGateController extends ChangeNotifier {
   final VersionPolicyPort _port;
   final BuildNumberProvider _buildNumber;
   final GatePlatformResolver _platformResolver;
+  final GatePassCache _passCache;
 
   VersionGateStatus _status = VersionGateStatus.idle;
   VersionPolicy? _policy;
@@ -80,18 +84,33 @@ class VersionGateController extends ChangeNotifier {
     try {
       fetched = await _port.fetch(platform);
     } catch (_) {
-      // 조회 실패는 강제 업데이트가 아니다 — 재시도 상태로만 표시.
-      _set(VersionGateStatus.fetchFailed);
+      // 조회 실패는 강제 업데이트가 아니다. G1: 이 빌드가 직전에 정책을
+      // 통과한 적이 있으면(마지막 통과 캐시) 오프라인 콜드스타트를 막지
+      // 않는다 — 최초 설치 직후 오프라인만 재시도 화면 유지.
+      final int? lastPass = await _passCache.readLastPassBuild();
+      if (lastPass == currentBuild) {
+        _set(VersionGateStatus.pass);
+      } else {
+        _set(VersionGateStatus.fetchFailed);
+      }
       return;
     }
 
     switch (decide(currentBuild: currentBuild, policy: fetched)) {
       case GatePass():
+        await _passCache.writeLastPassBuild(currentBuild); // G1
         _set(VersionGateStatus.pass);
       case GateForceUpdate(policy: final VersionPolicy p):
+        // G1: 강제 업데이트 판정을 받은 빌드는 캐시를 지운다 — 이후 오프라인
+        // 재시작이 이전 통과 캐시로 입장하는 것을 막는다. ★ 판정을 받기 전
+        // 계속 오프라인인 기기까지 막지는 못한다(availability 우선 —
+        // 한계·후속 선택지는 GatePassCache 문서 참조).
+        await _passCache.clear();
         _policy = p;
         _set(VersionGateStatus.forceUpdate);
       case GateRecommendUpdate(policy: final VersionPolicy p):
+        // 권장은 입장 허용 상태 — 통과 캐시를 기록한다(G1).
+        await _passCache.writeLastPassBuild(currentBuild);
         if (_recommendDismissed) {
           // 앱 실행당 1회만 안내 — 이미 닫았다면 다시 띄우지 않는다.
           _set(VersionGateStatus.pass);

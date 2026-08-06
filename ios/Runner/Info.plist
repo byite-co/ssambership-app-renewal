@@ -20,6 +20,11 @@
 	<!-- image_picker 촬영(S16): 카메라 사용 사유. 없으면 촬영 진입 시 크래시. -->
 	<key>NSCameraUsageDescription</key>
 	<string>문제를 촬영해 질문에 첨부하기 위해 카메라를 사용해요.</string>
+	<!-- 숏폼 작성 WebView(WKWebView) 영상 촬영: iOS 는 영상 녹화 시 마이크 권한을
+	     함께 요구한다. 이 키가 없으면 '촬영' 선택 순간 TCC 강제 종료(크래시) —
+	     사진 촬영(카메라 키만 필요)·파일 업로드는 되고 영상 촬영만 죽는 증상의 원인. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>숏폼 영상을 촬영할 때 소리를 함께 녹음하기 위해 마이크를 사용해요.</string>
 	<!-- web_bridge: iOS canOpenURL 은 여기 선언된 스킴만 조회를 허용한다(미선언 스킴은 항상 false —
 	     Apple UIApplication.canOpenURL 문서). web_bridge._defaultLauncher 가 canLaunchUrl 로
 	     사전 확인하므로 선언이 없으면 약관·개인정보·지원·탈퇴 등 웹 링크 전 경로가 조용히 실패한다.

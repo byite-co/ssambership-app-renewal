@@ -4,6 +4,7 @@ import '../../app/app_tabs.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/commerce/commerce_policy.dart';
 import '../../core/entitlement/subscription_status_display.dart';
+import '../../core/refresh/data_refresh_bus.dart';
 import '../../core/entitlement/subscription_summary.dart';
 import '../../core/entitlement/weekly_question_usage.dart';
 import '../../core/supabase/supabase_client.dart';
@@ -24,6 +25,7 @@ import 'data/question_room_read_repository.dart';
 import 'ui/mentor/mentor_inbox_screen.dart';
 import 'ui/mentor_room_home_screen.dart';
 import '../../shared/errors/friendly_error.dart';
+import '../../shared/widgets/screen_visibility.dart';
 
 /// 질문방 탭(1뎁스). HomeShell 이 AppBar/하단탭을 제공하므로 본문만 구성(자체 Scaffold 없음).
 ///
@@ -62,7 +64,12 @@ class _StudentRoomList extends StatefulWidget {
 
 /// 목록 한 행에 필요한 묶음(방 + 멘토 표시명 + 구독 요약 + 주간 사용량).
 class _RoomItem {
-  const _RoomItem({required this.room, this.mentor, this.sub, this.usage});
+  const _RoomItem(
+      {required this.room,
+      this.mentor,
+      this.sub,
+      this.usage,
+      required this.lastActivity});
   final Room room;
   final MentorPublic? mentor;
   final SubscriptionSummary? sub;
@@ -70,11 +77,17 @@ class _RoomItem {
   /// A2: 이 멘토와의 이번 주 질문 사용량(RPC). null = 미조회/실패 → 표시 생략.
   final WeeklyQuestionUsage? usage;
 
+  /// N37: 실제 마지막 활동 = max(방 updated_at, 스레드 updated_at) — 서버는
+  /// Q&A 활동 시 방 행을 갱신하지 않으므로(트리거·RPC 실측) 방 값만으로는
+  /// 동결된다. 멘토 인박스와 동일 기준으로 통일.
+  final DateTime lastActivity;
+
   String get mentorName => mentor?.displayName ?? '멘토';
 }
 
 class _StudentRoomListState extends State<_StudentRoomList>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
   final MentorLookupRepository _mentors = const MentorLookupRepository();
 
@@ -88,15 +101,24 @@ class _StudentRoomListState extends State<_StudentRoomList>
     // §4: 웹에서 구독·결제 후 앱 복귀 시 방 목록·구독 상태 재조회
     // (IndexedStack 탭이라 재빌드가 없으므로 lifecycle 신호로 갱신).
     WidgetsBinding.instance.addObserver(this);
+    // N35: 탭 전환·재선택, 무료 질문 생성 등 질문방 표면 신호 수신.
+    DataRefreshBus.questionRoomsGeneration.addListener(_refresh);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refresh();
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
   }
 
   @override
   void dispose() {
+    DataRefreshBus.questionRoomsGeneration.removeListener(_refresh);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -111,24 +133,42 @@ class _StudentRoomListState extends State<_StudentRoomList>
             SupabaseInit.clientOrNull!, studentId);
     final Map<String, MentorPublic> names =
         await _mentors.fetchMany(rooms.map((Room r) => r.mentorId));
-    // A2: 멘토별 주간 사용량(RPC). ★ 한도값 재하드코딩 없이 RPC 반환만. 실패는 null(표시 생략).
-    final Map<String, WeeklyQuestionUsage?> usageByMentor =
-        <String, WeeklyQuestionUsage?>{};
-    if (studentId != null) {
-      final Set<String> mentorIds = rooms.map((Room r) => r.mentorId).toSet();
-      await Future.wait(mentorIds.map((String mentorId) async {
-        usageByMentor[mentorId] =
-            await _repo.weeklyUsage(studentId: studentId, mentorId: mentorId);
-      }));
+    // A2: 멘토별 주간 사용량. ★ 한도값 재하드코딩 없이 RPC 반환만. 실패는 null(표시 생략).
+    // C15: 멘토 수만큼 병렬 호출하던 것을 배치 RPC 1회로.
+    final Map<String, WeeklyQuestionUsage?> usageByMentor = studentId == null
+        ? <String, WeeklyQuestionUsage?>{}
+        : await _repo.weeklyUsageBatch(rooms.map((Room r) => r.mentorId));
+    // N37: 방별 실제 활동시각 — 스레드 슬림 조회 1회(방·상태·활동시각만).
+    final Map<String, DateTime> lastByRoom = <String, DateTime>{};
+    try {
+      final List<ThreadStatusRow> statusRows = await _repo
+          .threadStatusRowsForRooms(rooms.map((Room r) => r.id).toList());
+      for (final ThreadStatusRow t in statusRows) {
+        final DateTime? cur = lastByRoom[t.roomId];
+        if (cur == null || t.updatedAt.isAfter(cur)) {
+          lastByRoom[t.roomId] = t.updatedAt;
+        }
+      }
+    } catch (_) {
+      // 실패 시 방 updated_at 폴백(표시 저하일 뿐 흐름은 막지 않는다).
     }
-    return rooms
+    DateTime activityOf(Room r) {
+      final DateTime? t = lastByRoom[r.id];
+      return (t != null && t.isAfter(r.updatedAt)) ? t : r.updatedAt;
+    }
+    final List<_RoomItem> items = rooms
         .map((Room r) => _RoomItem(
+              lastActivity: activityOf(r),
               room: r,
               mentor: names[r.mentorId],
               sub: subs[r.mentorId],
               usage: usageByMentor[r.mentorId],
             ))
         .toList();
+    // N37: 표시·정렬 기준 통일 — 실제 활동시각 내림차순(인박스와 동일).
+    items.sort(
+        (_RoomItem a, _RoomItem b) => b.lastActivity.compareTo(a.lastActivity));
+    return items;
   }
 
   void _refresh() {
@@ -175,7 +215,10 @@ class _StudentRoomListState extends State<_StudentRoomList>
     return FutureBuilder<List<_RoomItem>>(
       future: _future,
       builder: (BuildContext context, AsyncSnapshot<List<_RoomItem>> snap) {
-        if (snap.connectionState != ConnectionState.done) {
+        // R1(20건 리뷰): future 교체형 새로고침(N35 탭 신호·resume) 동안
+        // 이전 데이터가 스냅샷에 유지되므로, 데이터가 있으면 스피너 대신
+        // 기존 목록을 계속 보여준다(탭 전환마다 번쩍임 제거).
+        if (snap.connectionState != ConnectionState.done && !snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
@@ -308,9 +351,9 @@ class _RoomTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s8),
-                    // 마지막 활동시각(정렬에 쓰던 room.updatedAt) — 새 조회 없음.
+                    // 마지막 활동시각 — N37: 방·스레드 max(인박스와 동일 기준).
                     Text(
-                      '${Formatters.relativeKorean(item.room.updatedAt)} 활동',
+                      '${Formatters.relativeKorean(item.lastActivity)} 활동',
                       style: AppType.caption,
                     ),
                   ],

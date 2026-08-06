@@ -73,14 +73,16 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
   /// 주간 사용량 조회(읽기전용). 실패해도 화면 흐름은 막지 않는다.
   Future<void> _loadUsage() async {
-    final WeeklyQuestionUsage? u = await _read.weeklyUsage(
-      studentId: widget.room.studentId,
-      mentorId: widget.room.mentorId,
-    );
+    final WeeklyQuestionUsage? u = await _read.weeklyUsage(mentorId: widget.room.mentorId);
     if (mounted) setState(() => _usage = u);
   }
 
-  bool get _canAsk => widget.sub?.canAsk ?? false;
+  /// N29: '질문하기' 게이트 정본은 서버 get_weekly_question_usage 의 can_ask
+  /// (활성 구독 부재 시 limit=0 → false — 구독+주간 잔여를 모두 포함하는 완전
+  /// 판정, staging 함수 정의 실측 2026-08-05). 이 화면은 진입·답변 확인·복귀
+  /// 마다 usage 를 재조회하므로 게이트가 살아 움직인다. 조회 실패(null)일 때만
+  /// push 시점 구독 스냅샷으로 폴백(fail-closed: 둘 다 없으면 false).
+  bool get _canAsk => _usage?.canAsk ?? (widget.sub?.canAsk ?? false);
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +168,11 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                 label: '+ 새로운 질문하기',
                 onPressed: _busy ? null : _openNewQuestion,
               ),
-            ] else if (widget.sub?.isActive == true) ...<Widget>[
+            // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
+            // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
+            // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
+            ] else if (widget.sub?.isActive == true ||
+                (_usage != null && _usage!.limit > 0)) ...<Widget>[
               // 구독 중인데 이번 주 소진 — 안내만(구매 유도 아님).
               const Text(
                 '이번 주 질문을 모두 사용했어요.',

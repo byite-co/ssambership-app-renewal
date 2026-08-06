@@ -14,6 +14,7 @@ import '../iq_flags.dart';
 import 'iq_detail_screen.dart';
 import 'widgets/iq_widgets.dart';
 import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/widgets/screen_visibility.dart';
 
 /// 학생 — 내 개별질문 목록. 신규 등록은 경계 확정(2026-08-05)에 따라 웹에서만
 /// 한다 — 여기 CTA 는 웹 등록 페이지를 연다. 지정형 등록은 멘토 상세에서 같은
@@ -44,7 +45,9 @@ class StudentIqListScreen extends StatefulWidget {
   State<StudentIqListScreen> createState() => _StudentIqListScreenState();
 }
 
-class _StudentIqListScreenState extends State<StudentIqListScreen> {
+class _StudentIqListScreenState extends State<StudentIqListScreen>
+    with WidgetsBindingObserver, ResumeVisibilityGate {
+
   final IndividualQuestionRepository _repo =
       const IndividualQuestionRepository();
   late Future<List<IndividualQuestion>> _future;
@@ -56,6 +59,26 @@ class _StudentIqListScreenState extends State<StudentIqListScreen> {
   void initState() {
     super.initState();
     _future = _load();
+    // N34: 등록이 웹 전용이라 웹에서 등록 후 앱 복귀 시 목록이 낡은 채였다 —
+    // 질문방 탭과 동일하게 resume 시 재조회한다(PTR 의존 제거).
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) handleResumed();
+  }
+
+  // N12: 보일 때만 재조회(가려진 탭·덮인 라우트는 재노출 시 1회).
+  @override
+  void onResumeRefresh() {
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<List<IndividualQuestion>> _load() =>

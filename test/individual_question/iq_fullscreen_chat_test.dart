@@ -245,8 +245,10 @@ void main() {
       expect(find.text('첨부'), findsNothing);
     });
 
-    testWidgets('멘토 첨삭 진입도 질문 항목의 첨부에서 연다(게이트 유지)',
+    testWidgets('첨삭 폐쇄(2026-08): 질문 항목 첨부에도 첨삭하기 미노출',
         (WidgetTester tester) async {
+      // 첨삭 기능이 제품에서 닫혀 있는 동안 진입 버튼을 노출하지 않는다 —
+      // 재개 시 iq_detail_screen._canAnnotateGroup 원복과 함께 되살릴 것.
       await _pump(
         tester,
         role: AppRole.mentor,
@@ -255,6 +257,9 @@ void main() {
       );
 
       expect(find.descendant(of: _bubble(kBody), matching: find.text('첨삭하기')),
+          findsNothing);
+      // 첨부 카드 자체는 살아 있다 — 저장(다운로드) 유지.
+      expect(find.descendant(of: _bubble(kBody), matching: find.text('저장')),
           findsOneWidget);
     });
 

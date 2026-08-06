@@ -7,7 +7,7 @@ import '../../features/notifications/data/notification_types.dart';
 /// → deliveries).
 ///
 /// 서버 deliveries 의 data 필드 계약:
-/// - `type`: 정본 17종 코드(notification_types.dart, 정확 일치 — 목록 밖은 unknown)
+/// - `type`: 정본 18종 코드(notification_types.dart, 정확 일치 — 목록 밖은 unknown)
 /// - 선택 id: `room_id` / `thread_id` / `question_id`
 /// - 중복 제거용: `notification_id`(우선) / `event_key`(폴백)
 /// - ★ `link`/`url` 등 외부 경로 필드는 '무시'한다 — payload 로 URL/외부 scheme 을
@@ -24,7 +24,7 @@ class PushPayload {
     this.eventId = '',
   });
 
-  /// 정본 17종 매핑(목록 밖은 unknown — 이동 없음).
+  /// 정본 18종 매핑(목록 밖은 unknown — 이동 없음).
   final NotificationEventType type;
 
   /// 표시 문구(notification 파트, 없으면 빈 문자열).

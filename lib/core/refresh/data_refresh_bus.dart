@@ -23,6 +23,10 @@ class DataRefreshBus {
   ///
   /// ★ 앱 밖 변경(웹 구독 완료 후 앱 복귀)은 세대 신호가 올 수 없으므로
   ///   화면 resume 재조회가 정본 경로다 — 이 세대는 그 보완재지 대체재가 아니다.
+  /// ★ N30: 현재 생산자(bumpSubscription 호출) 0건은 **의도된 대기 상태**다 —
+  ///   Commerce-Zero 로 앱 안에서 구독 변화를 알게 되는 지점이 아직 없다.
+  ///   앱 내에서 구독 상태를 알게 되는 표면이 생기면 그 성공 지점에서 부른다.
+  ///   (리스너·가드 테스트는 test/refresh/subscription_stale_test.dart 에 유지.)
   static final ValueNotifier<int> subscriptionGeneration =
       ValueNotifier<int>(0);
 
@@ -37,4 +41,14 @@ class DataRefreshBus {
 
   /// 알림 재조회가 필요한 지점(알림 탭 재선택 등)에서 호출.
   static void bumpNotifications() => notificationsGeneration.value++;
+
+  /// 질문방 표면 세대(N35) — 탭 전환·재선택, 무료 질문 생성 등 '질문방 목록을
+  /// 다시 보라'는 신호. 학생 목록·멘토 인박스가 살아 있으면(IndexedStack)
+  /// 재조회한다. 종전에는 알림 탭에만 이런 배선이 있어, 무료 질문 직후
+  /// 질문방 탭이 낡은 목록을 보여줬다.
+  static final ValueNotifier<int> questionRoomsGeneration =
+      ValueNotifier<int>(0);
+
+  /// 질문방 재조회가 필요한 지점(탭 선택·재선택, 스레드 생성 성공 등)에서 호출.
+  static void bumpQuestionRooms() => questionRoomsGeneration.value++;
 }

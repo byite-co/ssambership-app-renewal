@@ -106,6 +106,12 @@ class MentorDirectoryRepository {
 
   /// 전체 공개 멘토 로드 — 검색·과목 필터·정렬을 **전체 집합**에 적용하기 위함.
   ///
+  /// ★ C28 스케일 경계(의도된 트레이드오프): 검색은 한글 라벨 정규화
+  ///   (subjectViews·searchHaystack)가 앱에 있어 전량 로드 후 로컬 처리가
+  ///   정확성 면에서 정본이다. 멘토 수백 명 규모까지는 이 방식이 단순·정확
+  ///   하며, [maxPages] 상한 도달(incomplete=true)이 서버측 검색 RPC(정규화
+  ///   로직 서버 이관 포함)로 이행할 신호다 — 조용한 절단은 없다.
+  ///
   /// created_at desc + mentor_id desc 로 [pageSize]씩 읽어 짧은 페이지가 나올
   /// 때까지 순회하고, 페이지 사이 삽입으로 생길 수 있는 중복은 mentor_id 로
   /// 제거한다(누락 0·중복 0). 결과 항목엔 활성 요금제를 붙인다.
@@ -162,50 +168,68 @@ class MentorDirectoryRepository {
 
   /// 상세 화면 추가 정보(평균 답변시간 + 내 구독 여부). 프로필·요금제·평점은
   /// 목록(뷰 행)에서 받은 항목을 재사용하므로 여기서는 부족한 부분만 채운다.
-  Future<MentorDetailExtras> fetchExtras(String mentorId) async {
-    num? avgHours;
+  ///
+  /// C26: [knownAvgRating]/[knownReviewCount] 로 목록 항목의 평점·리뷰 수를
+  /// 넘기면 같은 뷰 단건 재조회를 생략한다(상세 진입·resume 마다의 중복 제거).
+  /// 안 넘긴 호출(구 계약)만 뷰 행을 조회한다. 서로 독립인 조회는 병렬.
+  Future<MentorDetailExtras> fetchExtras(
+    String mentorId, {
+    double? knownAvgRating,
+    int? knownReviewCount,
+  }) async {
+    final Future<num?> avgHoursF = _fetchAvgResponseHours(mentorId);
+    final Future<bool> subscribedF = _fetchMySubscribed(mentorId);
+
+    double? avgRating = knownAvgRating;
+    int reviewCount = knownReviewCount ?? 0;
+    if (knownReviewCount == null) {
+      // 평점·리뷰 수 — 뷰 행이 정본(별도 reviews 집계 쿼리 제거).
+      try {
+        final Map<String, dynamic>? row =
+            await _gateway.selectDirectoryRow(mentorId);
+        if (row != null) {
+          avgRating = (row['avg_rating'] as num?)?.toDouble();
+          reviewCount = (row['review_count'] as num?)?.toInt() ?? 0;
+        }
+      } catch (_) {
+        // 조회 실패 → 평점 미표시(날조 금지).
+      }
+    }
+
+    return MentorDetailExtras(
+      avgResponseHours: await avgHoursF,
+      avgRating: avgRating,
+      reviewCount: reviewCount,
+      alreadySubscribed: await subscribedF,
+    );
+  }
+
+  Future<num?> _fetchAvgResponseHours(String mentorId) async {
     try {
       final dynamic r = await _client.rpc(
         'get_mentor_avg_response_hours',
         params: <String, dynamic>{'p_mentor_id': mentorId},
       );
-      if (r is num) avgHours = r;
+      if (r is num) return r;
     } catch (_) {
-      avgHours = null; // 통계 없음 → '신규 멘토'
+      // 통계 없음 → '신규 멘토'
     }
+    return null;
+  }
 
-    // 평점·리뷰 수 — 뷰 행이 정본(별도 reviews 집계 쿼리 제거).
-    double? avgRating;
-    int reviewCount = 0;
+  Future<bool> _fetchMySubscribed(String mentorId) async {
+    // ★ 병렬 조회 헬퍼는 절대 throw 하지 않는다 — 클라이언트 미연결 포함
+    //   모든 실패를 안에서 흡수해야 대기 전 실패가 unhandled 로 새지 않는다.
     try {
-      final Map<String, dynamic>? row =
-          await _gateway.selectDirectoryRow(mentorId);
-      if (row != null) {
-        avgRating = (row['avg_rating'] as num?)?.toDouble();
-        reviewCount = (row['review_count'] as num?)?.toInt() ?? 0;
-      }
+      final SupabaseClient client = _client;
+      final String? uid = client.auth.currentUser?.id;
+      if (uid == null) return false;
+      final Map<String, SubscriptionSummary> subs =
+          await SubscriptionReader.fetchForStudent(client, uid);
+      return subs[mentorId]?.isActive ?? false;
     } catch (_) {
-      // 조회 실패 → 평점 미표시(날조 금지).
+      return false;
     }
-
-    bool subscribed = false;
-    final String? uid = _client.auth.currentUser?.id;
-    if (uid != null) {
-      try {
-        final Map<String, SubscriptionSummary> subs =
-            await SubscriptionReader.fetchForStudent(_client, uid);
-        subscribed = subs[mentorId]?.isActive ?? false;
-      } catch (_) {
-        subscribed = false;
-      }
-    }
-
-    return MentorDetailExtras(
-      avgResponseHours: avgHours,
-      avgRating: avgRating,
-      reviewCount: reviewCount,
-      alreadySubscribed: subscribed,
-    );
   }
 
   SupabaseClient get _client {
