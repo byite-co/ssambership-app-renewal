@@ -52,6 +52,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
+  /// N18: 댓글 1페이지 크기 — 무제한 전량 조회 제거. '더 보기'가 한도를
+  /// 페이지씩 늘려 재조회한다(정렬 안정 — offset 병합 대신 한도 확장).
+  static const int _commentsPageSize = 100;
+  int _commentsLimit = _commentsPageSize;
+
+  /// 마지막 조회가 한도만큼 꽉 찼는지(= 더 있을 수 있음 → '더 보기' 노출).
+  bool _commentsMaybeMore = false;
+
   bool _liked = false;
   bool _scrapped = false;
   late int _likeCount;
@@ -75,7 +83,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   void initState() {
     super.initState();
     _likeCount = widget.post.likeCount;
-    _comments = widget.read.comments(CommunityPostType.board, widget.post.id);
+    _comments = _fetchCommentsPage();
     _loadReactionState();
     // 상세 진입 시 조회 기록(노출당 1회 — 같은 키 재사용, 실패 시 재시도 없음).
     // N40: 서버가 실제 가산했을 때만 본인 진입 +1 을 표시에 반영.
@@ -264,11 +272,19 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     }
   }
 
+  /// 현재 한도까지의 댓글 1회 조회 + '더 있음' 판정 갱신(N18).
+  Future<List<CommunityComment>> _fetchCommentsPage() async {
+    final List<CommunityComment> list = await widget.read
+        .comments(CommunityPostType.board, widget.post.id,
+            limit: _commentsLimit);
+    _commentsMaybeMore = list.length >= _commentsLimit;
+    return list;
+  }
+
   /// 댓글 재조회 + 댓글 수 동기화. Future 교체 방식이라 FutureBuilder 가
   /// 최신 future 만 반영(늦은 응답이 덮지 않음), 콜백은 mounted 가드.
   void _reloadComments() {
-    final Future<List<CommunityComment>> next =
-        widget.read.comments(CommunityPostType.board, widget.post.id);
+    final Future<List<CommunityComment>> next = _fetchCommentsPage();
     // ★ 블록 바디: 화살표로 Future 를 대입하면 'setState callback returned a
     //   Future' 로 리빌드가 취소된다(§4 공통 함정).
     setState(() {
@@ -276,9 +292,33 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     });
     next.then((List<CommunityComment> list) {
       if (!mounted) return;
-      setState(() => _commentCountOverride = list.length);
+      // 한도 미만이면 전체를 다 본 것 — 그때만 개수 정본으로 승격.
+      if (list.length < _commentsLimit) {
+        setState(() => _commentCountOverride = list.length);
+      }
     }).catchError((Object _) {
       // 재조회 실패 시 기존 표시값 유지(정상 데이터를 지우지 않는다).
+    });
+  }
+
+  /// '더 보기' — 한도를 1페이지 늘려 재조회.
+  void _loadMoreComments() {
+    _commentsLimit += _commentsPageSize;
+    _reloadComments();
+  }
+
+  /// 등록 직후 내 댓글을 로컬로 덧붙인다(N18 — 등록마다 전량 재조회 제거).
+  /// 대화순(asc) 끝에 붙는 게 서버 정렬과 동일하고, 본인 댓글이라 차단
+  /// 필터도 무관하다.
+  void _appendLocalComment(CommunityComment created) {
+    final Future<List<CommunityComment>> next = _comments
+        .then((List<CommunityComment> l) => <CommunityComment>[...l, created])
+        .catchError((Object _) => <CommunityComment>[created]);
+    setState(() {
+      _comments = next;
+      final int? cur = _commentCountOverride;
+      // 전체 미확인(잘린 목록) 상태면 서버 스냅샷 +1 근사로 표시.
+      _commentCountOverride = (cur ?? widget.post.commentCount) + 1;
     });
   }
 
@@ -290,7 +330,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     if (!mounted) return;
     setState(() => _busy = true);
     try {
-      await widget.write.addComment(
+      final CommunityComment created = await widget.write.addComment(
         postType: CommunityPostType.board,
         postId: widget.post.id,
         body: body,
@@ -298,7 +338,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       if (!mounted) return; // ★ await 중 화면이 닫혔으면 상태 갱신 금지
       _input.clear();
       _changed = true;
-      _reloadComments();
+      _appendLocalComment(created);
     } catch (e) {
       _snack('댓글 등록에 실패했어요. ${friendlyError(e)}');
     } finally {
@@ -431,11 +471,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         }
         final List<CommunityComment> comments =
             snap.data ?? <CommunityComment>[];
+        // N18: 잘린 목록이면 length 는 과소 표기 — 서버 스냅샷 개수로 보정.
+        final int headerCount = _commentCountOverride ??
+            (_commentsMaybeMore && widget.post.commentCount > comments.length
+                ? widget.post.commentCount
+                : comments.length);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // 헤더: "댓글 {개수}"(동적 — 현재 리스트 length). 스타일 title.
-            Text('댓글 ${comments.length}', style: AppType.title),
+            // 헤더: "댓글 {개수}". 스타일 title.
+            Text('댓글 $headerCount', style: AppType.title),
             const SizedBox(height: AppSpacing.titleBody),
             if (comments.isEmpty)
               Text('첫 댓글을 남겨보세요.', style: AppType.caption)
@@ -451,6 +496,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   onBlock: () => _blockCommentAuthor(comments[i].id),
                 ),
               ],
+            // N18: 페이지 한도까지 꽉 찼으면 더 있을 수 있다 — 명시 확장.
+            if (_commentsMaybeMore)
+              Center(
+                child: TextButton(
+                  onPressed: _loadMoreComments,
+                  child: const Text('댓글 더 보기'),
+                ),
+              ),
           ],
         );
       },
