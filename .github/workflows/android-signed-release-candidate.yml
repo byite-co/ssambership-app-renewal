@@ -164,18 +164,35 @@ jobs:
           echo "FLUTTER_ANALYZE=PASS" >> "$SUMMARY"
 
       - name: flutter test (전체 스위트 — 기대 1469건 전부 통과)
+        # 성공 판정은 (1) flutter test 의 exit code, (2) 실제 reporter footer
+        # 의 숫자("N tests passed.")를 EXPECTED_TEST_COUNT 와 대조 — 두 겹이다.
+        # GitHub Actions 의 flutter test 는 github reporter 를 쓰므로 로컬
+        # compact reporter 문구를 고정 검색하면 거짓 실패한다(run 31106224905).
         run: |
           set -euo pipefail
+
           flutter test 2>&1 | tee /tmp/test.log \
             || { echo "::error::flutter test 실패"; exit 1; }
-          grep -q "All tests passed!" /tmp/test.log \
-            || { echo "::error::테스트 전부 통과가 아니다"; exit 1; }
-          COUNT=$(grep -oE '\+[0-9]+' /tmp/test.log | tail -1 | tr -d '+')
-          echo "TEST_COUNT=$COUNT"
-          if [ "$COUNT" != "$EXPECTED_TEST_COUNT" ]; then
-            echo "::error::테스트 수 $COUNT != ${EXPECTED_TEST_COUNT} — source SHA 가 맞는지 먼저 확인하라"
+
+          COUNT="$(
+            grep -aoE '[0-9]+ tests passed\.' /tmp/test.log \
+              | tail -1 \
+              | grep -aoE '^[0-9]+' \
+              || true
+          )"
+
+          if [ -z "$COUNT" ]; then
+            echo "::error::테스트 성공 요약에서 통과 수를 읽지 못했다"
             exit 1
           fi
+
+          echo "TEST_COUNT=$COUNT"
+
+          if [ "$COUNT" != "$EXPECTED_TEST_COUNT" ]; then
+            echo "::error::테스트 수 $COUNT != ${EXPECTED_TEST_COUNT}"
+            exit 1
+          fi
+
           echo "FLUTTER_TEST=PASS ($COUNT)" >> "$SUMMARY"
 
       # ── 4. 운영 .env 생성(테스트 이후·build 직전) + 정확 일치 preflight ──

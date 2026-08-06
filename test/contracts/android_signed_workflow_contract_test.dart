@@ -294,6 +294,35 @@ void main() {
           reason: 'release candidate 는 dart-define 주입 없이 기본값으로 빌드');
     });
 
+    test('flutter test gate uses actual numeric reporter footer', () {
+      // run 31106224905 회귀: 1,469건 전부 통과 후 stale 문구('All tests
+      // passed!' — 로컬 compact reporter 전용) 고정 검색으로 거짓 실패했다.
+      // 성공 판정은 exit code + 실제 reporter footer 의 숫자("N tests
+      // passed.") 파싱 + EXPECTED_TEST_COUNT 대조여야 한다. 주석이 아닌
+      // 실제 step run 본문을 검사한다.
+      final YamlMap testStep = steps.whereType<YamlMap>().firstWhere(
+          (YamlMap s) =>
+              (s['name'] ?? '').toString().startsWith('flutter test'));
+      final String run = testStep['run'].toString();
+      expect(run, contains('set -euo pipefail'));
+      expect(run, contains('flutter test 2>&1 | tee /tmp/test.log'));
+      // 숫자 footer 파싱 게이트 존재.
+      expect(run, contains(r"grep -aoE '[0-9]+ tests passed\.'"),
+          reason: '실제 reporter footer("N tests passed.")에서 숫자를 읽어야 한다');
+      expect(run, contains(r'if [ -z "$COUNT" ]'),
+          reason: '통과 수를 읽지 못하면 실패하는 게이트가 있어야 한다');
+      expect(run, contains(r'"$COUNT" != "$EXPECTED_TEST_COUNT"'),
+          reason: 'EXPECTED_TEST_COUNT 와의 대조가 있어야 한다');
+      // stale 문구 의존 금지(실행 본문 기준).
+      expect(run, isNot(contains('All tests passed!')),
+          reason: '로컬 compact reporter 전용 문구 — CI(github reporter)에서 '
+              '거짓 실패를 만든다');
+      // flutter test 명령 자체를 성공으로 강제하는 || true 금지
+      // (footer 추출 서브셸의 빈 결과 처리용 || true 만 허용).
+      expect(run, isNot(matches(RegExp(r'flutter test[^\n]*\|\|\s*true'))),
+          reason: 'flutter test 실패가 exit code 로 반드시 드러나야 한다');
+    });
+
     test('게이트가 실행 본문(run)에 실제로 배선돼 있다 — 주석으로는 불충분', () {
       expect(runBodies, contains('BLOCKED_APP_PR_HEAD_MOVED'));
       expect(runBodies, contains('dart run tool/validate_release_env.dart'));
