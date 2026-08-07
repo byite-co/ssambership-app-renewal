@@ -21,7 +21,7 @@ const String kWorkflowPath =
     '.github/workflows/android-signed-release-candidate.yml';
 
 /// 빌드 대상 고정 — S3 후보(1.0.0+19) head. 전체 40자 SHA 여야 한다.
-const String kSourceSha = '8579622b2a849368de5e96adf4dc9cac2143a245';
+const String kSourceSha = '1bbbc2143192ebe406f070c993f4df70b7a1b175';
 
 /// 출시 Supabase 정본 URL(공개 식별자) — workflow 비교 기준값과 동일해야 한다.
 const String kProductionSupabaseUrl =
