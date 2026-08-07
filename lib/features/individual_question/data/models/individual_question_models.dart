@@ -353,6 +353,8 @@ class IndividualQuestion {
     this.claimedMentorId,
     this.subject,
     this.topic,
+    this.requiredSchoolTier,
+    this.requiredMajorCategory,
     this.expiresAt,
     this.answeredAt,
     this.releasedAt,
@@ -371,6 +373,13 @@ class IndividualQuestion {
   final String? claimedMentorId;
   final String? subject;
   final String? topic;
+
+  /// [QA-B6] 학생이 정한 답변 자격 조건 — 요구 학교군(예: '서연고').
+  /// 서버에 저장돼 있고 웹은 표시하는데 앱 모델에만 없어서 화면에 못 그렸다.
+  final String? requiredSchoolTier;
+
+  /// [QA-B6] 학생이 정한 답변 자격 조건 — 요구 계열(예: '메디컬').
+  final String? requiredMajorCategory;
   final DateTime? expiresAt;
   final DateTime? answeredAt;
   final DateTime? releasedAt;
@@ -393,6 +402,8 @@ class IndividualQuestion {
       claimedMentorId: map['claimed_mentor_id'] as String?,
       subject: map['subject'] as String?,
       topic: map['topic'] as String?,
+      requiredSchoolTier: map['required_school_tier'] as String?,
+      requiredMajorCategory: map['required_major_category'] as String?,
       expiresAt: _parseTime(map['expires_at']),
       answeredAt: _parseTime(map['answered_at']),
       releasedAt: _parseTime(map['released_at']),
@@ -410,6 +421,8 @@ class OpenIndividualQuestion {
     required this.priceCents,
     this.subject,
     this.topic,
+    this.requiredSchoolTier,
+    this.requiredMajorCategory,
     this.expiresAt,
     this.createdAt,
   });
@@ -419,6 +432,14 @@ class OpenIndividualQuestion {
   final int priceCents;
   final String? subject;
   final String? topic;
+
+  /// [QA-B6] 수락 전에 조건을 보고 판단할 수 있어야 한다 — 요구 학교군.
+  /// 서버 RPC(list_open_individual_questions_for_mentor)가 이 값을 돌려주도록
+  /// 함께 넓혔다(웹 migration 20260807010000).
+  final String? requiredSchoolTier;
+
+  /// [QA-B6] 요구 계열.
+  final String? requiredMajorCategory;
   final DateTime? expiresAt;
   final DateTime? createdAt;
 
@@ -429,6 +450,8 @@ class OpenIndividualQuestion {
       priceCents: _parseInt(map['price_cents']),
       subject: map['subject'] as String?,
       topic: map['topic'] as String?,
+      requiredSchoolTier: map['required_school_tier'] as String?,
+      requiredMajorCategory: map['required_major_category'] as String?,
       expiresAt: _parseTime(map['expires_at']),
       createdAt: _parseTime(map['created_at']),
     );

@@ -20,7 +20,7 @@ import 'package:yaml/yaml.dart';
 const String kWorkflowPath =
     '.github/workflows/android-signed-release-candidate.yml';
 
-/// 빌드 대상 고정 — PR #51 head(1.0.0+18). 전체 40자 SHA 여야 한다.
+/// 빌드 대상 고정 — S3 후보(1.0.0+19) head. 전체 40자 SHA 여야 한다.
 const String kSourceSha = '35d7b03afe1f1fc601032e5f2c5218b7040422f5';
 
 /// 출시 Supabase 정본 URL(공개 식별자) — workflow 비교 기준값과 동일해야 한다.
@@ -64,7 +64,7 @@ void main() {
       final YamlMap inputs =
           (on['workflow_dispatch'] as YamlMap)['inputs'] as YamlMap;
       for (final String name in <String>[
-        'confirm_version_code_18_unused',
+        'confirm_version_code_19_unused',
         'confirm_no_store_upload',
       ]) {
         final YamlMap input = inputs[name] as YamlMap;
@@ -79,7 +79,7 @@ void main() {
 
     test('job 은 두 확인 입력이 모두 true 일 때만 시작한다', () {
       final String cond = job['if'].toString();
-      expect(cond, contains('confirm_version_code_18_unused == true'));
+      expect(cond, contains('confirm_version_code_19_unused == true'));
       expect(cond, contains('confirm_no_store_upload == true'));
       expect(cond, contains('&&'), reason: '두 확인의 AND 결합이어야 한다');
     });
@@ -100,7 +100,7 @@ void main() {
 
     test('concurrency 고정 그룹 + cancel-in-progress=false', () {
       final YamlMap conc = doc['concurrency'] as YamlMap;
-      expect(conc['group'], 'android-signed-release-candidate-18');
+      expect(conc['group'], 'android-signed-release-candidate-19');
       expect(conc['cancel-in-progress'], isFalse,
           reason: '진행 중 서명 작업 취소는 반쪽 산출물을 남긴다');
     });
@@ -138,13 +138,13 @@ void main() {
 
     test('버전·패키지·URL·테스트수 기대값 고정', () {
       expect(env['EXPECTED_PR'].toString(), '51');
-      expect(env['EXPECTED_VERSION'].toString(), '1.0.0+18');
+      expect(env['EXPECTED_VERSION'].toString(), '1.0.0+19');
       expect(env['EXPECTED_VERSION_NAME'].toString(), '1.0.0');
-      expect(env['EXPECTED_VERSION_CODE'].toString(), '18');
+      expect(env['EXPECTED_VERSION_CODE'].toString(), '19');
       expect(env['EXPECTED_APPLICATION_ID'], 'com.ssambership.edu');
       expect(env['EXPECTED_MIN_SDK'].toString(), '24');
       expect(env['EXPECTED_TARGET_SDK'].toString(), '36');
-      expect(env['EXPECTED_TEST_COUNT'].toString(), '1469');
+      expect(env['EXPECTED_TEST_COUNT'].toString(), '1505');
       expect(env['EXPECTED_SUPABASE_URL'], kProductionSupabaseUrl,
           reason: '.env 정확 일치·AAB 내장 판정의 기준값 — 변경은 의도적으로만');
     });

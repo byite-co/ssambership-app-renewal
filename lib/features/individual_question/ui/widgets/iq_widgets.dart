@@ -83,6 +83,12 @@ class IqQuestionCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              // [QA-B6] 학생 본인 목록에서도 자신이 건 조건을 확인할 수 있어야 한다.
+              IqRequirementChips(
+                subject: question.subject,
+                requiredSchoolTier: question.requiredSchoolTier,
+                requiredMajorCategory: question.requiredMajorCategory,
+              ),
               const SizedBox(height: 6),
               Row(
                 children: <Widget>[
@@ -141,6 +147,12 @@ class IqOpenQuestionCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            // [QA-B6] 수락 전에 조건을 볼 수 있어야 한다.
+            IqRequirementChips(
+              subject: question.subject,
+              requiredSchoolTier: question.requiredSchoolTier,
+              requiredMajorCategory: question.requiredMajorCategory,
+            ),
             if (remaining != null) ...<Widget>[
               const SizedBox(height: 6),
               Text(remaining, style: AppTypography.caption),
@@ -155,6 +167,49 @@ class IqOpenQuestionCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// [QA-B6] 질문의 조건(과목 · 요구 학교군 · 요구 계열)을 한 줄 칩으로 보여준다.
+///
+/// 멘토는 이 조건을 보고 수락 여부를 판단한다 — 종전에는 서버에 값이 있고 웹은
+/// 보여주는데 앱만 아무것도 그리지 않아, 조건을 모른 채 질문을 잡아야 했다.
+/// 값이 하나도 없으면 아무것도 그리지 않는다(빈 줄·빈 칩 금지).
+class IqRequirementChips extends StatelessWidget {
+  const IqRequirementChips({
+    super.key,
+    this.subject,
+    this.requiredSchoolTier,
+    this.requiredMajorCategory,
+  });
+
+  final String? subject;
+  final String? requiredSchoolTier;
+  final String? requiredMajorCategory;
+
+  static String? _clean(String? v) {
+    final String t = (v ?? '').trim();
+    return t.isEmpty ? null : t;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String? s = _clean(subject);
+    final String? tier = _clean(requiredSchoolTier);
+    final String? major = _clean(requiredMajorCategory);
+    if (s == null && tier == null && major == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: <Widget>[
+          if (s != null) AppBadge(label: s),
+          if (tier != null) AppBadge(label: '$tier 이상'),
+          if (major != null) AppBadge(label: '$major 계열'),
+        ],
       ),
     );
   }

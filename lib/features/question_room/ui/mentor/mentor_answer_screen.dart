@@ -17,6 +17,7 @@ import '../../data/question_room_write_repository.dart';
 import '../../data/room_counterparty.dart';
 import '../../data/room_safety_repository.dart';
 import '../../data/thread_messages_controller.dart';
+import '../../../scan_annotation/scan_annotation_screen.dart';
 import '../../data/thread_realtime.dart';
 import '../attachment_viewer_screen.dart';
 import '../widgets/chat_input_bar.dart';
@@ -395,6 +396,34 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   }
 
   /// 선택 결과 공통 처리: 5MB 초과 리사이즈(§6-4) → 검증 → 미리보기 세팅.
+  /// [QA-C3] 전송 전 대기 이미지에 주석 달기 — 학생 화면(chat_screen)에만 있고
+  /// 멘토 답변 화면에는 배선이 아예 없었다(심볼 0건). 주석 화면·평탄화·업로드는
+  /// 이미 공용 부품이라 여기서는 같은 경로를 이어 주기만 하면 된다.
+  ///
+  /// 주석 화면이 true 를 반환하면 그 화면이 이미 첨부로 전송을 끝낸 상태다 —
+  /// 대기 슬롯을 비우고 목록을 재조회한다(중복 전송 금지).
+  Future<void> _annotatePending() async {
+    final PickedImage? img = _pending;
+    if (img == null) return;
+    final bool? sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => ScanAnnotationScreen(
+          background: img.bytes,
+          roomId: widget.thread.roomId,
+          threadId: widget.thread.id,
+        ),
+      ),
+    );
+    if (sent != true || !mounted) return;
+    setState(() => _pending = null);
+    await _refresh();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주석을 첨부로 보냈어요.')),
+      );
+    }
+  }
+
   Future<void> _acceptPicked(PickedImage picked) async {
     final PickedImage img = await downscaleIfOversized(picked);
     final String? invalid = validatePickedImage(img);
@@ -458,6 +487,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
             sendTooltip: '답변 전송',
             pendingImage: _blocked ? null : _pending,
             onRemovePending: () => setState(() => _pending = null),
+            onAnnotate: _annotatePending,
             enabled: !_blocked,
             disabledNotice: _blocked ? _blockedNotice : null,
           ),
