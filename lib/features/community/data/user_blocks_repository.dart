@@ -108,50 +108,66 @@ class UserBlocksRepository {
   }
 
   /// 차단 목록(표시명 포함) — 차단 관리 화면용.
+  ///
+  /// [QA-C7] 종전에는 user_blocks 조회 후 users 를 직접 읽어 닉네임을 붙였는데,
+  /// public.users 의 SELECT 정책이 **본인 + admin** 뿐이라 타인 행이 0건으로
+  /// 돌아왔다 — 그래서 화면에 전부 '사용자'로만 보였다. 앱 결함이 아니라 서버가
+  /// 표시명을 내줄 경로가 없었다.
+  ///
+  /// 서버가 정의자 RPC `public.my_blocked_users()` 를 제공한다(웹 migration
+  /// 20260807020000). 인자가 없어 타인 목록을 물을 수 없고, 반환은
+  /// blocked_id · nickname · created_at 뿐이다.
+  ///
+  /// RPC 가 아직 배포되지 않은 서버(구버전)에서는 종전 경로로 물러난다 —
+  /// 이름은 '사용자' 폴백이 되지만 **차단 목록 자체는 보여야** 해제할 수 있다.
   Future<List<BlockedUser>> myBlockedUsers() async {
     final SupabaseClient? c = _client;
     final String? uid = _uid;
     if (c == null || uid == null) return <BlockedUser>[];
+    final List<BlockedUser>? viaRpc = await _blockedUsersViaRpc(c);
+    if (viaRpc != null) return viaRpc;
+    return _blockedUsersLegacy(c, uid);
+  }
+
+  /// 정본 경로 — 서버 RPC. 호출 자체가 실패하면 null 을 돌려 폴백을 태운다
+  /// (빈 목록과 '조회 실패'를 구분한다 — 빈 목록도 정상 응답이다).
+  Future<List<BlockedUser>?> _blockedUsersViaRpc(SupabaseClient c) async {
+    try {
+      final Object? res = await c.rpc('my_blocked_users');
+      if (res is! List) return null;
+      final List<BlockedUser> out = <BlockedUser>[];
+      for (final Object? row in res) {
+        if (row is! Map) continue;
+        final String? id = row['blocked_id'] as String?;
+        if (id == null || id.isEmpty) continue;
+        final String nick = (row['nickname'] as String?)?.trim() ?? '';
+        out.add(BlockedUser(
+          userId: id,
+          displayName: nick.isEmpty ? '사용자' : nick,
+        ));
+      }
+      return out;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 구서버 폴백 — 차단 id 만 읽어 목록을 만든다(이름은 '사용자').
+  Future<List<BlockedUser>> _blockedUsersLegacy(
+      SupabaseClient c, String uid) async {
     try {
       final List<Map<String, dynamic>> rows = await c
           .from(_table)
           .select('blocked_id')
           .eq('blocker_id', uid)
           .order('created_at', ascending: false);
-      final List<String> ids = <String>[
-        for (final Map<String, dynamic> r in rows)
-          if (r['blocked_id'] != null) r['blocked_id'] as String,
-      ];
-      if (ids.isEmpty) return <BlockedUser>[];
-      final Map<String, String> names = await _displayNames(c, ids);
       return <BlockedUser>[
-        for (final String id in ids)
-          BlockedUser(userId: id, displayName: names[id] ?? '사용자'),
+        for (final Map<String, dynamic> r in rows)
+          if (r['blocked_id'] != null)
+            BlockedUser(userId: r['blocked_id'] as String, displayName: '사용자'),
       ];
     } catch (_) {
       return <BlockedUser>[];
-    }
-  }
-
-  /// 표시명 조회(users 테이블 — nickname 우선). 실패/RLS 시 빈 맵(폴백 '사용자').
-  Future<Map<String, String>> _displayNames(
-      SupabaseClient c, List<String> ids) async {
-    try {
-      final List<Map<String, dynamic>> rows = await c
-          .from('users')
-          .select('id, nickname, full_name')
-          .inFilter('id', ids);
-      final Map<String, String> out = <String, String>{};
-      for (final Map<String, dynamic> r in rows) {
-        final String? id = r['id'] as String?;
-        if (id == null) continue;
-        final String nick = (r['nickname'] as String?)?.trim() ?? '';
-        final String full = (r['full_name'] as String?)?.trim() ?? '';
-        out[id] = nick.isNotEmpty ? nick : (full.isNotEmpty ? full : '사용자');
-      }
-      return out;
-    } catch (_) {
-      return <String, String>{};
     }
   }
 

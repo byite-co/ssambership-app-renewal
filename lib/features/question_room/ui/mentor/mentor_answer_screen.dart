@@ -386,12 +386,50 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
         context,
         picked: picked,
         rasterizer: widget.pdfRasterizer,
-        maxCount: 1, // 대기 슬롯 1(전송 전 미리보기 1장).
+        maxCount: kPdfMaxPagesPerPick, // [QA-B5] 여러 페이지를 고를 수 있다.
       );
-      if (images.isNotEmpty) await _acceptPicked(images.first);
+      if (images.isEmpty) return;
+      // [QA-B5] 학생 화면과 동일 규칙 — 첫 장은 미리보기 슬롯, 나머지는 순차 전송.
+      await _acceptPicked(images.first);
+      if (images.length > 1) {
+        await _sendExtraPagesSequentially(images.sublist(1));
+      }
     } catch (e) {
       // PDF 폴백 안내(AppError) 포함 — 원문 비노출 규약.
       _showError(friendlyError(e));
+    }
+  }
+
+  /// [QA-B5] 첫 장을 뺀 나머지 페이지를 한 장씩 이어서 전송한다.
+  ///
+  /// 한 장이라도 실패하면 거기서 멈추고 몇 장이 갔는지 알린다 — 조용히 일부만
+  /// 보내고 성공처럼 보이게 하지 않는다. 이미 올라간 장은 되돌리지 않는다.
+  Future<void> _sendExtraPagesSequentially(List<PickedImage> pages) async {
+    if (pages.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    int done = 0;
+    try {
+      for (final PickedImage page in pages) {
+        final PickedImage img = await downscaleIfOversized(page);
+        final String? invalid = validatePickedImage(img);
+        if (invalid != null) {
+          _showError('$invalid (${done + 1}번째 페이지에서 멈췄어요)');
+          break;
+        }
+        final bool ok = await _uploadPending(img);
+        if (!ok) {
+          _showError('$done장까지 보냈어요. 나머지는 다시 시도해 주세요.');
+          break;
+        }
+        done += 1;
+      }
+    } catch (e) {
+      _showError('$done장까지 보냈어요. ${friendlyError(e)}');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+    if (done > 0 && mounted) {
+      _showError('페이지 $done장을 보냈어요.');
     }
   }
 
