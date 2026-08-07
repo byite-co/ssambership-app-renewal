@@ -81,6 +81,18 @@ void main() {
       expect(find.text('전공계열 · 메디컬'), findsOneWidget);
     });
 
+    testWidgets('과목 코드는 한글 라벨로 변환된다 — 영문 코드가 화면에 새지 않는다',
+        (WidgetTester tester) async {
+      // 실데이터 실측(2026-08-07): individual_questions.subject 는 정본 코드로
+      // 저장된다(korean_reading 등). 초기 fixture 가 한글 라벨이라 이 결함을 놓쳤다.
+      await pump(
+        tester,
+        const IqRequirementChips(subject: 'korean_reading'),
+      );
+      expect(find.text('독서'), findsOneWidget);
+      expect(find.text('korean_reading'), findsNothing);
+    });
+
     testWidgets('조건이 하나도 없으면 아무것도 그리지 않는다(빈 칩 금지)',
         (WidgetTester tester) async {
       await pump(tester, const IqRequirementChips());

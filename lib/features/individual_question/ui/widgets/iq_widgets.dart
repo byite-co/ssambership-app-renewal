@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../data/mappings/subject_labels.dart';
 import '../../../../design/tokens/typography.dart';
 import '../../../../design/widgets/app_badge.dart';
 import '../../../../design/widgets/app_card.dart';
@@ -196,7 +197,10 @@ class IqRequirementChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String? s = _clean(subject);
+    // subject 는 DB 정본 코드(`korean_reading` 등)로 내려온다 — 반드시 한글 라벨화.
+    // (학교군·계열은 한글로 저장되어 그대로 쓴다. 실측 2026-08-07)
+    final String? rawSubject = _clean(subject);
+    final String? s = rawSubject == null ? null : subjectLabel(rawSubject);
     final String? tier = _clean(requiredSchoolTier);
     final String? major = _clean(requiredMajorCategory);
     if (s == null && tier == null && major == null) return const SizedBox.shrink();
