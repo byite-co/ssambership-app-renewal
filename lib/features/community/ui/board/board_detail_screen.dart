@@ -48,7 +48,8 @@ class BoardDetailScreen extends StatefulWidget {
   State<BoardDetailScreen> createState() => _BoardDetailScreenState();
 }
 
-class _BoardDetailScreenState extends State<BoardDetailScreen> {
+class _BoardDetailScreenState extends State<BoardDetailScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _input = TextEditingController();
   late Future<List<CommunityComment>> _comments;
 
@@ -79,9 +80,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   /// late final 이라 리빌드에도 재생성되지 않는다(멱등 계약 — 중복 가산 0).
   late final String _viewEventKey = newBoardPostIdempotencyKey();
 
+  /// [QA-C6] 이 글이 서버에서 사라졌는가(삭제·숨김). 열어둔 상세는 목록 스냅샷을
+  /// 그리기만 해서, 다른 기기·관리자가 글을 지워도 새로고침 전까지 그대로 남았다.
+  bool _gone = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _likeCount = widget.post.likeCount;
     _comments = _fetchCommentsPage();
     _loadReactionState();
@@ -96,8 +102,62 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _input.dispose();
     super.dispose();
+  }
+
+  /// [QA-C6] 앱 복귀 시 글이 아직 있는지 확인한다.
+  ///
+  /// 서버 정책 교정(QA-A4 / cp_select_visible)으로 soft-delete 된 글은 조회에서
+  /// 빠지므로, 재조회가 null 이면 사라진 것이다. 자동으로 화면을 닫지는 않는다 —
+  /// 댓글을 쓰던 중일 수 있어 갑작스러운 pop 은 입력을 잃게 한다. 대신 안내를
+  /// 띄우고 목록으로 돌아가는 선택을 사용자에게 준다.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkStillExists();
+  }
+
+  Future<void> _checkStillExists() async {
+    if (_gone || !mounted) return;
+    try {
+      final BoardPost? p = await widget.read.boardPostById(widget.post.id);
+      if (!mounted || p != null) return;
+      setState(() {
+        _gone = true;
+        _changed = true; // 목록도 이 글을 지워야 한다.
+      });
+    } catch (_) {
+      // 네트워크 실패를 '삭제됨'으로 오해하지 않는다 — 조용히 넘어가고 다음 복귀에 다시 본다.
+    }
+  }
+
+  /// [QA-C6] 사라진 글에 표시하는 안내 화면.
+  Widget _goneBody() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Text('더 이상 볼 수 없는 글이에요.', style: AppType.cardTitle),
+            const SizedBox(height: 8),
+            const Text(
+              // 삭제와 모더레이션 비공개를 구분해 말할 근거가 조회 결과에 없다
+              // (둘 다 목록 뷰에서 함께 빠진다) — 지어내지 않고 둘 다 적는다.
+              '삭제되었거나 비공개로 바뀌었어요.',
+              style: AppType.caption,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(_changed),
+              child: const Text('목록으로 돌아가기'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadReactionState() async {
@@ -236,7 +296,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       _snack('차단에 실패했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
-    final bool blocked = await confirmAndBlockAuthor(context, authorId: authorId);
+    final bool blocked =
+        await confirmAndBlockAuthor(context, authorId: authorId);
     if (blocked && mounted) Navigator.of(context).pop(true);
   }
 
@@ -274,9 +335,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   /// 현재 한도까지의 댓글 1회 조회 + '더 있음' 판정 갱신(N18).
   Future<List<CommunityComment>> _fetchCommentsPage() async {
-    final List<CommunityComment> list = await widget.read
-        .comments(CommunityPostType.board, widget.post.id,
-            limit: _commentsLimit);
+    final List<CommunityComment> list = await widget.read.comments(
+        CommunityPostType.board, widget.post.id,
+        limit: _commentsLimit);
     _commentsMaybeMore = list.length >= _commentsLimit;
     return list;
   }
@@ -388,70 +449,75 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenH, 16, AppSpacing.screenH, 16),
+      // [QA-C6] 서버에서 사라진 글이면 스냅샷을 계속 그리지 않는다.
+      body: _gone
+          ? _goneBody()
+          : Column(
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    AppBadge(
-                        label: communityCategoryLabel(p.category),
-                        tinted: true),
-                    const Spacer(),
-                    Text(Formatters.relativeKorean(p.createdAt),
-                        style: AppType.caption),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.titleBody),
-                Text(p.title, style: AppType.title),
-                const SizedBox(height: AppSpacing.titleBody),
-                Row(
-                  children: <Widget>[
-                    InitialAvatar(name: p.authorName, size: 28, tinted: false),
-                    const SizedBox(width: 8),
-                    Text(p.authorName, style: AppType.caption),
-                    const SizedBox(width: 10),
-                    Text('조회 ${p.viewCount + _viewCountBump}', style: AppType.caption),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s16),
-                Text(
-                  p.body?.trim().isNotEmpty == true
-                      ? p.body!.trim()
-                      : '(내용 없음)',
-                  style: AppType.body,
-                ),
-                // 첨부 이미지 — imageRefs 순서대로. 한 장의 실패가 본문·다른
-                // 이미지 표시를 막지 않는다(장별 독립 해석·플레이스홀더).
-                for (final String ref in p.imageRefs) ...<Widget>[
-                  const SizedBox(height: AppSpacing.s16),
-                  _PostImage(
-                    key: ValueKey<String>('post-image-$ref'),
-                    imageRef: ref,
-                    resolver: widget.imageUrlResolver,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.screenH, 16, AppSpacing.screenH, 16),
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          AppBadge(
+                              label: communityCategoryLabel(p.category),
+                              tinted: true),
+                          const Spacer(),
+                          Text(Formatters.relativeKorean(p.createdAt),
+                              style: AppType.caption),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.titleBody),
+                      Text(p.title, style: AppType.title),
+                      const SizedBox(height: AppSpacing.titleBody),
+                      Row(
+                        children: <Widget>[
+                          InitialAvatar(
+                              name: p.authorName, size: 28, tinted: false),
+                          const SizedBox(width: 8),
+                          Text(p.authorName, style: AppType.caption),
+                          const SizedBox(width: 10),
+                          Text('조회 ${p.viewCount + _viewCountBump}',
+                              style: AppType.caption),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
+                      Text(
+                        p.body?.trim().isNotEmpty == true
+                            ? p.body!.trim()
+                            : '(내용 없음)',
+                        style: AppType.body,
+                      ),
+                      // 첨부 이미지 — imageRefs 순서대로. 한 장의 실패가 본문·다른
+                      // 이미지 표시를 막지 않는다(장별 독립 해석·플레이스홀더).
+                      for (final String ref in p.imageRefs) ...<Widget>[
+                        const SizedBox(height: AppSpacing.s16),
+                        _PostImage(
+                          key: ValueKey<String>('post-image-$ref'),
+                          imageRef: ref,
+                          resolver: widget.imageUrlResolver,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.s24),
+                      ReactionBar(
+                        liked: _liked,
+                        scrapped: _scrapped,
+                        likeCount: _likeCount,
+                        commentCount: _commentCountOverride ?? p.commentCount,
+                        onToggleLike: _toggleLike,
+                        onToggleScrap: _toggleScrap,
+                        onReport: _report,
+                      ),
+                      const Divider(height: 28, color: ColorTokens.border),
+                      _commentList(),
+                    ],
                   ),
-                ],
-                const SizedBox(height: AppSpacing.s24),
-                ReactionBar(
-                  liked: _liked,
-                  scrapped: _scrapped,
-                  likeCount: _likeCount,
-                  commentCount: _commentCountOverride ?? p.commentCount,
-                  onToggleLike: _toggleLike,
-                  onToggleScrap: _toggleScrap,
-                  onReport: _report,
                 ),
-                const Divider(height: 28, color: ColorTokens.border),
-                _commentList(),
+                _inputBar(),
               ],
             ),
-          ),
-          _inputBar(),
-        ],
-      ),
     );
   }
 
@@ -635,8 +701,8 @@ class _PostImageState extends State<_PostImage> {
                 _placeholder(
               child: const Text('이미지를 불러오지 못했어요.', style: AppType.caption),
             ),
-            loadingBuilder: (BuildContext c, Widget child,
-                ImageChunkEvent? progress) {
+            loadingBuilder:
+                (BuildContext c, Widget child, ImageChunkEvent? progress) {
               if (progress == null) return child;
               return _placeholder(
                   child: const SizedBox(

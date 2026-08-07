@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
-import '../role_accent.dart';
 import '../shape_tokens.dart';
 import '../tokens/color_tokens.dart';
 
 /// 상태 칩의 의미색(시맨틱 토큰에만 매핑 — hex 하드코딩 금지).
-/// info = 역할 강조색(학생 파랑/멘토 초록), 나머지는 공통 시맨틱색.
+/// 전 tone 이 **역할 무관 공통 시맨틱색**이다.
+///
+/// [QA-C4] info 는 원래 역할 강조색(학생 파랑 #2563EB / 멘토 초록 #059669)이었다.
+/// 그런데 상태칩에서 info 는 '진행 중', success 는 '답변 완료'를 뜻하는데
+/// success(#047857)도 초록이라, **멘토 화면에서는 진행 중과 답변 완료가 둘 다
+/// 초록으로 보여 구분되지 않았다**. 상태색은 역할이 아니라 상태를 말해야 하므로
+/// info 를 역할 무관 파랑으로 고정한다 — 학생 화면은 종전과 동일하고, 멘토 화면만
+/// 진행 중이 파랑으로 돌아온다(QA 기대 동작).
+///
+/// 역할 강조색이 필요한 곳(버튼·링크 등)은 그대로 AppAccent 를 쓴다 —
+/// 여기서 바꾸는 것은 **상태 의미색**뿐이다.
 enum StatusTone { neutral, info, success, warning, danger }
 
 /// tone → 시맨틱 색(단일 소스). StatusPill·StatusDot·CountBadge 가 공유한다.
@@ -17,7 +26,8 @@ Color statusToneColor(BuildContext context, StatusTone tone) {
     case StatusTone.danger:
       return ColorTokens.danger;
     case StatusTone.info:
-      return AppAccent.of(context).accent;
+      // 역할 무관 고정 파랑 — success(초록)와 반드시 구분돼야 한다(QA-C4).
+      return ColorTokens.accent;
     case StatusTone.neutral:
       return ColorTokens.secondary;
   }

@@ -17,6 +17,7 @@ import '../../data/question_room_write_repository.dart';
 import '../../data/room_counterparty.dart';
 import '../../data/room_safety_repository.dart';
 import '../../data/thread_messages_controller.dart';
+import '../../../scan_annotation/scan_annotation_screen.dart';
 import '../../data/thread_realtime.dart';
 import '../attachment_viewer_screen.dart';
 import '../widgets/chat_input_bar.dart';
@@ -385,16 +386,82 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
         context,
         picked: picked,
         rasterizer: widget.pdfRasterizer,
-        maxCount: 1, // 대기 슬롯 1(전송 전 미리보기 1장).
+        maxCount: kPdfMaxPagesPerPick, // [QA-B5] 여러 페이지를 고를 수 있다.
       );
-      if (images.isNotEmpty) await _acceptPicked(images.first);
+      if (images.isEmpty) return;
+      // [QA-B5] 학생 화면과 동일 규칙 — 첫 장은 미리보기 슬롯, 나머지는 순차 전송.
+      await _acceptPicked(images.first);
+      if (images.length > 1) {
+        await _sendExtraPagesSequentially(images.sublist(1));
+      }
     } catch (e) {
       // PDF 폴백 안내(AppError) 포함 — 원문 비노출 규약.
       _showError(friendlyError(e));
     }
   }
 
+  /// [QA-B5] 첫 장을 뺀 나머지 페이지를 한 장씩 이어서 전송한다.
+  ///
+  /// 한 장이라도 실패하면 거기서 멈추고 몇 장이 갔는지 알린다 — 조용히 일부만
+  /// 보내고 성공처럼 보이게 하지 않는다. 이미 올라간 장은 되돌리지 않는다.
+  Future<void> _sendExtraPagesSequentially(List<PickedImage> pages) async {
+    if (pages.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    int done = 0;
+    try {
+      for (final PickedImage page in pages) {
+        final PickedImage img = await downscaleIfOversized(page);
+        final String? invalid = validatePickedImage(img);
+        if (invalid != null) {
+          _showError('$invalid (${done + 1}번째 페이지에서 멈췄어요)');
+          break;
+        }
+        final bool ok = await _uploadPending(img);
+        if (!ok) {
+          _showError('$done장까지 보냈어요. 나머지는 다시 시도해 주세요.');
+          break;
+        }
+        done += 1;
+      }
+    } catch (e) {
+      _showError('$done장까지 보냈어요. ${friendlyError(e)}');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+    if (done > 0 && mounted) {
+      _showError('페이지 $done장을 보냈어요.');
+    }
+  }
+
   /// 선택 결과 공통 처리: 5MB 초과 리사이즈(§6-4) → 검증 → 미리보기 세팅.
+  /// [QA-C3] 전송 전 대기 이미지에 주석 달기 — 학생 화면(chat_screen)에만 있고
+  /// 멘토 답변 화면에는 배선이 아예 없었다(심볼 0건). 주석 화면·평탄화·업로드는
+  /// 이미 공용 부품이라 여기서는 같은 경로를 이어 주기만 하면 된다.
+  ///
+  /// 주석 화면이 true 를 반환하면 그 화면이 이미 첨부로 전송을 끝낸 상태다 —
+  /// 대기 슬롯을 비우고 목록을 재조회한다(중복 전송 금지).
+  Future<void> _annotatePending() async {
+    final PickedImage? img = _pending;
+    if (img == null) return;
+    final bool? sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (BuildContext context) => ScanAnnotationScreen(
+          background: img.bytes,
+          roomId: widget.thread.roomId,
+          threadId: widget.thread.id,
+        ),
+      ),
+    );
+    if (sent != true || !mounted) return;
+    setState(() => _pending = null);
+    await _refresh();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주석을 첨부로 보냈어요.')),
+      );
+    }
+  }
+
   Future<void> _acceptPicked(PickedImage picked) async {
     final PickedImage img = await downscaleIfOversized(picked);
     final String? invalid = validatePickedImage(img);
@@ -458,6 +525,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
             sendTooltip: '답변 전송',
             pendingImage: _blocked ? null : _pending,
             onRemovePending: () => setState(() => _pending = null),
+            onAnnotate: _annotatePending,
             enabled: !_blocked,
             disabledNotice: _blocked ? _blockedNotice : null,
           ),

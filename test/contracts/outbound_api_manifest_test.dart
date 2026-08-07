@@ -42,6 +42,10 @@ const Set<String> kExpectedRpcNames = <String>{
   'refund_individual_question',
   'release_individual_question',
   // 커뮤니티
+  // [QA-C7] 차단 목록 표시명 — users SELECT 정책이 본인+admin 뿐이라 타인 닉네임을
+  // 앱이 직접 읽을 수 없다. 정의자 RPC 가 본인 차단분의 닉네임만 돌려준다
+  // (웹 migration 20260807020000).
+  'my_blocked_users',
   'community_comment_soft_delete_self',
   'community_post_soft_delete',
   'community_post_view_record_v2',

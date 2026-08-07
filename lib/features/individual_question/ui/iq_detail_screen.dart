@@ -215,6 +215,8 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       widget.urlResolverOverride ?? IqAttachmentUrlResolver.supabase();
 
   late Future<IqDetailData> _future;
+  /// 마지막으로 관측한 타임라인 항목 수 — 증가할 때만 끝으로 수렴한다(QA-C8).
+  int _lastTimelineCount = 0;
   bool _busy = false;
   bool _changed = false;
 
@@ -223,6 +225,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     super.initState();
     _future = _load();
     _chatController.addListener(_onChatChanged);
+    _messages.addListener(_onTimelineChanged);
     // §G: 실시간 보조 채널 + 복귀 재조회(실시간이 유일 소스가 되지 않게).
     _startRealtime();
     WidgetsBinding.instance.addObserver(this);
@@ -237,6 +240,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       _realtime?.dispose();
       _realtime = null;
       _messages.resetTo(const <IqMessage>[], notify: false);
+      _lastTimelineCount = 0; // 질문이 바뀌면 수렴 기준도 초기화한다(QA-C8).
       _pendingUploads.clear();
       _startRealtime();
       _refresh(scrollToLatest: true);
@@ -311,6 +315,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     AuthService.instance.removeListener(_onAuthChanged);
     WidgetsBinding.instance.removeObserver(this);
     _realtime?.dispose();
+    _messages.removeListener(_onTimelineChanged);
     _messages.dispose();
     _answerController.dispose();
     _chatController.dispose();
@@ -848,17 +853,38 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   }
 
   /// 끝으로 점프. ListView 의 children 지연 레이아웃 때문에 maxScrollExtent 가
-  /// 추정치일 수 있어, 실제 끝에 닿을 때까지 몇 프레임 재시도한다(상한 고정 —
-  /// 초기 진입 직후에만 도는 짧은 수렴 루프).
+  /// 추정치라, 실제 끝에 닿을 때까지 몇 프레임 재시도한다(상한 고정).
+  ///
+  /// [QA-C8·C9] 종전에는 `pixels >= maxScrollExtent` 면 **재시도 루프까지 끊고**
+  /// 즉시 반환했다. 이미지 첨부가 섞인 타임라인은 레이아웃 직후 한 프레임 동안
+  /// 콘텐츠가 짧아 그 조건이 참이 되는데, 거기서 루프가 죽으면 다음 프레임에
+  /// 이미지 높이가 잡히며 extent 가 늘어나도 아무도 따라가지 않는다 — 결과적으로
+  /// 전송 후 화면이 엉뚱한 위치(대개 위쪽)에 남는다.
+  /// 이제 이미 끝에 있으면 점프만 건너뛰고 **재시도는 계속한다**.
   void _jumpTimelineToEnd({required int retriesLeft}) {
     if (!mounted || !_timelineScroll.hasClients) return;
     final ScrollPosition p = _timelineScroll.position;
-    if (p.pixels >= p.maxScrollExtent) return;
-    _timelineScroll.jumpTo(p.maxScrollExtent);
+    if (p.pixels < p.maxScrollExtent) p.jumpTo(p.maxScrollExtent);
     if (retriesLeft > 0) {
       WidgetsBinding.instance.addPostFrameCallback(
           (_) => _jumpTimelineToEnd(retriesLeft: retriesLeft - 1));
     }
+  }
+
+  /// [QA-C8] 타임라인 목록이 늘어나면(전송·실시간 수신·첨부 삽입) 끝으로 수렴한다.
+  /// 질문방(live_message_list)이 이미 같은 규칙으로 동작한다 — 개별질문만 빠져 있었다.
+  /// FutureBuilder 한 번당 한 번 도는 1회용 플래그와 달리, 이 경로는 목록이 바뀔
+  /// 때마다 동작하므로 재조회 없이 들어오는 실시간·첨부 삽입도 덮는다.
+  void _onTimelineChanged() {
+    final int n = _messages.items.length;
+    if (n <= _lastTimelineCount) {
+      _lastTimelineCount = n;
+      return;
+    }
+    _lastTimelineCount = n;
+    if (!mounted) return;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _jumpTimelineToEnd(retriesLeft: 6));
   }
 
   /// 화면 전체 = 대화방: [컴팩트 헤더] → [Expanded 타임라인] → [하단 고정 영역].
@@ -959,6 +985,12 @@ class _IqDetailScreenState extends State<IqDetailScreen>
             const SizedBox(height: 2),
             Text(meta.join(' · '), style: AppTypography.caption),
           ],
+          // [QA-B6] 과목·요구 학교군·요구 계열 — 목록·상세 어디에도 없던 값이다.
+          IqRequirementChips(
+            subject: q.subject,
+            requiredSchoolTier: q.requiredSchoolTier,
+            requiredMajorCategory: q.requiredMajorCategory,
+          ),
         ],
       ),
     );
