@@ -64,7 +64,9 @@ class BoardListViewState extends State<BoardListView> {
   Future<void> reload() => _pager.refresh();
 
   void _selectCategory(String? code) {
-    _category = code;
+    // setState 필수 — 칩의 selected 인덱스는 build() 에서 계산되므로, 없으면
+    // 목록만 갱신되고(pager 알림) 선택 표시는 첫 칩에 고정된 채 움직이지 않는다.
+    setState(() => _category = code);
     _pager.refresh(); // 세대 +1 — 이전 카테고리 응답은 도착해도 무시
   }
 
