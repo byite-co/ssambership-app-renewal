@@ -54,7 +54,7 @@ concurrency:
 
 env:
   # ── 빌드 대상 고정(자유 입력 금지) ───────────────────────────────
-  SOURCE_SHA: 2398b9bdc2aee91ff86214207a1998c10b444f3c
+  SOURCE_SHA: 8579622b2a849368de5e96adf4dc9cac2143a245
   EXPECTED_PR: "51"
   EXPECTED_VERSION: 1.0.0+19
   EXPECTED_VERSION_NAME: 1.0.0
