@@ -18,11 +18,11 @@ const String kPbxprojPath = 'ios/Runner.xcodeproj/project.pbxproj';
 const String kPodfilePath = 'ios/Podfile';
 const String kRunbookPath = 'docs/IOS_RELEASE_RUNBOOK.md';
 
-/// 버전 고정(§7 런북 버전 규약). Play Console 실측(2026-08-06)상 build 16·17 이
-/// 이미 사용돼 출시 후보를 `1.0.0+18` 로 올렸다 — 근거와 재상향 규칙은
-/// `test/app/build_version_test.dart` 주석 참조. 실제 업로드용 release 커밋에서
-/// 다시 올릴 때 이 상수를 함께 갱신한다.
-const String kPinnedPubspecVersion = 'version: 1.0.0+19';
+/// 버전 고정(§7 런북 버전 규약). App Store Connect 실측(2026-08-07, 오너 확인)상
+/// build 21 까지 이미 존재해 iOS 출시 후보를 `1.0.0+22` 로 올렸다 — 근거와
+/// 재상향 규칙은 `test/app/build_version_test.dart` 주석 참조. 실제 업로드용
+/// release 커밋에서 다시 올릴 때 이 상수를 함께 갱신한다.
+const String kPinnedPubspecVersion = 'version: 1.0.0+22';
 
 /// iOS 번들 ID 계약(HANDOFF §3-6, 2026-07-22 패키지 계약).
 /// App Store Connect 첫 업로드 후 변경 불가 — 변경은 오너 결정으로만(런북 §3).
