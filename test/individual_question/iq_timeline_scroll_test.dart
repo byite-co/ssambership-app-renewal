@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/design/theme.dart';
-import 'package:ssambership_app/design/widgets/app_card.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
-import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
 
 /// vc11 정본 UX 계약 — 개별질문 상세는 '화면 전체가 대화방'이다.
 ///
@@ -52,15 +50,6 @@ IqMessage _msg(String id, String authorId, String body) => IqMessage(
       createdAt: DateTime(2026, 7, 2),
     );
 
-/// 학생 작성 이미지(author_id 정본) — 최초 질문 말풍선 귀속 검증용.
-/// 작성자 미기록 레거시는 중립 그룹으로 빠진다(iq_media_attribution_test).
-const IqAttachment _image = IqAttachment(
-  id: 'a1',
-  storagePath: 'q1/1-000001.png',
-  authorId: kStudentId,
-  fileName: '문제.png',
-  mimeType: 'image/png',
-);
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -98,15 +87,7 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
-Finder _bubble(String body) => find.byWidgetPredicate(
-      (Widget w) => w is ConversationBubble && w.body == body,
-    );
 
-ConversationBubble _bubbleWidget(WidgetTester tester, String body) {
-  final Finder f = _bubble(body);
-  expect(f, findsOneWidget, reason: '본문 "$body" 말풍선을 찾지 못했다');
-  return tester.widget<ConversationBubble>(f);
-}
 
 /// 타임라인(대화 스크롤 영역) 파인더 — 화면의 유일한 ListView 여야 한다.
 Finder get _timeline => find.byType(ListView);
