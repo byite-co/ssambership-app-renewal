@@ -140,10 +140,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text('삭제된 글이에요.', style: AppType.cardTitle),
+            const Text('더 이상 볼 수 없는 글이에요.', style: AppType.cardTitle),
             const SizedBox(height: 8),
             const Text(
-              '작성자나 관리자가 이 글을 지웠어요.',
+              // 삭제와 모더레이션 비공개를 구분해 말할 근거가 조회 결과에 없다
+              // (둘 다 목록 뷰에서 함께 빠진다) — 지어내지 않고 둘 다 적는다.
+              '삭제되었거나 비공개로 바뀌었어요.',
               style: AppType.caption,
               textAlign: TextAlign.center,
             ),

@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/design/theme.dart';
 import 'package:ssambership_app/design/tokens/color_tokens.dart';
+import 'package:ssambership_app/design/role_accent.dart';
+import 'package:ssambership_app/design/widgets/count_badge.dart';
 import 'package:ssambership_app/design/widgets/status_pill.dart';
 
 /// [QA-C4] 멘토 화면에서 '진행 중'(info)과 '답변 완료'(success)가 둘 다 초록으로
@@ -50,6 +52,37 @@ void main() {
     final Map<StatusTone, Color> tones = await tonesFor(tester, AppRole.mentor);
     expect(tones[StatusTone.info], ColorTokens.accent);
     expect(tones[StatusTone.success], ColorTokens.success);
+  });
+
+  // [적대적 검증] 상태칩 info 를 역할 무관 파랑으로 고정하면서 개수 배지까지
+  // 파래지면 과한 변경이다 — 개수 배지는 상태가 아니라 정체성 장식에 가깝다.
+  testWidgets('CountBadge 기본색은 역할 강조색을 유지한다(멘토 초록)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.build(AppRole.mentor),
+      home: const Scaffold(body: Center(child: CountBadge(count: 3))),
+    ));
+    final Container box = tester.widget<Container>(find.descendant(
+      of: find.byType(CountBadge),
+      matching: find.byType(Container),
+    ));
+    final BoxDecoration d = box.decoration! as BoxDecoration;
+    expect(d.color, RoleAccent.mentor.accent);
+    expect(d.color, isNot(ColorTokens.accent));
+  });
+
+  testWidgets('CountBadge 에 tone 을 주면 그 상태색을 쓴다', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.build(AppRole.mentor),
+      home: const Scaffold(
+        body: Center(child: CountBadge(count: 3, tone: StatusTone.success)),
+      ),
+    ));
+    final Container box = tester.widget<Container>(find.descendant(
+      of: find.byType(CountBadge),
+      matching: find.byType(Container),
+    ));
+    expect((box.decoration! as BoxDecoration).color, ColorTokens.success);
   });
 
   testWidgets('상태 5종이 서로 다른 색이다(중복 없음)', (WidgetTester tester) async {

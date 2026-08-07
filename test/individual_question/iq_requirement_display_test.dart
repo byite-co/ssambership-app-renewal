@@ -77,8 +77,8 @@ void main() {
         ),
       );
       expect(find.text('수학'), findsOneWidget);
-      expect(find.text('서연고 이상'), findsOneWidget);
-      expect(find.text('메디컬 계열'), findsOneWidget);
+      expect(find.text('학교군 · 서연고'), findsOneWidget);
+      expect(find.text('전공계열 · 메디컬'), findsOneWidget);
     });
 
     testWidgets('조건이 하나도 없으면 아무것도 그리지 않는다(빈 칩 금지)',
@@ -97,8 +97,8 @@ void main() {
           requiredMajorCategory: '메디컬',
         ),
       );
-      expect(find.text('메디컬 계열'), findsOneWidget);
-      expect(find.textContaining('이상'), findsNothing);
+      expect(find.text('전공계열 · 메디컬'), findsOneWidget);
+      expect(find.textContaining('학교군'), findsNothing);
     });
   });
 }

@@ -207,8 +207,10 @@ class IqRequirementChips extends StatelessWidget {
         runSpacing: 6,
         children: <Widget>[
           if (s != null) AppBadge(label: s),
-          if (tier != null) AppBadge(label: '$tier 이상'),
-          if (major != null) AppBadge(label: '$major 계열'),
+          // 문구는 웹 작성 폼의 어휘를 그대로 쓴다('학교군'·'전공계열') —
+          // 앱이 '이상'·'계열' 같은 순서·의미를 지어내면 학생이 건 조건과 어긋난다.
+          if (tier != null) AppBadge(label: '학교군 · $tier'),
+          if (major != null) AppBadge(label: '전공계열 · $major'),
         ],
       ),
     );

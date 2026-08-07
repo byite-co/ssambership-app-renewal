@@ -62,7 +62,7 @@ env:
   EXPECTED_APPLICATION_ID: com.ssambership.edu
   EXPECTED_MIN_SDK: "24"
   EXPECTED_TARGET_SDK: "36"
-  EXPECTED_TEST_COUNT: "1505"
+  EXPECTED_TEST_COUNT: "1507"
   # 출시 Supabase 정본 URL — 공개 식별자(secret 아님). 비교 기준값.
   EXPECTED_SUPABASE_URL: https://lbeqxarxothkmzqvpudy.supabase.co
   # ── bundletool 고정(공식 GitHub release · checksum 검증) ─────────
@@ -142,7 +142,7 @@ jobs:
           java -version
 
       # ── 3. 빌드 전 검증 — 자리표시 .env 로 analyze·test ─────────────
-      # 운영 secret 은 아직 디스크에 없다. 테스트 스위트(임의 Dart 코드 1505건)
+      # 운영 secret 은 아직 디스크에 없다. 테스트 스위트(임의 Dart 코드 1507건)
       # 는 flutter-ci 와 동일하게 자리표시 .env(.env.example)로만 실행된다.
       - name: flutter clean + pub get + 자리표시 .env
         run: |
@@ -163,7 +163,7 @@ jobs:
           fi
           echo "FLUTTER_ANALYZE=PASS" >> "$SUMMARY"
 
-      - name: flutter test (전체 스위트 — 기대 1505건 전부 통과)
+      - name: flutter test (전체 스위트 — 기대 1507건 전부 통과)
         # 성공 판정은 (1) flutter test 의 exit code, (2) 실제 reporter footer
         # 의 숫자("N tests passed.")를 EXPECTED_TEST_COUNT 와 대조 — 두 겹이다.
         # GitHub Actions 의 flutter test 는 github reporter 를 쓰므로 로컬

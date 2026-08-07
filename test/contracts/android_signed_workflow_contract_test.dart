@@ -144,7 +144,7 @@ void main() {
       expect(env['EXPECTED_APPLICATION_ID'], 'com.ssambership.edu');
       expect(env['EXPECTED_MIN_SDK'].toString(), '24');
       expect(env['EXPECTED_TARGET_SDK'].toString(), '36');
-      expect(env['EXPECTED_TEST_COUNT'].toString(), '1505');
+      expect(env['EXPECTED_TEST_COUNT'].toString(), '1507');
       expect(env['EXPECTED_SUPABASE_URL'], kProductionSupabaseUrl,
           reason: '.env 정확 일치·AAB 내장 판정의 기준값 — 변경은 의도적으로만');
     });
