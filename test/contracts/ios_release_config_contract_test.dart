@@ -22,7 +22,7 @@ const String kRunbookPath = 'docs/IOS_RELEASE_RUNBOOK.md';
 /// 이미 사용돼 출시 후보를 `1.0.0+18` 로 올렸다 — 근거와 재상향 규칙은
 /// `test/app/build_version_test.dart` 주석 참조. 실제 업로드용 release 커밋에서
 /// 다시 올릴 때 이 상수를 함께 갱신한다.
-const String kPinnedPubspecVersion = 'version: 1.0.0+19';
+const String kPinnedPubspecVersion = 'version: 1.0.0+22';
 
 /// iOS 번들 ID 계약(HANDOFF §3-6, 2026-07-22 패키지 계약).
 /// App Store Connect 첫 업로드 후 변경 불가 — 변경은 오너 결정으로만(런북 §3).
