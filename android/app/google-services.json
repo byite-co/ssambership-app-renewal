@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "442278346463",
+    "project_id": "ssambership-prod",
+    "storage_bucket": "ssambership-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:442278346463:android:392ce2c4a35db0f152b36a",
+        "android_client_info": {
+          "package_name": "com.ssambership.edu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-vmUfzS6BpDaGbA_Z4k2fq9D2EPxaC6A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
