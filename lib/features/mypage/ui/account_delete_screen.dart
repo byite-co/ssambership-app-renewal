@@ -50,13 +50,14 @@ import '../format/cash_format.dart';
 class AccountDeleteScreen extends StatefulWidget {
   const AccountDeleteScreen({
     super.key,
-    this.port = const SupabaseAccountDeletionRepository(),
+    this.port,
     this.signOutOverride,
     this.openWebFallbackOverride,
     this.pendingOverride,
   });
 
-  final AccountDeletionPort port;
+  /// Optional test seam. Production resolves the port from [AppScope].
+  final AccountDeletionPort? port;
 
   /// 테스트 주입: 기본은 AppScope 의 auth.signOut(revoke → signOut 보장).
   final Future<void> Function()? signOutOverride;
@@ -72,6 +73,7 @@ class AccountDeleteScreen extends StatefulWidget {
 }
 
 class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
+  late final AccountDeletionPort _port;
   bool _acknowledged = false;
   bool _busy = false;
 
@@ -102,6 +104,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   @override
   void initState() {
     super.initState();
+    _port = widget.port ?? AppScope.of(context).accountDeletion;
     if (_pending) _loadStatus();
   }
 
@@ -109,7 +112,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   /// (취소창 경과·locked 이후엔 버튼 자체를 만들지 않음 — 로컬 추정 금지.)
   Future<void> _loadStatus() async {
     try {
-      final DeletionStatusResult s = await widget.port.fetchStatus();
+      final DeletionStatusResult s = await _port.fetchStatus();
       if (!mounted) return;
       setState(() {
         _cancelableUntil = s.cancelableUntil; // 서버 정본 시각(있을 때만 표시)
@@ -144,7 +147,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
         '탈퇴 요청',
       );
       if (!ok || !mounted) return;
-      await _submit(widget.port.requestDeletion());
+      await _submit(_port.requestDeletion());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -167,7 +170,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
         '동의하고 탈퇴',
       );
       if (!ok || !mounted) return; // 취소 → consent RPC 0회.
-      await _submit(widget.port.requestDeletionWithForfeitConsent(
+      await _submit(_port.requestDeletionWithForfeitConsent(
         acknowledgedBalanceCents: balance,
       ));
     } finally {
@@ -224,7 +227,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final DeletionCancelResult result = await widget.port.cancelDeletion();
+      final DeletionCancelResult result = await _port.cancelDeletion();
       if (!mounted) return;
       if (result.ok) {
         // 기존 세션이 완전히 복원됐다고 가정하지 않는다 — 재로그인 요구.
