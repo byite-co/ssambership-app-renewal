@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../app/app_scope.dart';
+import '../../core/auth/auth_service.dart' show AppRole;
 import '../../design/widgets/empty_state.dart';
 import 'iq_flags.dart';
 import 'ui/mentor_iq_list_screen.dart';
@@ -28,7 +29,7 @@ class IndividualQuestionTabScreen extends StatelessWidget {
       );
     }
     final bool isMentor = isMentorOverride ??
-        (AuthService.instance.currentRole == AppRole.mentor);
+        (AppScope.of(context).auth.currentRole == AppRole.mentor); // A-2
     return isMentor
         ? const MentorIqListScreen(embedded: true)
         : const StudentIqListScreen(embedded: true);
