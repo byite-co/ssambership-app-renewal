@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/app_scope.dart';
 import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/spacing_tokens.dart';
@@ -49,7 +50,7 @@ class IqCreateScreen extends StatefulWidget {
     this.scanPicker = const DeviceScanSourcePicker(),
     this.galleryPicker = const DeviceImagePicker(),
     this.pdfRasterizer = const PdfxRasterizer(),
-    this.attachments = const SupabaseIqAttachmentsRepository(),
+    this.attachments,
     this.annotateOverride,
   });
 
@@ -78,8 +79,9 @@ class IqCreateScreen extends StatefulWidget {
   /// PDF 래스터라이저 포트(S19: 파일 소스 PDF → 페이지 선택). fake 주입 지점.
   final PdfRasterizerPort pdfRasterizer;
 
-  /// 첨부 업로드 포트(S17: 버킷 업로드 + RPC 행 등록). 테스트에서 fake 주입.
-  final IqAttachmentsPort attachments;
+  /// 첨부 업로드 포트(S17: 버킷 업로드 + RPC 행 등록). 테스트 override가
+  /// 없으면 AppScope의 운영 의존성을 사용한다.
+  final IqAttachmentsPort? attachments;
 
   /// 테스트용 필기 화면 진입 오버라이드(S18). null 이면 실제
   /// [ScanAnnotationScreen] push. 인자는 (배경 원본, 기존 스트로크).
@@ -95,8 +97,10 @@ class IqCreateScreen extends StatefulWidget {
 }
 
 class _IqCreateScreenState extends State<IqCreateScreen> {
-  final IndividualQuestionRepository _repo =
-      const IndividualQuestionRepository();
+  IndividualQuestionRepository get _repo =>
+      AppScope.of(context).individualQuestions;
+  IqAttachmentsPort get _attachments =>
+      widget.attachments ?? AppScope.of(context).iqAttachments;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _bodyController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
@@ -248,7 +252,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
     final List<PickedImage> failed = <PickedImage>[];
     for (final PickedImage img in List<PickedImage>.of(_images)) {
       try {
-        await widget.attachments.upload(questionId: questionId, image: img);
+        await _attachments.upload(questionId: questionId, image: img);
       } catch (_) {
         failed.add(img);
       }
