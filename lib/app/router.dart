@@ -145,7 +145,9 @@ class AppRouter {
         if (kDevToolsEnabled)
           GoRoute(
             path: EntryGuard.devS3,
-            builder: (context, state) => const S3DataInspector(),
+            builder: (context, state) => S3DataInspector(
+              repository: dependencies.questionRoomRead,
+            ),
           ),
       ],
     );
