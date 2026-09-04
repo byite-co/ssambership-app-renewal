@@ -1,10 +1,13 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart' show AppRole;
 import '../../core/entitlement/subscription_summary.dart';
 import '../../features/mentors/ui/free_question_compose_screen.dart';
+import '../../features/question_room/data/models/question_attachment.dart';
 import '../../features/question_room/data/models/question_thread.dart';
 import '../../features/question_room/data/models/room.dart';
+import '../../features/question_room/ui/attachment_viewer_screen.dart';
 import '../../features/question_room/ui/chat_screen.dart';
 import '../../features/question_room/ui/connection_notes_screen.dart';
 import '../../features/question_room/ui/mentor/mentor_answer_screen.dart';
@@ -86,6 +89,28 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
                 writeRepository: dependencies.questionRoomWrite,
               );
             },
+          );
+        },
+      ),
+      GoRoute(
+        path:
+            '${AppRoutePaths.rooms}/:roomId/threads/:threadId/attachments/:attachmentId',
+        builder: (context, state) {
+          final String roomId = state.pathParameters['roomId']!;
+          final String threadId = state.pathParameters['threadId']!;
+          final String attachmentId = state.pathParameters['attachmentId']!;
+          return AsyncRouteLoader<_AttachmentRouteData>(
+            key: ValueKey<String>('$roomId/$threadId/$attachmentId'),
+            load: (dependencies) => _loadAttachmentRoute(
+                dependencies, roomId, threadId, attachmentId),
+            builder: (context, data, dependencies) => AttachmentViewerScreen(
+              attachment: data.attachment,
+              roomId: data.room.id,
+              threadId: data.thread.id,
+              resolver: dependencies.attachmentUrlResolver,
+            ),
+            notFoundMessage: '첨부 이미지를 찾을 수 없어요.',
+            errorMessage: '첨부 이미지를 불러오지 못했어요.',
           );
         },
       ),
@@ -332,4 +357,55 @@ class _ThreadRouteData {
   final QuestionThread thread;
   final AppRole role;
   final String otherName;
+}
+
+Future<_AttachmentRouteData?> _loadAttachmentRoute(
+  AppDependencies dependencies,
+  String roomId,
+  String threadId,
+  String attachmentId,
+) async {
+  final List<Object?> rows = await Future.wait<Object?>(<Future<Object?>>[
+    dependencies.questionRoomRead.roomById(roomId),
+    dependencies.questionRoomRead.threadById(threadId),
+    dependencies.questionRoomRead.attachments(threadId),
+  ]);
+  final Room? room = rows[0] as Room?;
+  final QuestionThread? thread = rows[1] as QuestionThread?;
+  final List<QuestionAttachment> attachments =
+      rows[2]! as List<QuestionAttachment>;
+  QuestionAttachment? attachment;
+  for (final QuestionAttachment candidate in attachments) {
+    if (candidate.id == attachmentId) {
+      attachment = candidate;
+      break;
+    }
+  }
+  if (room == null ||
+      room.id != roomId ||
+      thread == null ||
+      thread.id != threadId ||
+      thread.roomId != room.id ||
+      attachment == null ||
+      attachment.id != attachmentId ||
+      attachment.threadId != thread.id) {
+    return null;
+  }
+  return _AttachmentRouteData(
+    room: room,
+    thread: thread,
+    attachment: attachment,
+  );
+}
+
+class _AttachmentRouteData {
+  const _AttachmentRouteData({
+    required this.room,
+    required this.thread,
+    required this.attachment,
+  });
+
+  final Room room;
+  final QuestionThread thread;
+  final QuestionAttachment attachment;
 }

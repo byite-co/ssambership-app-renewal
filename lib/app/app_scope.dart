@@ -22,6 +22,7 @@ import '../features/mypage/data/profile_edit_repository.dart';
 import '../features/notifications/data/notification_badge_controller.dart';
 import '../features/notifications/data/notifications_repository.dart';
 import '../features/question_room/data/attachments/attachment_upload.dart';
+import '../features/question_room/data/attachments/attachment_url_resolver.dart';
 import '../features/question_room/data/mentor_lookup_repository.dart';
 import '../features/question_room/data/question_room_read_repository.dart';
 import '../features/question_room/data/question_room_write_repository.dart';
@@ -58,6 +59,7 @@ class AppDependencies {
     this.profileEdit = const ProfileEditRepository(),
     this.accountDeletion = const SupabaseAccountDeletionRepository(),
     this.attachmentUploader = const SupabaseAttachmentUploader(),
+    AttachmentUrlResolver? attachmentUrlResolver,
     this.freeQuestionEntry = const SupabaseFreeQuestionEntryRepository(),
     this.notifications = const SupabaseNotificationsRepository(),
     this.roomSafety = const SupabaseRoomSafetyRepository(),
@@ -67,6 +69,8 @@ class AppDependencies {
     VersionGateController? versionGate,
   })  : _routingAccess = routingAccess ?? (() => _inferRoutingAccess(auth)),
         _supabaseClient = supabaseClient ?? _productionClient,
+        attachmentUrlResolver =
+            attachmentUrlResolver ?? AttachmentUrlResolver.supabase(),
         notificationBadge =
             notificationBadge ?? NotificationBadgeController.instance,
         deletionNotice = deletionNotice ?? DeletionNoticeController.instance,
@@ -118,6 +122,7 @@ class AppDependencies {
   final ProfileEditRepository profileEdit;
   final AccountDeletionPort accountDeletion;
   final AttachmentUploaderPort attachmentUploader;
+  final AttachmentUrlResolver attachmentUrlResolver;
   final FreeQuestionEntryPort freeQuestionEntry;
   final NotificationsRepository notifications;
   final RoomSafetyPort roomSafety;

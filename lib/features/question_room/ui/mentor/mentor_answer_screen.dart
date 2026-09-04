@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
@@ -107,7 +109,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   PickedImage? _pending;
 
   /// 첨부 이미지 서명 URL 리졸버(만료 전 캐시 재사용).
-  final AttachmentUrlResolver _resolver = AttachmentUrlResolver.supabase();
+  late final AttachmentUrlResolver _resolver;
   List<QuestionAttachment> _attachments = <QuestionAttachment>[];
 
   // A-2: 사용자 id 는 AppScope 의 auth 에서(클라이언트 직접 참조 0).
@@ -123,6 +125,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   @override
   void initState() {
     super.initState();
+    _resolver = AppScope.of(context).attachmentUrlResolver;
     _status = widget.thread.status;
     _counterparty = RoomCounterparty.of(
       widget.room,
@@ -276,14 +279,18 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
 
   /// 이미지 첨부 탭 → 전체화면 뷰어. 주석이 전송되면 목록 새로고침.
   Future<void> _openImage(QuestionAttachment a) async {
-    final bool? refreshed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (BuildContext context) => AttachmentViewerScreen(
-          attachment: a,
-          roomId: widget.thread.roomId,
-          threadId: widget.thread.id,
-          resolver: _resolver,
-        ),
+    final bool? refreshed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.roomAttachment(
+        widget.thread.roomId,
+        widget.thread.id,
+        a.id,
+      ),
+      fallbackBuilder: (BuildContext context) => AttachmentViewerScreen(
+        attachment: a,
+        roomId: widget.thread.roomId,
+        threadId: widget.thread.id,
+        resolver: _resolver,
       ),
     );
     if (refreshed == true && mounted) await _refresh();
