@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/typography_tokens.dart';
@@ -287,10 +288,9 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
           mentorId: widget.item.id, bridge: widget.webBridgeOverride);
 
   void _goToQuestionRoom(BuildContext context) {
-    // 루트(HomeShell)로 되돌아간 뒤 질문방 탭으로 전환 요청.
-    // TabNavigator(app_tabs) → HomeShell 이 수신해 탭 인덱스를 바꾼다(라우터 변경 불필요).
-    Navigator.of(context).popUntil((Route<dynamic> r) => r.isFirst);
-    TabNavigator.go(AppTab.questionRoom);
+    // 운영은 URL로 완료해 cold deep link도 HomeShell 부재에 기대지 않는다.
+    // 직접-pump 테스트는 AppNavigation이 기존 TabNavigator 계약을 보존한다.
+    AppNavigation.finishAtLocation(context, AppTab.questionRoom);
   }
 }
 

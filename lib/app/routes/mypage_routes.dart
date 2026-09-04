@@ -7,6 +7,8 @@ import '../../features/mypage/mypage_screen.dart';
 import '../../features/mypage/ui/account_delete_screen.dart';
 import '../../features/mypage/ui/profile_edit_screen.dart';
 import '../../shared/constants/app_constants.dart';
+import '../app_navigation.dart';
+import '../app_route_completion.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../app_tabs.dart';
@@ -17,36 +19,48 @@ List<RouteBase> buildMyPageRoutes() => <RouteBase>[
       GoRoute(
         path: AppRoutePaths.myPage,
         builder: (BuildContext context, GoRouterState state) =>
-            const MyPageRoutePage(),
+            const AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.rooms,
+          child: MyPageRoutePage(),
+        ),
       ),
       GoRoute(
         path: AppRoutePaths.accountDeletion,
         builder: (BuildContext context, GoRouterState state) {
           final AppDependencies dependencies = AppScope.of(context);
-          return AccountDeleteScreen(
-            port: dependencies.accountDeletion,
-            signOutOverride: dependencies.auth.signOut,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.myPage,
+            child: AccountDeleteScreen(
+              port: dependencies.accountDeletion,
+              signOutOverride: dependencies.auth.signOut,
+            ),
           );
         },
       ),
       GoRoute(
         path: AppRoutePaths.profileEdit,
         builder: (BuildContext context, GoRouterState state) =>
-            AsyncRouteLoader<MyProfile>(
-          load: (dependencies) async =>
-              (await dependencies.myPage.load()).profile,
-          builder: (context, profile, dependencies) => ProfileEditScreen(
-            profile: profile,
-            repository: dependencies.profileEdit,
+            AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.myPage,
+          child: AsyncRouteLoader<MyProfile>(
+            load: (dependencies) async =>
+                (await dependencies.myPage.load()).profile,
+            builder: (context, profile, dependencies) => ProfileEditScreen(
+              profile: profile,
+              repository: dependencies.profileEdit,
+            ),
+            errorMessage: '프로필을 불러오지 못했어요.',
           ),
-          errorMessage: '프로필을 불러오지 못했어요.',
         ),
       ),
       GoRoute(
         path: AppRoutePaths.blockedUsers,
         builder: (BuildContext context, GoRouterState state) =>
-            BlockedUsersScreen(
-          repository: AppScope.of(context).userBlocks,
+            AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.myPage,
+          child: BlockedUsersScreen(
+            repository: AppScope.of(context).userBlocks,
+          ),
         ),
       ),
     ];
@@ -67,10 +81,16 @@ class MyPageRoutePage extends StatelessWidget {
       appBar: AppBar(title: const Text(AppConstants.myPageTitle)),
       body: MyPageScreen(
         loaderOverride: loaderOverride,
-        onOpenQuestionsTab: () =>
-            Navigator.of(context).pop(AppTab.questionRoom),
-        onOpenNotifications: () =>
-            Navigator.of(context).pop(AppTab.notifications),
+        onOpenQuestionsTab: () => AppNavigation.complete<String>(
+          context,
+          result: AppTab.questionRoom,
+          fallbackLocation: AppTab.questionRoom,
+        ),
+        onOpenNotifications: () => AppNavigation.complete<String>(
+          context,
+          result: AppTab.notifications,
+          fallbackLocation: AppTab.notifications,
+        ),
       ),
     );
   }

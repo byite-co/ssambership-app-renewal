@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/mentors/data/mentor_favorites_repository.dart';
 import '../../features/mentors/data/mentor_models.dart';
 import '../../features/mentors/ui/mentor_detail_screen.dart';
+import '../app_route_completion.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../async_route_loader.dart';
@@ -11,8 +12,11 @@ import '../async_route_loader.dart';
 List<RouteBase> buildMentorRoutes() => <RouteBase>[
       GoRoute(
         path: '${AppRoutePaths.mentors}/:mentorId',
-        builder: (context, state) => MentorDetailRoutePage(
-          mentorId: state.pathParameters['mentorId']!,
+        builder: (context, state) => AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.mentors,
+          child: MentorDetailRoutePage(
+            mentorId: state.pathParameters['mentorId']!,
+          ),
         ),
       ),
     ];

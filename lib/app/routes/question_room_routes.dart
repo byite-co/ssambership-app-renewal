@@ -16,6 +16,7 @@ import '../../features/question_room/ui/mentor/student_room_home_screen.dart';
 import '../../features/question_room/ui/mentor_room_home_screen.dart';
 import '../../features/question_room/ui/new_question_screen.dart';
 import '../../features/question_room/ui/question_list_screen.dart';
+import '../app_route_completion.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../async_route_loader.dart';
@@ -26,17 +27,21 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         path: '${AppRoutePaths.rooms}/:roomId/free-question',
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
-          return AsyncRouteLoader<_FreeQuestionRouteData>(
-            key: ValueKey<String>(roomId),
-            load: (dependencies) =>
-                _loadFreeQuestionRoute(dependencies, roomId),
-            builder: (context, data, dependencies) => FreeQuestionComposeScreen(
-              roomId: data.room.id,
-              mentorName: data.mentorName,
-              port: dependencies.freeQuestionEntry,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.rooms,
+            child: AsyncRouteLoader<_FreeQuestionRouteData>(
+              key: ValueKey<String>(roomId),
+              load: (dependencies) =>
+                  _loadFreeQuestionRoute(dependencies, roomId),
+              builder: (context, data, dependencies) =>
+                  FreeQuestionComposeScreen(
+                roomId: data.room.id,
+                mentorName: data.mentorName,
+                port: dependencies.freeQuestionEntry,
+              ),
+              notFoundMessage: '질문방을 찾을 수 없어요.',
+              errorMessage: '무료 질문 정보를 불러오지 못했어요.',
             ),
-            notFoundMessage: '질문방을 찾을 수 없어요.',
-            errorMessage: '무료 질문 정보를 불러오지 못했어요.',
           );
         },
       ),
@@ -44,16 +49,19 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         path: '${AppRoutePaths.rooms}/:roomId/threads/new',
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
-          return AsyncRouteLoader<Room>(
-            key: ValueKey<String>(roomId),
-            load: (dependencies) => _loadNewQuestionRoute(
-              dependencies,
-              roomId,
-            ),
-            builder: (context, room, dependencies) => NewQuestionScreen(
-              room: room,
-              readRepository: dependencies.questionRoomRead,
-              writeRepository: dependencies.questionRoomWrite,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.room(roomId),
+            child: AsyncRouteLoader<Room>(
+              key: ValueKey<String>(roomId),
+              load: (dependencies) => _loadNewQuestionRoute(
+                dependencies,
+                roomId,
+              ),
+              builder: (context, room, dependencies) => NewQuestionScreen(
+                room: room,
+                readRepository: dependencies.questionRoomRead,
+                writeRepository: dependencies.questionRoomWrite,
+              ),
             ),
           );
         },
@@ -62,13 +70,16 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         path: '${AppRoutePaths.rooms}/:roomId/notes',
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
-          return AsyncRouteLoader<_ConnectionNotesRouteData>(
-            key: ValueKey<String>(roomId),
-            load: (dependencies) =>
-                _loadConnectionNotesRoute(dependencies, roomId),
-            builder: (context, data, dependencies) => ConnectionNotesScreen(
-              room: data.room,
-              mentorName: data.otherName,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.room(roomId),
+            child: AsyncRouteLoader<_ConnectionNotesRouteData>(
+              key: ValueKey<String>(roomId),
+              load: (dependencies) =>
+                  _loadConnectionNotesRoute(dependencies, roomId),
+              builder: (context, data, dependencies) => ConnectionNotesScreen(
+                room: data.room,
+                mentorName: data.otherName,
+              ),
             ),
           );
         },
@@ -77,24 +88,28 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         path: '${AppRoutePaths.rooms}/:roomId/threads',
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
-          return AsyncRouteLoader<_ThreadListRouteData>(
-            key: ValueKey<String>(roomId),
-            load: (dependencies) => _loadThreadListRoute(dependencies, roomId),
-            builder: (context, data, dependencies) {
-              if (data.role == AppRole.mentor) {
-                return MentorQuestionListScreen(
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.room(roomId),
+            child: AsyncRouteLoader<_ThreadListRouteData>(
+              key: ValueKey<String>(roomId),
+              load: (dependencies) =>
+                  _loadThreadListRoute(dependencies, roomId),
+              builder: (context, data, dependencies) {
+                if (data.role == AppRole.mentor) {
+                  return MentorQuestionListScreen(
+                    room: data.room,
+                    studentName: data.otherName,
+                  );
+                }
+                return QuestionListScreen(
                   room: data.room,
-                  studentName: data.otherName,
+                  mentorName: data.otherName,
+                  sub: data.subscription,
+                  readRepository: dependencies.questionRoomRead,
+                  writeRepository: dependencies.questionRoomWrite,
                 );
-              }
-              return QuestionListScreen(
-                room: data.room,
-                mentorName: data.otherName,
-                sub: data.subscription,
-                readRepository: dependencies.questionRoomRead,
-                writeRepository: dependencies.questionRoomWrite,
-              );
-            },
+              },
+            ),
           );
         },
       ),
@@ -105,18 +120,21 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
           final String roomId = state.pathParameters['roomId']!;
           final String threadId = state.pathParameters['threadId']!;
           final String attachmentId = state.pathParameters['attachmentId']!;
-          return AsyncRouteLoader<_AttachmentRouteData>(
-            key: ValueKey<String>('$roomId/$threadId/$attachmentId'),
-            load: (dependencies) => _loadAttachmentRoute(
-                dependencies, roomId, threadId, attachmentId),
-            builder: (context, data, dependencies) => AttachmentViewerScreen(
-              attachment: data.attachment,
-              roomId: data.room.id,
-              threadId: data.thread.id,
-              resolver: dependencies.attachmentUrlResolver,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.roomThread(roomId, threadId),
+            child: AsyncRouteLoader<_AttachmentRouteData>(
+              key: ValueKey<String>('$roomId/$threadId/$attachmentId'),
+              load: (dependencies) => _loadAttachmentRoute(
+                  dependencies, roomId, threadId, attachmentId),
+              builder: (context, data, dependencies) => AttachmentViewerScreen(
+                attachment: data.attachment,
+                roomId: data.room.id,
+                threadId: data.thread.id,
+                resolver: dependencies.attachmentUrlResolver,
+              ),
+              notFoundMessage: '첨부 이미지를 찾을 수 없어요.',
+              errorMessage: '첨부 이미지를 불러오지 못했어요.',
             ),
-            notFoundMessage: '첨부 이미지를 찾을 수 없어요.',
-            errorMessage: '첨부 이미지를 불러오지 못했어요.',
           );
         },
       ),
@@ -125,32 +143,35 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           final String threadId = state.pathParameters['threadId']!;
-          return AsyncRouteLoader<_ThreadRouteData>(
-            key: ValueKey<String>('$roomId/$threadId'),
-            load: (dependencies) =>
-                _loadThreadRoute(dependencies, roomId, threadId),
-            builder: (context, data, dependencies) {
-              if (data.role == AppRole.mentor) {
-                return MentorAnswerScreen(
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.roomThreads(roomId),
+            child: AsyncRouteLoader<_ThreadRouteData>(
+              key: ValueKey<String>('$roomId/$threadId'),
+              load: (dependencies) =>
+                  _loadThreadRoute(dependencies, roomId, threadId),
+              builder: (context, data, dependencies) {
+                if (data.role == AppRole.mentor) {
+                  return MentorAnswerScreen(
+                    thread: data.thread,
+                    studentName: data.otherName,
+                    room: data.room,
+                    uploader: dependencies.attachmentUploader,
+                    safety: dependencies.roomSafety,
+                    currentUserIdOverride: dependencies.auth.currentUserId,
+                    readRepository: dependencies.questionRoomRead,
+                  );
+                }
+                return ChatScreen(
                   thread: data.thread,
-                  studentName: data.otherName,
+                  mentorName: data.otherName,
                   room: data.room,
                   uploader: dependencies.attachmentUploader,
                   safety: dependencies.roomSafety,
                   currentUserIdOverride: dependencies.auth.currentUserId,
                   readRepository: dependencies.questionRoomRead,
                 );
-              }
-              return ChatScreen(
-                thread: data.thread,
-                mentorName: data.otherName,
-                room: data.room,
-                uploader: dependencies.attachmentUploader,
-                safety: dependencies.roomSafety,
-                currentUserIdOverride: dependencies.auth.currentUserId,
-                readRepository: dependencies.questionRoomRead,
-              );
-            },
+              },
+            ),
           );
         },
       ),
@@ -158,22 +179,25 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         path: '${AppRoutePaths.rooms}/:roomId',
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
-          return AsyncRouteLoader<_RoomHomeRouteData>(
-            key: ValueKey<String>(roomId),
-            load: (dependencies) => _loadRoomHomeRoute(dependencies, roomId),
-            builder: (context, data, dependencies) {
-              if (data.role == AppRole.mentor) {
-                return StudentRoomHomeScreen(
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.rooms,
+            child: AsyncRouteLoader<_RoomHomeRouteData>(
+              key: ValueKey<String>(roomId),
+              load: (dependencies) => _loadRoomHomeRoute(dependencies, roomId),
+              builder: (context, data, dependencies) {
+                if (data.role == AppRole.mentor) {
+                  return StudentRoomHomeScreen(
+                    room: data.room,
+                    studentName: data.otherName,
+                  );
+                }
+                return MentorRoomHomeScreen(
                   room: data.room,
-                  studentName: data.otherName,
+                  mentorName: data.otherName,
+                  sub: data.subscription,
                 );
-              }
-              return MentorRoomHomeScreen(
-                room: data.room,
-                mentorName: data.otherName,
-                sub: data.subscription,
-              );
-            },
+              },
+            ),
           );
         },
       ),

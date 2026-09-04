@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_tabs.dart';
+
 /// URL-first navigation with a widget-test compatibility path.
 ///
 /// Production routers are explicitly marked by the app router factory. When a screen is
@@ -48,5 +50,47 @@ class AppNavigation {
             fallbackBuilder(context),
       ),
     );
+  }
+
+  /// Completes a pushed route with [result], or goes to [fallbackLocation]
+  /// when the current URL was opened without a page beneath it.
+  ///
+  /// [ModalRoute.willHandlePopInternally] distinguishes the local-history
+  /// sentinel installed by `AppRouteCompletionBoundary` from a real parent
+  /// page. This preserves typed results for shell-originated pushes while a
+  /// cold `/me` action can still reach the requested tab directly.
+  static void complete<T>(
+    BuildContext context, {
+    T? result,
+    required String fallbackLocation,
+  }) {
+    final NavigatorState navigator = Navigator.of(context);
+    final ModalRoute<Object?>? route = ModalRoute.of(context);
+    if (navigator.canPop() && route?.willHandlePopInternally != true) {
+      navigator.pop<T>(result);
+      return;
+    }
+
+    final GoRouter? router = GoRouter.maybeOf(context);
+    if (router != null && _productionRouters[router] == true) {
+      router.go(fallbackLocation);
+      return;
+    }
+    navigator.maybePop<T>(result);
+  }
+
+  /// Finishes the current workflow at a canonical tab URL.
+  ///
+  /// Production uses the router directly, so a cold detail page never relies
+  /// on a missing `HomeShell`. Focused legacy widget tests retain their
+  /// original root-pop plus [TabNavigator] hand-off behavior.
+  static void finishAtLocation(BuildContext context, String location) {
+    final GoRouter? router = GoRouter.maybeOf(context);
+    if (router != null && _productionRouters[router] == true) {
+      router.go(location);
+      return;
+    }
+    Navigator.of(context).popUntil((Route<dynamic> route) => route.isFirst);
+    TabNavigator.go(location);
   }
 }

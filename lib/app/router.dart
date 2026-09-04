@@ -88,8 +88,9 @@ class AppRouter {
             StatefulShellBranch(
               initialLocation: AppRoutePaths.mentors,
               routes: <RouteBase>[
-                // One navigator owns both role variants. `/mentors` remains a
-                // valid mentor deep URL even though their visible tab is 정산.
+                // One navigator owns both role variants. `/mentors` is the
+                // student/guest directory; mentor navigation canonicalizes to
+                // the role-visible `/settlements` destination below.
                 GoRoute(
                   path: AppRoutePaths.mentors,
                   builder: (context, state) => const HomeTabBranch(
@@ -173,6 +174,11 @@ class AppRouter {
         dependencies.auth.currentRole != AppRole.mentor &&
         destination == AppRoutePaths.settlements) {
       return AppRoutePaths.rooms;
+    }
+    if (access == AccessState.full &&
+        dependencies.auth.currentRole == AppRole.mentor &&
+        destination == AppRoutePaths.mentors) {
+      return AppRoutePaths.settlements;
     }
     return guarded;
   }

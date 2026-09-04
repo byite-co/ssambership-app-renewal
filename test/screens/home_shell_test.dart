@@ -82,10 +82,22 @@ void main() {
     expect(_path(harness.router), AppRoutePaths.rooms);
   });
 
-  testWidgets('멘토의 /mentors deep URL은 숨은 shared branch에서 그대로 유효하다', (
+  testWidgets('멘토의 /mentors deep URL은 역할 canonical 정산 탭으로 수렴한다', (
     WidgetTester tester,
   ) async {
-    final _RouterHarness harness = _productionHarness(AppRole.mentor);
+    const MyPageData data = MyPageData(
+      role: AppRole.mentor,
+      profile: MyProfile(name: '탐색멘토', roleLabel: '멘토'),
+      mentor: MentorDashboard(
+        studentCount: 3,
+        pendingAnswers: 2,
+        latestSettlementCents: 120000,
+      ),
+    );
+    final _RouterHarness harness = _productionHarness(
+      AppRole.mentor,
+      myPage: const GoldenMyPageRepository(data),
+    );
     addTearDown(harness.router.dispose);
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
@@ -93,12 +105,15 @@ void main() {
     harness.router.go(AppRoutePaths.mentors);
     await tester.pumpAndSettle();
 
-    expect(_path(harness.router), AppRoutePaths.mentors);
+    expect(_path(harness.router), AppRoutePaths.settlements);
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
       2,
     );
-    expect(find.text('멘토 찾기'), findsWidgets);
+    expect(_navigationLabels(tester), AppConstants.mentorBottomTabLabels);
+    expect(find.text('정산'), findsWidgets);
+    expect(find.text('답변 · 정산 요약'), findsOneWidget);
+    expect(find.text('멘토 찾기'), findsNothing);
   });
 
   testWidgets('게스트 canonical은 /mentors이고 /community 외 탭은 로그인으로 간다', (

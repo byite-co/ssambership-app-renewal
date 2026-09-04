@@ -175,9 +175,9 @@ class _HomeShellState extends State<HomeShell> {
       final int? branchIndex = _branchIndexFor(location);
       if (branchIndex == null) return;
 
-      // branch 2는 `/mentors`와 `/settlements` 두 유효 URL을 공유한다.
-      // 역할별 버튼은 정확한 canonical URL로 보내고, 이후 다른 branch를
-      // 오갈 때는 goBranch가 해당 Navigator의 마지막 상태를 복원한다.
+      // branch 2는 역할별 `/mentors`와 `/settlements` URL을 공유한다.
+      // 버튼은 정확한 canonical URL로 보내고, 역할에 맞지 않는 형제 URL은
+      // AppRouter가 정규화한다. 이후에는 branch의 마지막 상태를 복원한다.
       if (branchIndex == 2) {
         context.go(location);
       } else {

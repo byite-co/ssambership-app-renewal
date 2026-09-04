@@ -6,6 +6,7 @@ import '../../features/community/ui/board/board_detail_screen.dart';
 import '../../features/community/ui/board/board_write_screen.dart';
 import '../../features/community/ui/shortform/shortform_compose_screen.dart';
 import '../../features/community/ui/shortform/shortform_detail_screen.dart';
+import '../app_route_completion.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../async_route_loader.dart';
@@ -14,36 +15,50 @@ import '../async_route_loader.dart';
 List<RouteBase> buildCommunityRoutes() => <RouteBase>[
       GoRoute(
         path: AppRoutePaths.newBoardPost,
-        builder: (context, state) =>
-            BoardWriteScreen(write: AppScope.of(context).communityWrite),
-      ),
-      GoRoute(
-        path: '${AppRoutePaths.boardPosts}/:postId/edit',
-        builder: (context, state) => BoardEditRoutePage(
-          postId: state.pathParameters['postId']!,
+        builder: (context, state) => AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.community,
+          child: BoardWriteScreen(
+            write: AppScope.of(context).communityWrite,
+          ),
         ),
       ),
       GoRoute(
+        path: '${AppRoutePaths.boardPosts}/:postId/edit',
+        builder: (context, state) {
+          final String postId = state.pathParameters['postId']!;
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.boardPost(postId),
+            child: BoardEditRoutePage(postId: postId),
+          );
+        },
+      ),
+      GoRoute(
         path: AppRoutePaths.newShortform,
-        builder: (context, state) => ShortformComposeScreen(
-          supabaseClient: AppScope.of(context).supabaseClient,
+        builder: (context, state) => AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.community,
+          child: ShortformComposeScreen(
+            supabaseClient: AppScope.of(context).supabaseClient,
+          ),
         ),
       ),
       GoRoute(
         path: '${AppRoutePaths.boardPosts}/:postId',
         builder: (context, state) {
           final String postId = state.pathParameters['postId']!;
-          return AsyncRouteLoader<BoardPost>(
-            key: ValueKey<String>('board-detail/$postId'),
-            load: (dependencies) =>
-                dependencies.communityRead.boardPostById(postId),
-            builder: (context, post, dependencies) => BoardDetailScreen(
-              post: post,
-              read: dependencies.communityRead,
-              write: dependencies.communityWrite,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.community,
+            child: AsyncRouteLoader<BoardPost>(
+              key: ValueKey<String>('board-detail/$postId'),
+              load: (dependencies) =>
+                  dependencies.communityRead.boardPostById(postId),
+              builder: (context, post, dependencies) => BoardDetailScreen(
+                post: post,
+                read: dependencies.communityRead,
+                write: dependencies.communityWrite,
+              ),
+              notFoundMessage: '게시글을 찾을 수 없어요.',
+              errorMessage: '게시글을 불러오지 못했어요.',
             ),
-            notFoundMessage: '게시글을 찾을 수 없어요.',
-            errorMessage: '게시글을 불러오지 못했어요.',
           );
         },
       ),
@@ -51,17 +66,20 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
         path: '${AppRoutePaths.shortforms}/:shortformId',
         builder: (context, state) {
           final String shortformId = state.pathParameters['shortformId']!;
-          return AsyncRouteLoader<ShortformPost>(
-            key: ValueKey<String>(shortformId),
-            load: (dependencies) =>
-                dependencies.communityRead.shortformById(shortformId),
-            builder: (context, post, dependencies) => ShortformDetailScreen(
-              post: post,
-              read: dependencies.communityRead,
-              write: dependencies.communityWrite,
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.community,
+            child: AsyncRouteLoader<ShortformPost>(
+              key: ValueKey<String>(shortformId),
+              load: (dependencies) =>
+                  dependencies.communityRead.shortformById(shortformId),
+              builder: (context, post, dependencies) => ShortformDetailScreen(
+                post: post,
+                read: dependencies.communityRead,
+                write: dependencies.communityWrite,
+              ),
+              notFoundMessage: '숏폼을 찾을 수 없어요.',
+              errorMessage: '숏폼을 불러오지 못했어요.',
             ),
-            notFoundMessage: '숏폼을 찾을 수 없어요.',
-            errorMessage: '숏폼을 불러오지 못했어요.',
           );
         },
       ),
