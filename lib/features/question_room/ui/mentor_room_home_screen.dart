@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/spacing_tokens.dart';
@@ -93,8 +95,7 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
                 icon: Icons.forum_rounded,
                 title: '질문 / 답변',
                 child: d.latestThread == null
-                    ? Text('아직 질문이 없어요. 첫 질문을 남겨보세요.',
-                        style: AppType.caption)
+                    ? Text('아직 질문이 없어요. 첫 질문을 남겨보세요.', style: AppType.caption)
                     : Row(
                         children: <Widget>[
                           Expanded(
@@ -122,8 +123,7 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       )
-                    : Text('멘토가 남긴 노트가 아직 없어요.',
-                        style: AppType.caption),
+                    : Text('멘토가 남긴 노트가 아직 없어요.', style: AppType.caption),
                 onTap: () => _openNotes(),
               ),
             ],
@@ -145,8 +145,7 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
         Expanded(
           child: Text(widget.mentorName, style: AppType.title),
         ),
-        if (bits.isNotEmpty)
-          Text(bits.join(' · '), style: AppType.caption),
+        if (bits.isNotEmpty) Text(bits.join(' · '), style: AppType.caption),
       ],
     );
   }
@@ -168,12 +167,12 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
   }
 
   Future<void> _openNotes() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ConnectionNotesScreen(
-          room: widget.room,
-          mentorName: widget.mentorName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomNotes(widget.room.id),
+      fallbackBuilder: (_) => ConnectionNotesScreen(
+        room: widget.room,
+        mentorName: widget.mentorName,
       ),
     );
     if (mounted) _refresh();
@@ -190,4 +189,3 @@ class _RoomHomeData {
   final QuestionThread? latestThread;
   final ConnectionNote? latestMentorNote;
 }
-

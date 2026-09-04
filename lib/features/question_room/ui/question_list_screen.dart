@@ -220,12 +220,12 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   }
 
   Future<void> _openNotes() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ConnectionNotesScreen(
-          room: widget.room,
-          mentorName: widget.mentorName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomNotes(widget.room.id),
+      fallbackBuilder: (_) => ConnectionNotesScreen(
+        room: widget.room,
+        mentorName: widget.mentorName,
       ),
     );
   }
