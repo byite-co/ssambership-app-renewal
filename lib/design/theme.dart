@@ -54,7 +54,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       // 전역 폰트: Pretendard(정적 4종 400/500/600/700 등록). 시스템 폰트 대체.
-      fontFamily: 'Pretendard',
+      fontFamily: AppType.fontFamily,
       scaffoldBackgroundColor: ColorTokens.page,
       // 터치 피드백(A-6): 탭 가능한 카드·리스트·버튼 InkWell 에 은은한 역할색 리플.
       // "정적 웹페이지" → "반응형 앱" 느낌. 과하지 않게(splash ~10%, highlight ~5%).

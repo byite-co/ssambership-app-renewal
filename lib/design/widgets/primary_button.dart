@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../tokens/color_tokens.dart';
 import '../tokens/dimens.dart';
+import '../typography_tokens.dart';
 
 /// 주요 액션 버튼.
 /// ★ 색 위계(2026-07 QA4): 액션 CTA 는 역할 정체성 색이 아니라 **고정 액션
@@ -44,7 +45,12 @@ class PrimaryButton extends StatelessWidget {
         minimumSize: const Size(0, 52),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        // ★ ButtonStyle.textStyle 은 테마 fontFamily 를 상속하지 않는다 — 명시 필수.
+        textStyle: const TextStyle(
+          fontFamily: AppType.fontFamily,
+          fontWeight: FontWeight.w800,
+          fontSize: 15,
+        ),
       ),
       child: child,
     );
