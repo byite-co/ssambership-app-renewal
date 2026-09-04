@@ -8,6 +8,8 @@ import '../../features/question_room/ui/chat_screen.dart';
 import '../../features/question_room/ui/connection_notes_screen.dart';
 import '../../features/question_room/ui/mentor/mentor_answer_screen.dart';
 import '../../features/question_room/ui/mentor/mentor_question_list_screen.dart';
+import '../../features/question_room/ui/mentor/student_room_home_screen.dart';
+import '../../features/question_room/ui/mentor_room_home_screen.dart';
 import '../../features/question_room/ui/new_question_screen.dart';
 import '../../features/question_room/ui/question_list_screen.dart';
 import '../app_route_paths.dart';
@@ -102,6 +104,28 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
           );
         },
       ),
+      GoRoute(
+        path: '${AppRoutePaths.rooms}/:roomId',
+        builder: (context, state) {
+          final String roomId = state.pathParameters['roomId']!;
+          return AsyncRouteLoader<_RoomHomeRouteData>(
+            load: (dependencies) => _loadRoomHomeRoute(dependencies, roomId),
+            builder: (context, data, dependencies) {
+              if (data.role == AppRole.mentor) {
+                return StudentRoomHomeScreen(
+                  room: data.room,
+                  studentName: data.otherName,
+                );
+              }
+              return MentorRoomHomeScreen(
+                room: data.room,
+                mentorName: data.otherName,
+                sub: data.subscription,
+              );
+            },
+          );
+        },
+      ),
     ];
 
 Future<_ConnectionNotesRouteData?> _loadConnectionNotesRoute(
@@ -168,6 +192,52 @@ Future<_ThreadListRouteData?> _loadThreadListRoute(
 
 class _ThreadListRouteData {
   const _ThreadListRouteData({
+    required this.room,
+    required this.role,
+    required this.otherName,
+    this.subscription,
+  });
+
+  final Room room;
+  final AppRole role;
+  final String otherName;
+  final SubscriptionSummary? subscription;
+}
+
+Future<_RoomHomeRouteData?> _loadRoomHomeRoute(
+  AppDependencies dependencies,
+  String roomId,
+) async {
+  final Room? room = await dependencies.questionRoomRead.roomById(roomId);
+  if (room == null) return null;
+
+  final AppRole role = dependencies.auth.currentRole;
+  if (role == AppRole.mentor) {
+    final String studentName =
+        (await dependencies.studentLookup.fetch(room.studentId))?.displayName ??
+            '학생';
+    return _RoomHomeRouteData(
+      room: room,
+      role: role,
+      otherName: studentName,
+    );
+  }
+
+  final String mentorName =
+      (await dependencies.mentorLookup.fetch(room.mentorId))?.displayName ??
+          '멘토';
+  final Map<String, SubscriptionSummary> subscriptions =
+      await dependencies.subscriptions.fetchForStudent(room.studentId);
+  return _RoomHomeRouteData(
+    room: room,
+    role: role,
+    otherName: mentorName,
+    subscription: subscriptions[room.mentorId],
+  );
+}
+
+class _RoomHomeRouteData {
+  const _RoomHomeRouteData({
     required this.room,
     required this.role,
     required this.otherName,

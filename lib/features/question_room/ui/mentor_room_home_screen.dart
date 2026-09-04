@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
+import '../../../app/app_scope.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/spacing_tokens.dart';
@@ -35,12 +36,14 @@ class MentorRoomHomeScreen extends StatefulWidget {
 }
 
 class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
-  final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
+  late final AppDependencies _dependencies;
+  QuestionRoomReadRepository get _repo => _dependencies.questionRoomRead;
   late Future<_RoomHomeData> _future;
 
   @override
   void initState() {
     super.initState();
+    _dependencies = AppScope.of(context);
     _future = _load();
   }
 

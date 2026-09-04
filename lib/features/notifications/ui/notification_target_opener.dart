@@ -110,11 +110,11 @@ class NotificationTargetOpener {
           ),
         );
       } else {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                StudentRoomHomeScreen(room: targetRoom, studentName: sName),
-          ),
+        await AppNavigation.push<void>(
+          context,
+          AppRoutePaths.room(targetRoom.id),
+          fallbackBuilder: (_) =>
+              StudentRoomHomeScreen(room: targetRoom, studentName: sName),
         );
       }
       return true;
@@ -141,11 +141,11 @@ class NotificationTargetOpener {
         ),
       );
     } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              MentorRoomHomeScreen(room: targetRoom, mentorName: name),
-        ),
+      await AppNavigation.push<void>(
+        context,
+        AppRoutePaths.room(targetRoom.id),
+        fallbackBuilder: (_) =>
+            MentorRoomHomeScreen(room: targetRoom, mentorName: name),
       );
     }
     return true;
