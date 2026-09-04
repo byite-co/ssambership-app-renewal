@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/deeplink/notification_deep_link_controller.dart';
@@ -14,7 +16,6 @@ import '../../individual_question/ui/iq_detail_screen.dart';
 import '../../mentors/data/mentor_directory_repository.dart';
 import '../../mentors/data/mentor_models.dart';
 import '../../mentors/ui/mentor_detail_screen.dart';
-import '../../question_room/data/mentor_lookup_repository.dart';
 import '../../question_room/data/models/question_thread.dart';
 import '../../question_room/data/models/room.dart';
 import '../../question_room/data/question_room_read_repository.dart';
@@ -94,20 +95,21 @@ class NotificationTargetOpener {
       String studentName = '학생';
       try {
         final Map<String, StudentPublic> students =
-            await const StudentLookupRepository()
-                .fetchMany(<String>[targetRoom.studentId]);
-        studentName =
-            students[targetRoom.studentId]?.displayName ?? '학생';
+            await deps.studentLookup.fetchMany(<String>[targetRoom.studentId]);
+        studentName = students[targetRoom.studentId]?.displayName ?? '학생';
       } catch (_) {
         // 이름 조회 실패는 중립 표시로 계속 진행.
       }
       if (!context.mounted) return false;
       final String sName = studentName;
       if (targetThread != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => MentorAnswerScreen(
-                thread: targetThread, studentName: sName, room: targetRoom),
+        await AppNavigation.push<void>(
+          context,
+          AppRoutePaths.roomThread(targetRoom.id, targetThread.id),
+          fallbackBuilder: (_) => MentorAnswerScreen(
+            thread: targetThread,
+            studentName: sName,
+            room: targetRoom,
           ),
         );
       } else {
@@ -124,9 +126,7 @@ class NotificationTargetOpener {
     String mentorName = '멘토';
     try {
       mentorName =
-          (await const MentorLookupRepository().fetch(room.mentorId))
-                  ?.displayName ??
-              '멘토';
+          (await deps.mentorLookup.fetch(room.mentorId))?.displayName ?? '멘토';
     } catch (_) {
       // 이름 조회 실패는 중립 표시로 계속 진행.
     }
@@ -134,10 +134,13 @@ class NotificationTargetOpener {
     if (!context.mounted) return false;
     final String name = mentorName;
     if (targetThread != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => ChatScreen(
-              thread: targetThread, mentorName: name, room: targetRoom),
+      await AppNavigation.push<void>(
+        context,
+        AppRoutePaths.roomThread(targetRoom.id, targetThread.id),
+        fallbackBuilder: (_) => ChatScreen(
+          thread: targetThread,
+          mentorName: name,
+          room: targetRoom,
         ),
       );
     } else {

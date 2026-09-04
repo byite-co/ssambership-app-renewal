@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../data/mappings/subject_labels.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
@@ -155,8 +157,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
       child: ChipScroll(
         labels: labels,
         selectedIndex: _StatusTab.values.indexOf(_tab),
-        onSelected: (int i) =>
-            setState(() => _tab = _StatusTab.values[i]),
+        onSelected: (int i) => setState(() => _tab = _StatusTab.values[i]),
       ),
     );
   }
@@ -167,9 +168,8 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
       '전체',
       for (final String code in subjectCodes) subjectLabel(code),
     ];
-    final int selected = _subjectCode == null
-        ? 0
-        : subjectCodes.indexOf(_subjectCode!) + 1;
+    final int selected =
+        _subjectCode == null ? 0 : subjectCodes.indexOf(_subjectCode!) + 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
       child: Row(
@@ -186,7 +186,9 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
           IconButton(
             tooltip: _newestFirst ? '최신순' : '오래된순',
             icon: Icon(
-              _newestFirst ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              _newestFirst
+                  ? Icons.arrow_downward_rounded
+                  : Icons.arrow_upward_rounded,
               color: ColorTokens.secondary,
               size: 20,
             ),
@@ -202,9 +204,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
       return EmptyState(
         icon: Icons.inbox_outlined,
         title: noThreadsAtAll ? '아직 받은 질문이 없어요' : '이 조건의 질문이 없어요',
-        message: noThreadsAtAll
-            ? '학생이 질문하면 여기에 표시돼요.'
-            : '다른 탭이나 과목을 선택해 보세요.',
+        message: noThreadsAtAll ? '학생이 질문하면 여기에 표시돼요.' : '다른 탭이나 과목을 선택해 보세요.',
       );
     }
     return ListView.separated(
@@ -220,13 +220,13 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
   }
 
   Future<void> _openAnswer(QuestionThread t) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorAnswerScreen(
-          thread: t,
-          studentName: widget.studentName,
-          room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomThread(widget.room.id, t.id),
+      fallbackBuilder: (_) => MentorAnswerScreen(
+        thread: t,
+        studentName: widget.studentName,
+        room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
       ),
     );
     if (mounted) _refresh(); // 답변/상태 전이 반영.
