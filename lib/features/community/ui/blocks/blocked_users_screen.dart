@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../../../design/widgets/app_card.dart';
@@ -13,36 +14,40 @@ import '../../data/user_blocks_repository.dart';
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({
     super.key,
-    this.repository = const UserBlocksRepository(),
+    this.repository,
   });
 
-  final UserBlocksRepository repository;
+  /// Optional test seam. Production resolves the repository from [AppScope].
+  final UserBlocksRepository? repository;
 
   @override
   State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
 }
 
 class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
+  late final UserBlocksRepository _repository;
   late Future<List<BlockedUser>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.repository.myBlockedUsers();
+    _repository = widget.repository ?? AppScope.of(context).userBlocks;
+    _future = _repository.myBlockedUsers();
   }
 
   void _reload() {
     setState(() {
-      _future = widget.repository.myBlockedUsers();
+      _future = _repository.myBlockedUsers();
     });
   }
 
   Future<void> _unblock(BlockedUser u) async {
-    final bool ok = await widget.repository.unblock(u.userId);
+    final bool ok = await _repository.unblock(u.userId);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? '${u.displayName} 차단을 해제했어요.' : '해제에 실패했어요. 잠시 후 다시 시도해 주세요.'),
+        content: Text(
+            ok ? '${u.displayName} 차단을 해제했어요.' : '해제에 실패했어요. 잠시 후 다시 시도해 주세요.'),
       ),
     );
     if (ok) _reload();
@@ -70,7 +75,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenH, 12, AppSpacing.screenH, 24),
             itemCount: users.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+            separatorBuilder: (_, __) =>
+                const SizedBox(height: AppSpacing.cardGap),
             itemBuilder: (BuildContext context, int i) => _BlockedRow(
               user: users[i],
               onUnblock: () => _unblock(users[i]),
