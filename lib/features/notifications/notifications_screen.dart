@@ -112,7 +112,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void initState() {
     super.initState();
-    _repo = widget.repository ?? const SupabaseNotificationsRepository();
+    _repo = widget.repository ?? AppScope.of(context).notifications;
     _load();
     _badge.refresh();
     _startRealtime();
@@ -159,8 +159,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void _startRealtime() {
     final String? uid = AppScope.of(context).auth.currentUserId;
     if (uid == null) return; // 게스트/미연결 — 구독 없음(폴백 재조회만).
-    final NotificationsRealtimePort rt = (widget.realtimeFactory ??
-        SupabaseNotificationsRealtime.new)(uid);
+    final NotificationsRealtimePort rt =
+        (widget.realtimeFactory ?? SupabaseNotificationsRealtime.new)(uid);
     _realtime = rt;
     rt.start(
       onInsert: _onRealtimeInsert,
@@ -177,8 +177,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void _onRealtimeInsert(Map<String, dynamic> row) {
     if (!mounted) return;
     _badge.refresh();
-    final String rawType =
-        (row['type'] as String?)?.trim().toLowerCase() ?? '';
+    final String rawType = (row['type'] as String?)?.trim().toLowerCase() ?? '';
     if (kGatedNotificationTypeCodes.contains(rawType)) return; // CR 게이트 OFF.
     final AppNotification n;
     try {
@@ -376,8 +375,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                   ),
                   if (unread > 0)
-                    TextButton(
-                        onPressed: _markAll, child: const Text('모두 읽음')),
+                    TextButton(onPressed: _markAll, child: const Text('모두 읽음')),
                 ],
               );
             },
