@@ -22,6 +22,7 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
         builder: (context, state) {
           final String postId = state.pathParameters['postId']!;
           return AsyncRouteLoader<BoardPost>(
+            key: ValueKey<String>('board-edit/$postId'),
             load: (dependencies) =>
                 dependencies.communityRead.boardPostById(postId),
             builder: (context, post, dependencies) => BoardWriteScreen(
@@ -42,6 +43,7 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
         builder: (context, state) {
           final String postId = state.pathParameters['postId']!;
           return AsyncRouteLoader<BoardPost>(
+            key: ValueKey<String>('board-detail/$postId'),
             load: (dependencies) =>
                 dependencies.communityRead.boardPostById(postId),
             builder: (context, post, dependencies) => BoardDetailScreen(

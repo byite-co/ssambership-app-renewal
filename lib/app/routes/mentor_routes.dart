@@ -27,6 +27,7 @@ class MentorDetailRoutePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AsyncRouteLoader<_MentorDetailRouteData>(
+      key: ValueKey<String>(mentorId),
       load: (dependencies) => _loadMentorDetail(dependencies, mentorId),
       builder: (context, data, dependencies) => MentorDetailScreen(
         item: data.item,

@@ -27,6 +27,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<_FreeQuestionRouteData>(
+            key: ValueKey<String>(roomId),
             load: (dependencies) =>
                 _loadFreeQuestionRoute(dependencies, roomId),
             builder: (context, data, dependencies) => FreeQuestionComposeScreen(
@@ -44,6 +45,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<Room>(
+            key: ValueKey<String>(roomId),
             load: (dependencies) => _loadNewQuestionRoute(
               dependencies,
               roomId,
@@ -61,6 +63,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<_ConnectionNotesRouteData>(
+            key: ValueKey<String>(roomId),
             load: (dependencies) =>
                 _loadConnectionNotesRoute(dependencies, roomId),
             builder: (context, data, dependencies) => ConnectionNotesScreen(
@@ -75,6 +78,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<_ThreadListRouteData>(
+            key: ValueKey<String>(roomId),
             load: (dependencies) => _loadThreadListRoute(dependencies, roomId),
             builder: (context, data, dependencies) {
               if (data.role == AppRole.mentor) {
@@ -122,6 +126,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
           final String roomId = state.pathParameters['roomId']!;
           final String threadId = state.pathParameters['threadId']!;
           return AsyncRouteLoader<_ThreadRouteData>(
+            key: ValueKey<String>('$roomId/$threadId'),
             load: (dependencies) =>
                 _loadThreadRoute(dependencies, roomId, threadId),
             builder: (context, data, dependencies) {
@@ -154,6 +159,7 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<_RoomHomeRouteData>(
+            key: ValueKey<String>(roomId),
             load: (dependencies) => _loadRoomHomeRoute(dependencies, roomId),
             builder: (context, data, dependencies) {
               if (data.role == AppRole.mentor) {

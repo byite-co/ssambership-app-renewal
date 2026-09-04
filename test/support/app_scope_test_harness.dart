@@ -8,10 +8,14 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/auth/deletion_notice_controller.dart';
 import 'package:ssambership_app/core/version_gate/version_gate_controller.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
+import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
+import 'package:ssambership_app/features/mentors/data/mentor_favorites_repository.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 import 'package:ssambership_app/features/notifications/data/notification_badge_controller.dart';
 import 'package:ssambership_app/features/notifications/data/notifications_repository.dart';
 import 'package:ssambership_app/features/question_room/data/attachments/attachment_url_resolver.dart';
+import 'package:ssambership_app/features/question_room/data/mentor_lookup_repository.dart';
+import 'package:ssambership_app/features/question_room/data/question_room_read_repository.dart';
 
 /// Wraps a directly pumped test app in an explicit, backend-free [AppScope].
 Widget withTestAppScope(
@@ -32,9 +36,23 @@ extension AppScopeWidgetTester on WidgetTester {
 }
 
 /// Minimal dependency graph for widget tests that do not exercise app services.
-AppDependencies testAppDependencies({required AppAuth auth}) => AppDependencies(
+AppDependencies testAppDependencies({
+  required AppAuth auth,
+  QuestionRoomReadRepository questionRoomRead =
+      const QuestionRoomReadRepository(),
+  MentorLookupRepository mentorLookup = const MentorLookupRepository(),
+  MentorDirectoryRepository mentorDirectory =
+      const MentorDirectoryRepository(),
+  MentorFavoritesRepository mentorFavorites =
+      const MentorFavoritesRepository(),
+}) =>
+    AppDependencies(
       auth: auth,
       supabaseClient: () => null,
+      questionRoomRead: questionRoomRead,
+      mentorLookup: mentorLookup,
+      mentorDirectory: mentorDirectory,
+      mentorFavorites: mentorFavorites,
       attachmentUrlResolver:
           AttachmentUrlResolver(const _UnavailableAttachmentBackend()),
       notificationBadge:
