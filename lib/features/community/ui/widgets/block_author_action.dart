@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../data/user_blocks_repository.dart';
 
 /// 작성자 차단 확인 다이얼로그 → 차단 실행(공용). 차단 성공 시 true.
@@ -15,7 +16,7 @@ Future<bool> confirmAndBlockAuthor(
   String? table,
   String? contentId,
   String? authorId,
-  UserBlocksRepository repo = const UserBlocksRepository(),
+  UserBlocksRepository? repo,
 }) async {
   assert(authorId != null || (table != null && contentId != null),
       'authorId 또는 table+contentId 중 하나는 필요하다');
@@ -37,10 +38,12 @@ Future<bool> confirmAndBlockAuthor(
     ),
   );
   if (ok != true) return false;
+  if (!context.mounted) return false;
 
+  final UserBlocksRepository blocks = repo ?? AppScope.of(context).userBlocks;
   final BlockResult r = authorId != null
-      ? await repo.blockAuthor(authorId)
-      : await repo.blockAuthorOf(table: table!, contentId: contentId!);
+      ? await blocks.blockAuthor(authorId)
+      : await blocks.blockAuthorOf(table: table!, contentId: contentId!);
   if (!context.mounted) return r == BlockResult.blocked;
   final String msg;
   switch (r) {
