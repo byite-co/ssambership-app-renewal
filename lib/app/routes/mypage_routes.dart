@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/community/ui/blocks/blocked_users_screen.dart';
 import '../../features/mypage/data/mypage_models.dart';
 import '../../features/mypage/mypage_screen.dart';
 import '../../features/mypage/ui/account_delete_screen.dart';
@@ -39,6 +40,13 @@ List<RouteBase> buildMyPageRoutes() => <RouteBase>[
             repository: dependencies.profileEdit,
           ),
           errorMessage: '프로필을 불러오지 못했어요.',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutePaths.blockedUsers,
+        builder: (BuildContext context, GoRouterState state) =>
+            BlockedUsersScreen(
+          repository: AppScope.of(context).userBlocks,
         ),
       ),
     ];

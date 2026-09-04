@@ -252,10 +252,10 @@ class _SettingsSectionState extends State<SettingsSection> {
             MyPageRow(
               icon: Icons.block_rounded,
               label: '차단 관리',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const BlockedUsersScreen(),
-                ),
+              onTap: () => AppNavigation.push<void>(
+                context,
+                AppRoutePaths.blockedUsers,
+                fallbackBuilder: (_) => const BlockedUsersScreen(),
               ),
             ),
             MyPageRow(
