@@ -222,6 +222,7 @@ class _HomeShellState extends State<HomeShell> {
     final int selectedIndex = shell?.currentIndex ?? _fallbackIndex;
     final String activeLocation =
         widget.location ?? tabs[selectedIndex].location;
+    final bool shellRouteVisible = ModalRoute.of(context)?.isCurrent ?? true;
 
     return Scaffold(
       appBar: AppBar(
@@ -252,6 +253,7 @@ class _HomeShellState extends State<HomeShell> {
                   )
                 : _HomeTabVisibilityScope(
                     activeIndex: selectedIndex,
+                    shellRouteVisible: shellRouteVisible,
                     child: shell,
                   ),
           ),
@@ -326,9 +328,11 @@ class HomeTabBranch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int? activeIndex = _HomeTabVisibilityScope.maybeActiveIndex(context);
+    final _HomeTabVisibilityScope? scope =
+        _HomeTabVisibilityScope.maybeOf(context);
     return ScreenVisibility(
-      visible: activeIndex == null || activeIndex == branchIndex,
+      visible: scope == null ||
+          (scope.activeIndex == branchIndex && scope.shellRouteVisible),
       child: child,
     );
   }
@@ -337,18 +341,20 @@ class HomeTabBranch extends StatelessWidget {
 class _HomeTabVisibilityScope extends InheritedWidget {
   const _HomeTabVisibilityScope({
     required this.activeIndex,
+    required this.shellRouteVisible,
     required super.child,
   });
 
   final int activeIndex;
+  final bool shellRouteVisible;
 
-  static int? maybeActiveIndex(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<_HomeTabVisibilityScope>()
-      ?.activeIndex;
+  static _HomeTabVisibilityScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_HomeTabVisibilityScope>();
 
   @override
   bool updateShouldNotify(_HomeTabVisibilityScope oldWidget) =>
-      activeIndex != oldWidget.activeIndex;
+      activeIndex != oldWidget.activeIndex ||
+      shellRouteVisible != oldWidget.shellRouteVisible;
 }
 
 class _HomeTabDestination {
