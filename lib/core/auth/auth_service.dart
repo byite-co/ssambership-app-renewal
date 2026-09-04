@@ -7,6 +7,7 @@ import '../deeplink/deep_link_service.dart';
 import '../supabase/supabase_client.dart';
 import '../web_bridge/web_session_hygiene.dart';
 import 'account_status.dart';
+import 'app_auth.dart';
 import 'deletion_notice_controller.dart';
 
 /// 사용자 역할. 화면에는 영문 코드 대신 의미에 맞는 한글 UI를 쓴다.
@@ -26,7 +27,7 @@ enum AccessState { loading, loggedOut, guest, full, blocked }
 /// ChangeNotifier 로 두어 GoRouter refreshListenable 로 진입 분기를 갱신한다.
 /// - 세션: Supabase 이메일+비밀번호 로그인 / 로그아웃 / 앱 재시작 시 복원·유지.
 /// - 프로필: 로그인 후 users 본인 행(role·표시명·상태) + 탈퇴 RPC 2종 read.
-class AuthService extends ChangeNotifier {
+class AuthService extends ChangeNotifier implements AppAuth {
   AuthService._();
 
   static final AuthService instance = AuthService._();
@@ -41,8 +42,11 @@ class AuthService extends ChangeNotifier {
 
   // ── 외부 노출 게터 ──
   bool get isBootstrapping => _bootstrapping;
+  @override
   bool get isGuest => _guest;
+  @override
   AppRole get currentRole => _role;
+  @override
   AccountState get accountState => _account;
 
   /// 화면 표시용 이름(nickname 우선, 없으면 full_name, 둘 다 없으면 빈 문자열).
@@ -66,7 +70,12 @@ class AuthService extends ChangeNotifier {
   Session? get _session => _client?.auth.currentSession;
 
   /// 현재 로그인 여부(실제 Supabase 세션 기준).
+  @override
   bool get isSignedIn => _session != null;
+
+  /// 로그인 사용자 id(세션 기준). 없으면 null.
+  @override
+  String? get currentUserId => _session?.user.id;
 
   /// 진입 분기용 단일 상태.
   AccessState get access => computeAccess(
@@ -112,6 +121,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 차단 화면에 보여줄 안내 문구(상태별 구분 문구).
+  @override
   String get blockedMessage {
     // 계정 상태 자체의 차단/실패 문구가 있으면 그것이 최우선.
     final String accountMessage = _account.blockedMessage;
@@ -127,6 +137,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 차단 사유가 '일시 조회 실패'(재시도로 풀릴 수 있는 경우)인지.
+  @override
   bool get isRecoverableBlock => computeRecoverableBlock(
         signedIn: isSignedIn,
         role: _role,
@@ -301,6 +312,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 이메일+비밀번호 로그인. 실패 시 AuthException 전파(화면에서 안내).
+  @override
   Future<void> signInWithPassword({
     required String email,
     required String password,
@@ -320,6 +332,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 둘러보기(게스트 입장).
+  @override
   void enterAsGuest() {
     _guest = true;
     _resetProfile();
@@ -327,6 +340,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 로그아웃. ★ App-F0: 디바이스 토큰 등록 자체가 없어 철회 단계도 없다.
+  @override
   Future<void> signOut() async {
     final SupabaseClient? client = _client;
     _guest = false;
@@ -342,6 +356,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// 차단/상태불명 화면에서 프로필 재시도.
+  @override
   Future<void> reloadProfile() async {
     await _loadProfile();
     notifyListeners();

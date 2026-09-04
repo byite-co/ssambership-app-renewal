@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'app/app.dart';
+import 'app/app_scope.dart';
 import 'core/auth/auth_service.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/supabase/supabase_client.dart';
@@ -54,6 +55,10 @@ Future<void> main() async {
     // anon RPC 라 로그인 전에도 동작한다. android/ios 외 플랫폼은 스스로 건너뛴다.
     unawaited(VersionGateController.instance.start());
 
-    runApp(const SsambershipApp());
+    // A-2: 부팅한 싱글턴·레포지토리를 의존성 묶음으로 만들어 트리로 내려보낸다.
+    // 화면은 AppScope.of(context) 로 읽고 `.instance` 를 직접 부르지 않는다.
+    final AppDependencies dependencies = AppDependencies.production();
+
+    runApp(SsambershipApp(dependencies: dependencies));
   });
 }

@@ -3,6 +3,7 @@ import 'package:ssambership_app/core/entitlement/subscription_summary.dart';
 import 'package:ssambership_app/core/entitlement/weekly_question_usage.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/question_room/data/attachments/attachment_upload.dart';
+import 'package:ssambership_app/features/question_room/data/mentor_lookup_repository.dart';
 import 'package:ssambership_app/features/question_room/data/models/connection_note.dart';
 import 'package:ssambership_app/features/question_room/data/models/question_attachment.dart';
 import 'package:ssambership_app/features/question_room/data/models/question_message.dart';
@@ -10,6 +11,7 @@ import 'package:ssambership_app/features/question_room/data/models/question_thre
 import 'package:ssambership_app/features/question_room/data/models/room.dart';
 import 'package:ssambership_app/features/question_room/data/question_room_read_repository.dart';
 import 'package:ssambership_app/features/question_room/data/room_safety_repository.dart';
+import 'package:ssambership_app/features/question_room/data/student_lookup_repository.dart';
 import 'package:ssambership_app/features/question_room/data/thread_realtime.dart';
 
 /// 골든 픽스처 — 네트워크·인증·전역 싱글턴에 닿지 않는 손코딩 데이터와 포트 fake.
@@ -147,6 +149,84 @@ List<ConnectionNote> goldenNotes() => <ConnectionNote>[
       ),
     ];
 
+// ── 질문방 1뎁스(학생 목록·멘토 인박스) 픽스처 ──────────────────────────────
+
+const String kMentor2Id = 'm2';
+const String kMentor3Id = 'm3';
+const String kStudent2Id = 's2';
+const String kStudent3Id = 's3';
+
+Room _roomOf(String id, String studentId, String mentorId, int day) => Room(
+      id: id,
+      studentId: studentId,
+      mentorId: mentorId,
+      createdAt: _at(1),
+      updatedAt: _at(day),
+    );
+
+/// 학생 s1 의 멘토방 3개 — 활성 구독·만료 구독·구독 정보 없음.
+List<Room> goldenStudentRooms() => <Room>[
+      _roomOf(kRoomId, kStudentId, kMentorId, 3),
+      _roomOf('r2', kStudentId, kMentor2Id, 2),
+      _roomOf('r3', kStudentId, kMentor3Id, 1),
+    ];
+
+Map<String, MentorPublic> goldenMentors() => const <String, MentorPublic>{
+      kMentorId: MentorPublic(id: kMentorId, nickname: kMentorName),
+      kMentor2Id: MentorPublic(id: kMentor2Id, nickname: '박멘토'),
+      kMentor3Id: MentorPublic(id: kMentor3Id, nickname: '최멘토'),
+    };
+
+Map<String, SubscriptionSummary> goldenSubscriptionsByMentor() =>
+    <String, SubscriptionSummary>{
+      kMentorId: goldenSubscription(),
+      kMentor2Id: const SubscriptionSummary(
+        mentorId: kMentor2Id,
+        isActive: false,
+        status: 'expired',
+      ),
+    };
+
+Map<String, WeeklyQuestionUsage?> goldenUsageByMentor() =>
+    const <String, WeeklyQuestionUsage?>{
+      kMentorId: goldenUsage,
+      kMentor2Id: null,
+      kMentor3Id: null,
+    };
+
+ThreadStatusRow _statusRow(String roomId, ThreadStatus status, int day,
+        [int hour = 18]) =>
+    ThreadStatusRow(roomId: roomId, status: status, updatedAt: _at(day, hour));
+
+/// 학생 목록용 스레드 상태 행 — r1 대기+답변완료, r2 확인완료, r3 없음.
+List<ThreadStatusRow> goldenStudentStatusRows() => <ThreadStatusRow>[
+      _statusRow(kRoomId, ThreadStatus.pending, 3),
+      _statusRow(kRoomId, ThreadStatus.answered, 2, 14),
+      _statusRow('r2', ThreadStatus.confirmed, 2, 10),
+    ];
+
+/// 멘토 m1 의 학생방 3개.
+List<Room> goldenMentorRooms() => <Room>[
+      _roomOf(kRoomId, kStudentId, kMentorId, 3),
+      _roomOf('r4', kStudent2Id, kMentorId, 1),
+      _roomOf('r5', kStudent3Id, kMentorId, 1),
+    ];
+
+Map<String, StudentPublic> goldenStudents() => const <String, StudentPublic>{
+      kStudentId: StudentPublic(id: kStudentId, nickname: kStudentName),
+      kStudent2Id: StudentPublic(id: kStudent2Id, nickname: '박학생'),
+      kStudent3Id: StudentPublic(id: kStudent3Id, fullName: '최민준'),
+    };
+
+/// 인박스용 상태 행 — r1 답할 것 1(pending), r4 답변완료, r5 확인완료 2.
+List<ThreadStatusRow> goldenMentorStatusRows() => <ThreadStatusRow>[
+      _statusRow(kRoomId, ThreadStatus.pending, 3),
+      _statusRow(kRoomId, ThreadStatus.answered, 2, 14),
+      _statusRow('r4', ThreadStatus.answered, 1, 15),
+      _statusRow('r5', ThreadStatus.confirmed, 1, 9),
+      _statusRow('r5', ThreadStatus.confirmed, 1, 11),
+    ];
+
 MyPageData goldenStudentMyPage() => MyPageData(
       role: AppRole.student,
       profile: const MyProfile(
@@ -211,12 +291,35 @@ class GoldenReadRepository extends QuestionRoomReadRepository {
     this.messageRows = const <QuestionMessage>[],
     this.noteRows = const <ConnectionNote>[],
     this.usage,
+    this.roomRows = const <Room>[],
+    this.statusRows = const <ThreadStatusRow>[],
+    this.usageByMentor = const <String, WeeklyQuestionUsage?>{},
   });
 
   final List<QuestionThread> threadRows;
   final List<QuestionMessage> messageRows;
   final List<ConnectionNote> noteRows;
   final WeeklyQuestionUsage? usage;
+  final List<Room> roomRows;
+  final List<ThreadStatusRow> statusRows;
+  final Map<String, WeeklyQuestionUsage?> usageByMentor;
+
+  @override
+  Future<List<Room>> myRooms() async => roomRows;
+
+  @override
+  Future<List<ThreadStatusRow>> threadStatusRowsForRooms(
+          List<String> roomIds) async =>
+      statusRows
+          .where((ThreadStatusRow r) => roomIds.contains(r.roomId))
+          .toList();
+
+  @override
+  Future<Map<String, WeeklyQuestionUsage?>> weeklyUsageBatch(
+          Iterable<String> mentorIds) async =>
+      <String, WeeklyQuestionUsage?>{
+        for (final String id in mentorIds) id: usageByMentor[id],
+      };
 
   @override
   Future<List<QuestionThread>> threads(String roomId) async => threadRows;
