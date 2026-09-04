@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
+import '../../../app/app_scope.dart';
 import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
@@ -30,25 +31,25 @@ class QuestionListScreen extends StatefulWidget {
     required this.room,
     required this.mentorName,
     this.sub,
-    this.readRepository = const QuestionRoomReadRepository(),
-    this.writeRepository = const QuestionRoomWriteRepository(),
+    this.readRepository,
+    this.writeRepository,
   });
 
   final Room room;
   final String mentorName;
   final SubscriptionSummary? sub;
 
-  /// 테스트 주입 지점(기본: 운영 레포).
-  final QuestionRoomReadRepository readRepository;
-  final QuestionRoomWriteRepository writeRepository;
+  /// 테스트 주입 지점. null 이면 AppScope의 운영 레포를 사용.
+  final QuestionRoomReadRepository? readRepository;
+  final QuestionRoomWriteRepository? writeRepository;
 
   @override
   State<QuestionListScreen> createState() => _QuestionListScreenState();
 }
 
 class _QuestionListScreenState extends State<QuestionListScreen> {
-  QuestionRoomReadRepository get _read => widget.readRepository;
-  QuestionRoomWriteRepository get _write => widget.writeRepository;
+  late final QuestionRoomReadRepository _read;
+  late final QuestionRoomWriteRepository _write;
 
   late Future<List<QuestionThread>> _future;
   bool _busy = false;
@@ -59,6 +60,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   @override
   void initState() {
     super.initState();
+    _read = widget.readRepository ?? AppScope.of(context).questionRoomRead;
+    _write = widget.writeRepository ?? AppScope.of(context).questionRoomWrite;
     _future = _read.threads(widget.room.id);
     _loadUsage();
   }
@@ -199,8 +202,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
       AppRoutePaths.newRoomThread(widget.room.id),
       fallbackBuilder: (_) => NewQuestionScreen(
         room: widget.room,
-        readRepository: widget.readRepository,
-        writeRepository: widget.writeRepository,
+        readRepository: _read,
+        writeRepository: _write,
       ),
     );
     if (created == true && mounted) _refresh();
