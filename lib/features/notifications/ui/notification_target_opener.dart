@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/auth/auth_service.dart';
+import '../../../app/app_scope.dart';
+import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/deeplink/notification_deep_link_controller.dart';
 import '../../community/data/community_models.dart';
 import '../../community/data/community_read_repository.dart';
@@ -61,9 +62,11 @@ class NotificationTargetOpener {
   /// 웹 딥링크(role=mentor → /mentor/question-room/…)와 동일하게 교정.
   Future<bool> _openRoom(
       BuildContext context, NotificationRoomRoute route) async {
-    final AppRole role = AuthService.instance.currentRole;
+    // A-2: 역할·질문방 읽기 레포는 AppScope 에서(싱글턴·직접 생성 0).
+    final AppDependencies deps = AppScope.of(context);
+    final AppRole role = deps.auth.currentRole;
     if (role != AppRole.student && role != AppRole.mentor) return false;
-    const QuestionRoomReadRepository rooms = QuestionRoomReadRepository();
+    final QuestionRoomReadRepository rooms = deps.questionRoomRead;
 
     QuestionThread? thread;
     String? roomId = route.roomId;
