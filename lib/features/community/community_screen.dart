@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
 import '../../design/role_accent.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
@@ -83,10 +85,10 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   /// 게시판 글쓰기 → 성공(pop true) 시 목록 새로고침.
   Future<void> _openWrite() async {
-    final bool? created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardWriteScreen(write: widget.write),
-      ),
+    final bool? created = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.newBoardPost,
+      fallbackBuilder: (_) => BoardWriteScreen(write: widget.write),
     );
     if (created == true && mounted) {
       await _boardKey.currentState?.reload();
