@@ -1,12 +1,19 @@
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/auth_service.dart' show AccessState, AppRole;
 import '../features/auth/blocked_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/splash_screen.dart';
+import '../features/community/community_screen.dart';
 import '../features/dev/dev_flags.dart';
 import '../features/dev/s3_data_inspector.dart';
 import '../features/dev/widget_gallery.dart';
+import '../features/individual_question/individual_question_tab_screen.dart';
+import '../features/mentors/mentors_screen.dart';
+import '../features/notifications/notifications_screen.dart';
+import '../features/question_room/question_room_screen.dart';
 import 'app_navigation.dart';
+import 'app_route_paths.dart';
 import 'app_scope.dart';
 import 'entry_guard.dart';
 import 'home_shell.dart';
@@ -26,11 +33,12 @@ class AppRouter {
     final GoRouter router = GoRouter(
       initialLocation: EntryGuard.splash,
       refreshListenable: dependencies.auth,
-      redirect: (context, state) => EntryGuard.redirect(
-        access: dependencies.routingAccess,
-        location: state.matchedLocation,
-      ),
+      redirect: (context, state) =>
+          _redirect(dependencies, state.matchedLocation),
       routes: <RouteBase>[
+        // Legacy entry aliases. The top-level redirect resolves these to the
+        // current role's canonical first tab before a page is built.
+        GoRoute(path: AppRoutePaths.root, redirect: (_, __) => null),
         GoRoute(
           path: EntryGuard.splash,
           builder: (context, state) => const SplashScreen(),
@@ -39,13 +47,83 @@ class AppRouter {
           path: EntryGuard.login,
           builder: (context, state) => const LoginScreen(),
         ),
-        GoRoute(
-          path: EntryGuard.home,
-          builder: (context, state) => const HomeShell(),
-        ),
+        GoRoute(path: EntryGuard.home, redirect: (_, __) => null),
         GoRoute(
           path: EntryGuard.blocked,
           builder: (context, state) => const BlockedScreen(),
+        ),
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) => HomeShell(
+            navigationShell: navigationShell,
+            location: state.uri.path,
+          ),
+          branches: <StatefulShellBranch>[
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: AppRoutePaths.rooms,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 0,
+                    child: QuestionRoomScreen(),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: AppRoutePaths.individualQuestions,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 1,
+                    child: IndividualQuestionTabScreen(),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              initialLocation: AppRoutePaths.mentors,
+              routes: <RouteBase>[
+                // One navigator owns both role variants. `/mentors` remains a
+                // valid mentor deep URL even though their visible tab is 정산.
+                GoRoute(
+                  path: AppRoutePaths.mentors,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 2,
+                    child: MentorsScreen(),
+                  ),
+                ),
+                GoRoute(
+                  path: AppRoutePaths.settlements,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 2,
+                    child: MentorSettlementsTabBody(),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: AppRoutePaths.community,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 3,
+                    child: CommunityScreen(),
+                  ),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: <RouteBase>[
+                GoRoute(
+                  path: AppRoutePaths.notifications,
+                  builder: (context, state) => const HomeTabBranch(
+                    branchIndex: 4,
+                    child: NotificationsScreen(),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         ...buildQuestionRoomRoutes(),
         ...buildIndividualQuestionRoutes(),
@@ -67,5 +145,29 @@ class AppRouter {
     );
     AppNavigation.markProductionRouter(router);
     return router;
+  }
+
+  static String? _redirect(AppDependencies dependencies, String location) {
+    final AccessState access = dependencies.routingAccess;
+    final String? guarded = EntryGuard.redirect(
+      access: access,
+      location: location,
+    );
+    final String destination = guarded ?? location;
+
+    if (destination == AppRoutePaths.root ||
+        destination == AppRoutePaths.home) {
+      if (access == AccessState.guest) return AppRoutePaths.mentors;
+      if (access == AccessState.full) return AppRoutePaths.rooms;
+    }
+
+    // 정산은 멘토의 canonical tab이다. 학생이 URL을 직접 입력해도 멘토
+    // 데이터 표면을 열지 않고 자신의 첫 탭으로 수렴한다.
+    if (access == AccessState.full &&
+        dependencies.auth.currentRole != AppRole.mentor &&
+        destination == AppRoutePaths.settlements) {
+      return AppRoutePaths.rooms;
+    }
+    return guarded;
   }
 }

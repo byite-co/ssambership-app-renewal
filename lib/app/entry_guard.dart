@@ -1,13 +1,14 @@
 import '../core/auth/auth_service.dart';
 import 'app_route_paths.dart';
+import 'app_tabs.dart';
 
 /// 진입 가드: AccessState → 가야 할 경로. router.redirect 에서 사용한다.
 ///
 /// 분기 요약:
 /// - loading  → /splash
 /// - loggedOut→ /login (보호 경로 직접 접근 시에도 로그인으로)
-/// - guest    → /home(제한 탭) + /login + 공개 멘토 경로 접근 허용
-/// - full     → /home
+/// - guest    → /mentors·/community + /login
+/// - full     → 역할별 URL 탭과 상세 경로
 /// - blocked  → /blocked (banned/suspended/상태불명/관리자)
 class EntryGuard {
   EntryGuard._();
@@ -36,14 +37,16 @@ class EntryGuard {
     '/profile',
   ];
 
-  /// 게스트가 접근 가능한 하단 탭 인덱스.
-  /// (0 질문방 · 1 커뮤니티 · 2 멘토찾기 · 3 알림 · 4 개별질문)
-  /// → 커뮤니티(1)·멘토찾기(2)만 허용. 나머지는 로그인 필요.
-  /// 마이페이지(우측 상단 프로필 push)도 로그인 필요 — HomeShell 이 가드한다.
-  static const Set<int> guestAllowedTabs = <int>{1, 2};
+  /// 게스트가 접근 가능한 canonical 탭 경로. 역할별 순서와 무관하다.
+  static const Set<String> guestAllowedTabs = <String>{
+    AppTab.mentors,
+    AppTab.community,
+  };
 
-  static bool isTabAllowedForGuest(int index) =>
-      guestAllowedTabs.contains(index);
+  static bool isTabAllowedForGuest(String location) {
+    final String path = Uri.tryParse(location)?.path ?? location;
+    return guestAllowedTabs.contains(path);
+  }
 
   /// redirect 결정. null = 현재 위치 유지.
   static String? redirect({
@@ -59,10 +62,10 @@ class EntryGuard {
       case AccessState.loggedOut:
         return location == login ? null : login;
       case AccessState.guest:
-        // 게스트는 홈(제한 탭)·로그인과 공개 멘토 목록/상세만.
+        // `/home`은 AppRouter가 공개 canonical 탭(`/mentors`)으로 바꾼다.
         if (location == home ||
             location == login ||
-            _isGuestMentorLocation(location)) {
+            _isGuestPublicLocation(location)) {
           return null;
         }
         return home;
@@ -81,9 +84,11 @@ class EntryGuard {
     return false;
   }
 
-  static bool _isGuestMentorLocation(String location) {
+  static bool _isGuestPublicLocation(String location) {
     final String path = Uri.tryParse(location)?.path ?? location;
-    return path == AppRoutePaths.mentors ||
-        path.startsWith('${AppRoutePaths.mentors}/');
+    for (final String root in guestAllowedTabs) {
+      if (path == root || path.startsWith('$root/')) return true;
+    }
+    return false;
   }
 }

@@ -58,8 +58,8 @@ class NotificationsScreen extends StatefulWidget {
   /// 데이터 소스(기본: Supabase). 테스트에서 fake 주입.
   final NotificationsRepository? repository;
 
-  /// 딥링크 탭 이동 훅(기본: TabNavigator.go). 테스트에서 대상 검증용 주입.
-  final void Function(int tabIndex)? onDeepLinkTab;
+  /// 딥링크 경로 이동 훅(기본: TabNavigator.go). 테스트에서 대상 검증용 주입.
+  final void Function(String location)? onDeepLinkTab;
 
   /// 배지 컨트롤러(기본: 앱 전역 인스턴스). 테스트에서 fake 레포 주입용.
   final NotificationBadgeController? badge;
@@ -318,7 +318,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
     if (route == null) return; // 이동 없음(맞춤의뢰·unknown 등) — 목록에 머문다.
     if (route is NotificationTabRoute) {
-      (widget.onDeepLinkTab ?? TabNavigator.go)(route.tabIndex);
+      (widget.onDeepLinkTab ?? TabNavigator.go)(route.location);
       return;
     }
     _openDetail(route);

@@ -177,7 +177,9 @@ class _StudentRoomListState extends State<_StudentRoomList>
 
   void _refresh() {
     if (!mounted) return; // §4: dispose 후 setState 금지.
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
   }
 
   @override

@@ -131,7 +131,12 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
     return last;
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

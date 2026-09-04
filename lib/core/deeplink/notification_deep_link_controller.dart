@@ -57,8 +57,8 @@ sealed class NotificationDeepLinkRoute {
 
 /// 탭 이동만(정밀 id 없음·형식 불량 폴백 포함).
 class NotificationTabRoute extends NotificationDeepLinkRoute {
-  const NotificationTabRoute(this.tabIndex);
-  final int tabIndex;
+  const NotificationTabRoute(this.location);
+  final String location;
 }
 
 /// 질문방 상세 — roomId(+threadId 있으면 그 스레드 대화)로 연다.
@@ -94,11 +94,11 @@ class NotificationMentorRoute extends NotificationDeepLinkRoute {
   final String mentorId;
 }
 
-/// 상세를 열 수 없을 때(상세 열기 미배선·대상 소실)의 탭 폴백.
-int notificationRouteFallbackTab(NotificationDeepLinkRoute route) {
+/// 상세를 열 수 없을 때(상세 열기 미배선·대상 소실)의 URL 폴백.
+String notificationRouteFallbackLocation(NotificationDeepLinkRoute route) {
   switch (route) {
-    case NotificationTabRoute(:final int tabIndex):
-      return tabIndex;
+    case NotificationTabRoute(:final String location):
+      return location;
     case NotificationRoomRoute():
       return AppTab.questionRoom;
     case NotificationIqRoute():
@@ -159,14 +159,14 @@ NotificationDeepLinkRoute? resolveNotificationDeepLink(
 /// 규칙:
 /// - 목적지는 [resolveNotificationDeepLink] 로만 결정(stay/unknown → 이동 없음).
 /// - 상세 route 는 [openDetail] 이 배선된 경우에만 상세로 가고, 없으면 해당
-///   탭 폴백([notificationRouteFallbackTab]) — 기존 탭 이동 계약과 호환.
+///   경로 폴백([notificationRouteFallbackLocation])으로 수렴한다.
 /// - 같은 eventId 재전달(포그라운드+탭+콜드스타트 중복) → 최대 1회만 이동(LRU).
 /// - 비로그인 상태의 탭 → pending 보관(TTL 15분), 로그인 성공 시 정확히 1회 이동.
 ///   로그아웃/계정 전환(forUserId 불일치) 시 폐기. 메모리 보관만(디스크 저장 없음).
 /// - 알 수 없는 타입 → 이동 없음(stay). 타입은 알지만 필요한 id 부재 → 알림 탭 폴백.
 class NotificationDeepLinkController {
   NotificationDeepLinkController({
-    required void Function(int tabIndex) navigate,
+    required void Function(String location) navigate,
     void Function(NotificationDeepLinkRoute route)? openDetail,
     DateTime Function()? now,
     Duration pendingTtl = const Duration(minutes: 15),
@@ -177,7 +177,7 @@ class NotificationDeepLinkController {
         _pendingTtl = pendingTtl,
         _dedupCapacity = dedupCapacity;
 
-  final void Function(int tabIndex) _navigate;
+  final void Function(String location) _navigate;
 
   /// 상세 열기 훅(선택) — 미배선이면 상세 route 도 탭 폴백으로 수렴한다.
   final void Function(NotificationDeepLinkRoute route)? _openDetail;
@@ -247,7 +247,7 @@ class NotificationDeepLinkController {
 
   void _dispatch(NotificationDeepLinkRoute route) {
     if (route is NotificationTabRoute) {
-      _navigate(route.tabIndex);
+      _navigate(route.location);
       return;
     }
     final void Function(NotificationDeepLinkRoute route)? openDetail =
@@ -255,7 +255,7 @@ class NotificationDeepLinkController {
     if (openDetail != null) {
       openDetail(route);
     } else {
-      _navigate(notificationRouteFallbackTab(route));
+      _navigate(notificationRouteFallbackLocation(route));
     }
   }
 

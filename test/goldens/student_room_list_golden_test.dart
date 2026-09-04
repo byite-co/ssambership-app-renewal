@@ -16,7 +16,7 @@ void main() {
     await pumpGoldenScreen(
       tester,
       Scaffold(
-        appBar: AppBar(title: Text(AppConstants.bottomTabLabels[0])),
+        appBar: AppBar(title: Text(AppConstants.studentBottomTabLabels[0])),
         body: const QuestionRoomScreen(),
       ),
       role: AppRole.student,

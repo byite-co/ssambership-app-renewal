@@ -53,8 +53,8 @@ List<RouteBase> buildMyPageRoutes() => <RouteBase>[
 
 /// Route-level scaffold for [MyPageScreen].
 ///
-/// Tab hand-offs close this pushed route with the destination tab index so the
-/// underlying home shell can switch the visible tab after the pop completes.
+/// Tab hand-offs close this pushed route with the destination URL so the
+/// underlying home shell can navigate after the pop completes.
 class MyPageRoutePage extends StatelessWidget {
   const MyPageRoutePage({super.key, this.loaderOverride});
 

@@ -235,7 +235,7 @@ void main() {
           minute: 5, questionId: questionUuid),
       _n('g', 'weird_unknown_type', 'G 미지 알림', minute: 4),
     ]);
-    final List<int> tabs = <int>[];
+    final List<String> tabs = <String>[];
     final _FakeOpener opener = _FakeOpener();
     await tester.pumpWidget(_wrap(NotificationsScreen(
       repository: repo,
@@ -260,7 +260,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('B 구독 알림'));
     await tester.pumpAndSettle();
-    expect(tabs, <int>[AppTab.notifications, AppTab.myPage]);
+    expect(tabs, <String>[AppTab.notifications, AppTab.myPage]);
 
     // 맞춤의뢰(stay)·미지(unknown) — 이동하지 않고 읽음 처리만 된다.
     await tester.tap(find.text('D 맞춤의뢰 알림'));
