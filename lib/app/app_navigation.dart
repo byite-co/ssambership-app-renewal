@@ -27,8 +27,8 @@ class AppNavigation {
 
   /// Pushes [location] in production and uses [fallbackBuilder] elsewhere.
   ///
-  /// The fallback deliberately uses [PageRouteBuilder], not
-  /// `MaterialPageRoute`, so the A-3 migration's raw route count cannot grow.
+  /// The fallback deliberately uses [PageRouteBuilder], so the A-3 migration's
+  /// raw imperative-route inventory cannot grow because of this adapter.
   static Future<T?> push<T>(
     BuildContext context,
     String location, {
