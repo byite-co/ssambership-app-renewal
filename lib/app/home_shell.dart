@@ -6,7 +6,6 @@ import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/mypage/data/mypage_models.dart';
-import '../features/mypage/mypage_screen.dart';
 import '../features/notifications/data/notification_badge_controller.dart'
     show notificationBadgeLabel;
 import '../features/notifications/notifications_screen.dart';
@@ -14,9 +13,12 @@ import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
 import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
+import 'app_navigation.dart';
+import 'app_route_paths.dart';
 import 'app_scope.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
+import 'routes/mypage_routes.dart';
 
 /// 하단 탭 5개 셸(질문방·커뮤니티·멘토찾기·알림·개별질문).
 ///
@@ -126,11 +128,11 @@ class _HomeShellState extends State<HomeShell> {
       context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
-    final int? tab = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
-        builder: (_) =>
-            _MyPagePage(loaderOverride: widget.myPageLoaderOverride),
-      ),
+    final int? tab = await AppNavigation.push<int>(
+      context,
+      AppRoutePaths.myPage,
+      fallbackBuilder: (_) =>
+          MyPageRoutePage(loaderOverride: widget.myPageLoaderOverride),
     );
     if (!mounted || tab == null) return;
     _onSelect(tab);
@@ -243,30 +245,6 @@ class _ProfileCircleButton extends StatelessWidget {
           ),
           child: Icon(Icons.person_rounded, size: 22, color: scheme.primary),
         ),
-      ),
-    );
-  }
-}
-
-/// 마이페이지 push 라우트 래퍼.
-/// MyPageScreen 은 본문만 그리므로(자체 Scaffold 없음) 여기서 AppBar 를 씌운다.
-/// 탭 이동 액션(알림·받은 질문 보기·질문하러 가기)은 이 route 를 **pop 하면서
-/// 목적지 탭 index 를 반환**한다 — HomeShell 이 받아 실제 보이는 탭을 전환한다.
-class _MyPagePage extends StatelessWidget {
-  const _MyPagePage({this.loaderOverride});
-
-  final Future<MyPageData> Function()? loaderOverride;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text(AppConstants.myPageTitle)),
-      body: MyPageScreen(
-        loaderOverride: loaderOverride,
-        onOpenQuestionsTab: () =>
-            Navigator.of(context).pop(AppTab.questionRoom),
-        onOpenNotifications: () =>
-            Navigator.of(context).pop(AppTab.notifications),
       ),
     );
   }
