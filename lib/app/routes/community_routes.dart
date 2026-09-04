@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/community/data/community_models.dart';
 import '../../features/community/ui/board/board_detail_screen.dart';
 import '../../features/community/ui/board/board_write_screen.dart';
+import '../../features/community/ui/shortform/shortform_compose_screen.dart';
 import '../../features/community/ui/shortform/shortform_detail_screen.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
@@ -29,6 +30,12 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
             errorMessage: '게시글을 불러오지 못했어요.',
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutePaths.newShortform,
+        builder: (context, state) => ShortformComposeScreen(
+          supabaseClient: AppScope.of(context).supabaseClient,
+        ),
       ),
       GoRoute(
         path: '${AppRoutePaths.boardPosts}/:postId',

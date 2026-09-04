@@ -164,9 +164,11 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
   /// 작성 WebView 열기 → 완료 결과에 따라 피드 '서버 재조회'(로컬 가짜 카드 금지).
   Future<void> _openCompose() async {
     final ShortformComposeResult? result =
-        await Navigator.of(context).push<ShortformComposeResult>(
-      MaterialPageRoute<ShortformComposeResult>(
-        builder: (_) => const ShortformComposeScreen(),
+        await AppNavigation.push<ShortformComposeResult>(
+      context,
+      AppRoutePaths.newShortform,
+      fallbackBuilder: (context) => ShortformComposeScreen(
+        supabaseClient: AppScope.of(context).supabaseClient,
       ),
     );
     if (!mounted || result == null) return;
