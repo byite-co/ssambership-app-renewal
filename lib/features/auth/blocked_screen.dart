@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../app/app_scope.dart';
+import '../../core/auth/app_auth.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
 import '../../design/widgets/primary_button.dart';
@@ -15,7 +16,7 @@ class BlockedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final AuthService auth = AuthService.instance;
+    final AppAuth auth = AppScope.of(context).auth; // A-2: 싱글턴 직접 참조 0.
     final bool retryable = auth.isRecoverableBlock;
     return Scaffold(
       body: SafeArea(

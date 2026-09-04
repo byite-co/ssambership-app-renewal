@@ -1,5 +1,5 @@
 name: ssambership_app
-description: "쌤버십 모바일 앱 — 기존 웹(Next.js)의 컴패니언. 읽기 중심·Commerce-Zero(앱 내 결제 없음)."
+description: "쌤버십 모바일 앱 — 학습 멘토링. 캐시 충전을 제외한 전 기능 지원."
 publish_to: "none"
 version: 1.0.0+19
 

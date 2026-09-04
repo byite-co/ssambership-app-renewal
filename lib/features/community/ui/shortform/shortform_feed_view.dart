@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/auth/auth_service.dart';
+import '../../../../app/app_scope.dart';
+import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../core/web_bridge/shortform_compose_bridge.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/tokens/color_tokens.dart';
@@ -26,16 +27,14 @@ class ShortformFeedView extends StatefulWidget {
     super.key,
     required this.read,
     required this.write,
-    this.roleOf = _defaultRoleOf,
+    this.roleOf,
   });
 
   final CommunityReadRepository read;
   final CommunityWriteRepository write;
 
-  /// 현재 역할 판정(테스트 주입용). 기본은 [AuthService] 단일 소스.
-  final AppRole Function() roleOf;
-
-  static AppRole _defaultRoleOf() => AuthService.instance.currentRole;
+  /// 현재 역할 판정(테스트 주입용). null 이면 AppScope 의 auth(A-2 — 싱글턴 직접 참조 0).
+  final AppRole Function()? roleOf;
 
   @override
   State<ShortformFeedView> createState() => ShortformFeedViewState();
@@ -86,7 +85,9 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
   }
 
   Widget _body() {
-    final bool canCompose = widget.roleOf() == AppRole.mentor;
+    final AppRole role =
+        widget.roleOf?.call() ?? AppScope.of(context).auth.currentRole;
+    final bool canCompose = role == AppRole.mentor;
     if (_pager.initialLoading) {
       return const Center(child: CircularProgressIndicator());
     }

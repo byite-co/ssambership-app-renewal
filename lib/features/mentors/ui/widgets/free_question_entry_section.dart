@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/auth/auth_service.dart';
+import '../../../../app/app_scope.dart';
+import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../../../design/widgets/secondary_button.dart';
@@ -55,7 +56,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
 
   bool get _isStudent =>
       widget.isStudentOverride ??
-      (AuthService.instance.currentRole == AppRole.student);
+      (AppScope.of(context).auth.currentRole == AppRole.student);
 
   @override
   void initState() {

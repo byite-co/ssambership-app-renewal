@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/supabase/supabase_client.dart';
+import '../../../app/app_scope.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/typography_tokens.dart';
@@ -47,21 +47,22 @@ class ConnectionNotesScreen extends StatefulWidget {
 }
 
 class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
-  final QuestionRoomReadRepository _read = const QuestionRoomReadRepository();
-  final QuestionRoomWriteRepository _write =
-      const QuestionRoomWriteRepository();
+  // A-2: 레포지토리·사용자 id 는 AppScope 에서(직접 생성·클라이언트 참조 0).
+  late final AppDependencies _deps;
+  QuestionRoomReadRepository get _read => _deps.questionRoomRead;
+  QuestionRoomWriteRepository get _write => _deps.questionRoomWrite;
   final TextEditingController _editor = TextEditingController();
 
   late Future<List<ConnectionNote>> _future;
   bool _saving = false;
   bool _seeded = false;
 
-  String? get _uid =>
-      widget.currentUserId ?? SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  String? get _uid => widget.currentUserId ?? _deps.auth.currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _future = _loadNotes();
   }
 

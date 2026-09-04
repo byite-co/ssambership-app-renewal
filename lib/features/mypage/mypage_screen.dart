@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../app/entry_guard.dart';
-import '../../core/auth/auth_service.dart';
+import '../../core/auth/app_auth.dart';
 import '../../core/refresh/data_refresh_bus.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
@@ -53,7 +54,10 @@ class MyPageScreen extends StatefulWidget {
 class _MyPageScreenState extends State<MyPageScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
 
-  final MyPageRepository _repo = const MyPageRepository();
+  // A-2: 레포지토리·인증 상태는 AppScope 에서 받는다(직접 생성·싱글턴 참조 0).
+  late final AppDependencies _deps;
+  MyPageRepository get _repo => _deps.myPage;
+  AppAuth get _auth => _deps.auth;
 
   /// v19 보정1: 마지막 '정상 완료' MyPageData 스냅샷 — 이후 재조회가 어떤
   /// 원인(지갑 신호·resume·수동 재시도)으로 실패하든 이 화면을 지우지 않는다.
@@ -77,6 +81,7 @@ class _MyPageScreenState extends State<MyPageScreen>
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _reload();
     // §4: 지갑 변경 신호(IQ 예치·환불·정산 등) 수신 → 잔액·최근 내역 재조회.
     DataRefreshBus.walletGeneration.addListener(_onWalletChanged);
@@ -239,7 +244,7 @@ class _MyPageScreenState extends State<MyPageScreen>
   }
 
   Widget _sections(MyPageData data) {
-    final bool signedIn = AuthService.instance.isSignedIn;
+    final bool signedIn = _auth.isSignedIn;
     return ListView(
       padding:
           const EdgeInsets.fromLTRB(20, AppSpacing.s16, 20, AppSpacing.s24),
@@ -262,7 +267,7 @@ class _MyPageScreenState extends State<MyPageScreen>
         ProfileSection(
           profile: data.profile,
           // 게스트(비로그인)는 수정 불가 — 세션 있을 때만 수정 진입 노출.
-          onEdit: AuthService.instance.isSignedIn
+          onEdit: _auth.isSignedIn
               ? () => _openProfileEdit(data.profile)
               : null,
         ),
@@ -272,7 +277,7 @@ class _MyPageScreenState extends State<MyPageScreen>
         else
           ..._studentSections(data),
         SettingsSection(
-          onLogout: () => AuthService.instance.signOut(),
+          onLogout: () => _auth.signOut(),
           showLogout: signedIn,
         ),
         if (kDevToolsEnabled) ...<Widget>[

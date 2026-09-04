@@ -16,7 +16,8 @@ import 'widgets/free_question_entry_section.dart';
 import 'widgets/mentor_favorite_button.dart';
 import 'widgets/mentor_meta_item.dart';
 import '../../../app/app_tabs.dart';
-import '../../../core/auth/auth_service.dart';
+import '../../../app/app_scope.dart';
+import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/widgets/secondary_button.dart';
@@ -262,7 +263,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
           if (widget.createCtaOverride ??
               (kIndividualQuestionEnabled &&
                   kIndividualQuestionCreateEnabled &&
-                  AuthService.instance.currentRole ==
+                  AppScope.of(context).auth.currentRole ==
                       AppRole.student)) ...<Widget>[
             const SizedBox(height: 10),
             SecondaryButton(

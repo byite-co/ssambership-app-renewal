@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/app_scope.dart';
 import '../../app/entry_guard.dart';
-import '../../core/auth/auth_service.dart';
 import '../../design/shape_tokens.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await AuthService.instance.signInWithPassword(
+      await AppScope.of(context).auth.signInWithPassword(
         email: _email.text,
         password: _password.text,
       );
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _browse() {
-    AuthService.instance.enterAsGuest();
+    AppScope.of(context).auth.enterAsGuest();
     context.go(EntryGuard.home);
   }
 

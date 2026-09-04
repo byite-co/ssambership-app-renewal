@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../tokens/color_tokens.dart';
 import '../tokens/dimens.dart';
+import '../typography_tokens.dart';
 
 /// 보조 액션 버튼(외곽선).
 /// ★ 색 위계(2026-07 QA4): 액션 의미의 외곽선 버튼도 **고정 액션 파랑**
@@ -49,7 +50,12 @@ class SecondaryButton extends StatelessWidget {
         side: BorderSide(color: side, width: 1.4),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        // ★ ButtonStyle.textStyle 은 테마 fontFamily 를 상속하지 않는다 — 명시 필수.
+        textStyle: const TextStyle(
+          fontFamily: AppType.fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+        ),
       ),
       child: child,
     );

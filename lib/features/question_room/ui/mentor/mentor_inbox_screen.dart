@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/shape_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
@@ -49,8 +50,10 @@ class _StudentItem {
 class _MentorInboxScreenState extends State<MentorInboxScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
 
-  final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
-  final StudentLookupRepository _students = const StudentLookupRepository();
+  // A-2: 레포지토리는 AppScope 에서 받는다(직접 생성 0).
+  late final AppDependencies _deps;
+  QuestionRoomReadRepository get _repo => _deps.questionRoomRead;
+  StudentLookupRepository get _students => _deps.studentLookup;
 
   late Future<List<_StudentItem>> _future;
   String _query = '';
@@ -58,6 +61,7 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _future = _load();
     // N33: 학생 탭(질문방 목록)은 resume 재조회가 있는데 멘토 인박스는 없어
     // 같은 질문방 탭이 역할에 따라 신선도가 달랐다 — 동일 패턴으로 정렬.

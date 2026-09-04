@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_scope.dart';
 import '../../../core/auth/account_status.dart';
-import '../../../core/auth/auth_service.dart';
 import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
@@ -58,13 +58,13 @@ class AccountDeleteScreen extends StatefulWidget {
 
   final AccountDeletionPort port;
 
-  /// 테스트 주입: 기본은 AuthService.instance.signOut(revoke → signOut 보장).
+  /// 테스트 주입: 기본은 AppScope 의 auth.signOut(revoke → signOut 보장).
   final Future<void> Function()? signOutOverride;
 
   /// 테스트 주입: 기본은 웹브리지 /account/delete 열기.
   final Future<void> Function(BuildContext context)? openWebFallbackOverride;
 
-  /// 테스트 주입: 탈퇴 접수(deletionPending) 상태 여부. null 이면 AuthService.
+  /// 테스트 주입: 탈퇴 접수(deletionPending) 상태 여부. null 이면 AppScope 의 auth.
   final bool? pendingOverride;
 
   @override
@@ -96,7 +96,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   bool get _pending =>
       widget.pendingOverride ??
-      AuthService.instance.accountState.kind ==
+      AppScope.of(context).auth.accountState.kind ==
           AccountStatusKind.deletionPending;
 
   @override
@@ -123,7 +123,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   }
 
   Future<void> _signOut() =>
-      (widget.signOutOverride ?? AuthService.instance.signOut)();
+      (widget.signOutOverride ?? AppScope.of(context).auth.signOut)();
 
   Future<void> _openWeb() =>
       (widget.openWebFallbackOverride ?? openAccountDeleteWeb)(context);

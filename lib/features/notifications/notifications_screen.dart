@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../core/deeplink/notification_deep_link_controller.dart';
 import '../../core/refresh/data_refresh_bus.dart';
-import '../../core/supabase/supabase_client.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
@@ -105,8 +105,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   /// 실시간 채널(로그인 사용자 전용 — uid 필터). 로그아웃/화면 dispose 정리.
   NotificationsRealtimePort? _realtime;
 
+  // A-2: 기본 배지 컨트롤러·사용자 id 는 AppScope 에서(싱글턴·클라이언트 직접 참조 0).
   NotificationBadgeController get _badge =>
-      widget.badge ?? NotificationBadgeController.instance;
+      widget.badge ?? AppScope.of(context).notificationBadge;
 
   @override
   void initState() {
@@ -156,7 +157,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   /// 수명과 함께 가므로(IndexedStack), 로그아웃 시 셸이 내려가며 dispose 로
   /// 채널이 정리된다(이전 사용자 캐시는 새 셸에서 새로 조회).
   void _startRealtime() {
-    final String? uid = SupabaseInit.clientOrNull?.auth.currentUser?.id;
+    final String? uid = AppScope.of(context).auth.currentUserId;
     if (uid == null) return; // 게스트/미연결 — 구독 없음(폴백 재조회만).
     final NotificationsRealtimePort rt = (widget.realtimeFactory ??
         SupabaseNotificationsRealtime.new)(uid);

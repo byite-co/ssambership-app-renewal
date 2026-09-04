@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/supabase/supabase_client.dart';
+import '../../../../app/app_scope.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
 import '../../data/attachments/attachment_upload.dart';
@@ -110,9 +110,9 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
   final AttachmentUrlResolver _resolver = AttachmentUrlResolver.supabase();
   List<QuestionAttachment> _attachments = <QuestionAttachment>[];
 
+  // A-2: 사용자 id 는 AppScope 의 auth 에서(클라이언트 직접 참조 0).
   String? get _uid =>
-      widget.currentUserIdOverride ??
-      SupabaseInit.clientOrNull?.auth.currentUser?.id;
+      widget.currentUserIdOverride ?? AppScope.of(context).auth.currentUserId;
 
   /// 신고·차단 대상(방 참여자에서 도출). null 이면 안전 메뉴 비활성화.
   RoomCounterparty? _counterparty;
