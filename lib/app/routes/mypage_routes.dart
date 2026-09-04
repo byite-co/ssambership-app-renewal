@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../../features/mypage/data/mypage_models.dart';
 import '../../features/mypage/mypage_screen.dart';
 import '../../features/mypage/ui/account_delete_screen.dart';
+import '../../features/mypage/ui/profile_edit_screen.dart';
 import '../../shared/constants/app_constants.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../app_tabs.dart';
+import '../async_route_loader.dart';
 
 /// My-page routes are added one destination at a time during A-3.
 List<RouteBase> buildMyPageRoutes() => <RouteBase>[
@@ -25,6 +27,19 @@ List<RouteBase> buildMyPageRoutes() => <RouteBase>[
             signOutOverride: dependencies.auth.signOut,
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutePaths.profileEdit,
+        builder: (BuildContext context, GoRouterState state) =>
+            AsyncRouteLoader<MyProfile>(
+          load: (dependencies) async =>
+              (await dependencies.myPage.load()).profile,
+          builder: (context, profile, dependencies) => ProfileEditScreen(
+            profile: profile,
+            repository: dependencies.profileEdit,
+          ),
+          errorMessage: '프로필을 불러오지 못했어요.',
+        ),
       ),
     ];
 

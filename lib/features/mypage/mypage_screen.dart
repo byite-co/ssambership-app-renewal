@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../app/entry_guard.dart';
@@ -184,9 +186,12 @@ class _MyPageScreenState extends State<MyPageScreen>
   }
 
   Future<void> _openProfileEdit(MyProfile profile) async {
-    final bool? saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => ProfileEditScreen(profile: profile),
+    final bool? saved = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.profileEdit,
+      fallbackBuilder: (_) => ProfileEditScreen(
+        profile: profile,
+        repository: _deps.profileEdit,
       ),
     );
     if (saved == true && mounted) _reload();
