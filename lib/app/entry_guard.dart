@@ -6,7 +6,7 @@ import 'app_route_paths.dart';
 /// 분기 요약:
 /// - loading  → /splash
 /// - loggedOut→ /login (보호 경로 직접 접근 시에도 로그인으로)
-/// - guest    → /home(제한 탭) + /login 접근 허용
+/// - guest    → /home(제한 탭) + /login + 공개 멘토 경로 접근 허용
 /// - full     → /home
 /// - blocked  → /blocked (banned/suspended/상태불명/관리자)
 class EntryGuard {
@@ -59,8 +59,12 @@ class EntryGuard {
       case AccessState.loggedOut:
         return location == login ? null : login;
       case AccessState.guest:
-        // 게스트는 홈(제한 탭)과 로그인 화면만.
-        if (location == home || location == login) return null;
+        // 게스트는 홈(제한 탭)·로그인과 공개 멘토 목록/상세만.
+        if (location == home ||
+            location == login ||
+            _isGuestMentorLocation(location)) {
+          return null;
+        }
         return home;
       case AccessState.full:
         return _isFullAccessLocation(location) ? null : home;
@@ -75,5 +79,11 @@ class EntryGuard {
       if (path == root || path.startsWith('$root/')) return true;
     }
     return false;
+  }
+
+  static bool _isGuestMentorLocation(String location) {
+    final String path = Uri.tryParse(location)?.path ?? location;
+    return path == AppRoutePaths.mentors ||
+        path.startsWith('${AppRoutePaths.mentors}/');
   }
 }

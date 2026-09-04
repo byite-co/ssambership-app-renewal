@@ -19,9 +19,13 @@ void main() {
     expect(go(AccessState.loggedOut, EntryGuard.login), isNull);
   });
 
-  test('guest → 홈·로그인만 허용, 그 외는 홈으로', () {
+  test('guest → 홈·로그인·공개 멘토 URL만 허용, 그 외는 홈으로', () {
     expect(go(AccessState.guest, EntryGuard.home), isNull);
     expect(go(AccessState.guest, EntryGuard.login), isNull);
+    expect(go(AccessState.guest, '/mentors'), isNull);
+    expect(go(AccessState.guest, '/mentors/mentor-1'), isNull);
+    expect(go(AccessState.guest, '/mentors-copy/mentor-1'), EntryGuard.home);
+    expect(go(AccessState.guest, '/community'), EntryGuard.home);
     expect(go(AccessState.guest, '/blocked'), EntryGuard.home);
     expect(go(AccessState.guest, EntryGuard.splash), EntryGuard.home);
   });

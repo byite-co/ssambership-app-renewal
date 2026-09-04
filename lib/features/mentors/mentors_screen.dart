@@ -1,8 +1,7 @@
-// TODO(S10): router에 mentors 라우트 등록 필요 — S5 완료 후 합침
-// (참고: 멘토 찾기 '탭'은 HomeShell 에 이미 연결돼 있고, 상세는 Navigator.push 로 띄우므로
-//  현재 router.dart 변경 없이 동작한다. 별도 named-route 가 필요해지면 S5 머지 후 등록할 것.)
 import 'package:flutter/material.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
 import '../../design/role_accent.dart';
 import '../../design/shape_tokens.dart';
 import '../../design/spacing_tokens.dart';
@@ -346,12 +345,12 @@ class _MentorsScreenState extends State<MentorsScreen> {
   }
 
   Future<void> _open(MentorListItem item) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorDetailScreen(
-          item: item,
-          initialFavorited: _favoriteIds.contains(item.id),
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.mentor(item.id),
+      fallbackBuilder: (_) => MentorDetailScreen(
+        item: item,
+        initialFavorited: _favoriteIds.contains(item.id),
       ),
     );
     if (mounted) {

@@ -66,8 +66,8 @@ class MentorDetailScreen extends StatefulWidget {
 class _MentorDetailScreenState extends State<MentorDetailScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
 
-  final MentorDirectoryRepository _repo = const MentorDirectoryRepository();
-  final MentorFavoritesRepository _favRepo = const MentorFavoritesRepository();
+  late final MentorDirectoryRepository _repo;
+  late final MentorFavoritesRepository _favRepo;
   late bool _favorited = widget.initialFavorited;
 
   /// 마지막 '정상 완료' extras 스냅샷. 재조회 중에도 이 값을 계속 그린다 —
@@ -83,6 +83,9 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
   @override
   void initState() {
     super.initState();
+    final AppDependencies dependencies = AppScope.of(context);
+    _repo = dependencies.mentorDirectory;
+    _favRepo = dependencies.mentorFavorites;
     _reloadExtras();
     // 웹에서 구독을 마치고 앱으로 복귀 → 구독 여부 재조회(CTA stale 제거).
     WidgetsBinding.instance.addObserver(this);
