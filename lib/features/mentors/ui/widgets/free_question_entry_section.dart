@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../design/tokens/color_tokens.dart';
@@ -137,13 +139,13 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
         });
       }
       final CreatedFreeQuestion? created =
-          await Navigator.of(context).push<CreatedFreeQuestion>(
-        MaterialPageRoute<CreatedFreeQuestion>(
-          builder: (_) => FreeQuestionComposeScreen(
-            roomId: roomId,
-            mentorName: widget.mentorName,
-            port: widget.port,
-          ),
+          await AppNavigation.push<CreatedFreeQuestion>(
+        context,
+        AppRoutePaths.freeQuestion(roomId),
+        fallbackBuilder: (_) => FreeQuestionComposeScreen(
+          roomId: roomId,
+          mentorName: widget.mentorName,
+          port: widget.port,
         ),
       );
       if (!mounted) return;

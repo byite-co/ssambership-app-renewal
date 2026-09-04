@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart' show AppRole;
 import '../../core/entitlement/subscription_summary.dart';
+import '../../features/mentors/ui/free_question_compose_screen.dart';
 import '../../features/question_room/data/models/question_thread.dart';
 import '../../features/question_room/data/models/room.dart';
 import '../../features/question_room/ui/chat_screen.dart';
@@ -18,6 +19,23 @@ import '../async_route_loader.dart';
 
 /// Question-room detail routes are added one destination at a time.
 List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
+      GoRoute(
+        path: '${AppRoutePaths.rooms}/:roomId/free-question',
+        builder: (context, state) {
+          final String roomId = state.pathParameters['roomId']!;
+          return AsyncRouteLoader<_FreeQuestionRouteData>(
+            load: (dependencies) =>
+                _loadFreeQuestionRoute(dependencies, roomId),
+            builder: (context, data, dependencies) => FreeQuestionComposeScreen(
+              roomId: data.room.id,
+              mentorName: data.mentorName,
+              port: dependencies.freeQuestionEntry,
+            ),
+            notFoundMessage: '질문방을 찾을 수 없어요.',
+            errorMessage: '무료 질문 정보를 불러오지 못했어요.',
+          );
+        },
+      ),
       GoRoute(
         path: '${AppRoutePaths.rooms}/:roomId/threads/new',
         builder: (context, state) {
@@ -127,6 +145,29 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         },
       ),
     ];
+
+Future<_FreeQuestionRouteData?> _loadFreeQuestionRoute(
+  AppDependencies dependencies,
+  String roomId,
+) async {
+  final Room? room = await dependencies.questionRoomRead.roomById(roomId);
+  if (room == null) return null;
+
+  final String mentorName =
+      (await dependencies.mentorLookup.fetch(room.mentorId))?.displayName ??
+          '멘토';
+  return _FreeQuestionRouteData(room: room, mentorName: mentorName);
+}
+
+class _FreeQuestionRouteData {
+  const _FreeQuestionRouteData({
+    required this.room,
+    required this.mentorName,
+  });
+
+  final Room room;
+  final String mentorName;
+}
 
 Future<_ConnectionNotesRouteData?> _loadConnectionNotesRoute(
   AppDependencies dependencies,
