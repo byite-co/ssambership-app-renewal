@@ -9,7 +9,6 @@ import '../../../core/deeplink/notification_deep_link_controller.dart';
 import '../../community/data/community_models.dart';
 import '../../community/ui/board/board_detail_screen.dart';
 import '../../community/ui/shortform/shortform_detail_screen.dart';
-import '../../individual_question/data/individual_question_repository.dart';
 import '../../individual_question/data/models/individual_question_models.dart';
 import '../../individual_question/ui/iq_detail_screen.dart';
 import '../../question_room/data/models/question_thread.dart';
@@ -152,7 +151,7 @@ class NotificationTargetOpener {
   Future<bool> _openIq(BuildContext context, String questionId) async {
     // 사전 조회(당사자 RLS) — 없거나 권한 밖이면 중립 폴백.
     final IndividualQuestion? q =
-        await const IndividualQuestionRepository().fetch(questionId);
+        await AppScope.of(context).individualQuestions.fetch(questionId);
     if (q == null || !context.mounted) return false;
     await AppNavigation.push<bool>(
       context,
