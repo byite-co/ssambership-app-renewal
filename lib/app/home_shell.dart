@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/auth/auth_service.dart';
 import '../core/refresh/data_refresh_bus.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/mypage/data/mypage_models.dart';
 import '../features/mypage/mypage_screen.dart';
-import '../features/notifications/data/notification_badge_controller.dart';
+import '../features/notifications/data/notification_badge_controller.dart'
+    show notificationBadgeLabel;
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
 import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
+import 'app_scope.dart';
 import 'app_tabs.dart';
 import 'entry_guard.dart';
 
@@ -36,6 +37,8 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  // A-2: 인증 상태·알림 배지 컨트롤러는 AppScope 에서 받는다(싱글턴 직접 참조 0).
+  late final AppDependencies _deps;
   late int _index;
 
   /// N13: 방문한 탭만 실제 화면을 빌드한다(lazy). IndexedStack 이 5개 탭을
@@ -64,14 +67,15 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     // 게스트는 접근 가능한 탭(멘토 찾기=2)에서 시작.
-    _index = AuthService.instance.isGuest ? 2 : 0;
+    _index = _deps.auth.isGuest ? 2 : 0;
     _built[_index] = true; // N13: 시작 탭만 빌드.
     // 알림 딥링크 등 앱 내 탭 전환 요청 수신.
     TabNavigator.request.addListener(_onTabRequest);
     // 로그인 사용자 — 알림 배지 서버 개수 1회 조회(이후는 실시간·화면이 갱신).
-    if (!AuthService.instance.isGuest) {
-      NotificationBadgeController.instance.refresh();
+    if (!_deps.auth.isGuest) {
+      _deps.notificationBadge.refresh();
     }
   }
 
@@ -80,7 +84,7 @@ class _HomeShellState extends State<HomeShell> {
     TabNavigator.request.removeListener(_onTabRequest);
     // 로그아웃/계정 전환으로 셸이 내려가면 이전 사용자 배지 개수를 폐기한다
     // (다음 로그인 셸이 서버에서 새로 조회 — 교차 사용자 잔상 0).
-    NotificationBadgeController.instance.clear();
+    _deps.notificationBadge.clear();
     super.dispose();
   }
 
@@ -98,7 +102,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onSelect(int i) {
-    if (AuthService.instance.isGuest && !EntryGuard.isTabAllowedForGuest(i)) {
+    if (_deps.auth.isGuest && !EntryGuard.isTabAllowedForGuest(i)) {
       context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
@@ -118,7 +122,7 @@ class _HomeShellState extends State<HomeShell> {
   /// 로 돌아온다 — push 된 마이페이지가 화면을 덮은 채 숨은 탭 index 만 바뀌던
   /// 무반응 구조를 제거한다(route 를 닫고 나서 실제 보이는 탭을 전환).
   Future<void> _openMyPage() async {
-    if (AuthService.instance.isGuest) {
+    if (_deps.auth.isGuest) {
       context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
@@ -199,7 +203,7 @@ class _NotificationsTabIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int?>(
-      valueListenable: NotificationBadgeController.instance.count,
+      valueListenable: AppScope.of(context).notificationBadge.count,
       builder: (BuildContext context, int? count, Widget? _) {
         final String? label = notificationBadgeLabel(count);
         return Badge(
