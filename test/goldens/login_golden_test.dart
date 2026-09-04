@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/app/app_route_paths.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/features/auth/login_screen.dart';
+import 'package:ssambership_app/shared/constants/app_constants.dart';
 
 import 'golden_app_fakes.dart';
 import 'golden_harness.dart';
@@ -19,6 +21,7 @@ void main() {
 
     expect(find.text('이메일'), findsOneWidget);
     expect(find.text('둘러보기'), findsOneWidget);
+    await _settleBrandLogo(tester);
     await expectScreenGolden(tester, 'login_student');
   });
 
@@ -34,6 +37,18 @@ void main() {
 
     expect(find.text('이메일'), findsOneWidget);
     expect(find.text('둘러보기'), findsOneWidget);
+    await _settleBrandLogo(tester);
     await expectScreenGolden(tester, 'login_mentor');
   });
+}
+
+Future<void> _settleBrandLogo(WidgetTester tester) async {
+  final BuildContext context = tester.element(find.byType(LoginScreen));
+  await tester.runAsync(
+    () => precacheImage(
+      const AssetImage(AppConstants.brandLogoAsset),
+      context,
+    ),
+  );
+  await tester.pumpAndSettle();
 }
