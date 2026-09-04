@@ -14,6 +14,7 @@ class EntryGuard {
   EntryGuard._();
 
   static const String splash = AppRoutePaths.splash;
+  static const String onboarding = AppRoutePaths.onboarding;
   static const String login = AppRoutePaths.login;
   static const String home = AppRoutePaths.home;
   static const String blocked = AppRoutePaths.blocked;
@@ -60,11 +61,12 @@ class EntryGuard {
       case AccessState.loading:
         return location == splash ? null : splash;
       case AccessState.loggedOut:
-        return location == login ? null : login;
+        return location == login || location == onboarding ? null : login;
       case AccessState.guest:
         // `/home`은 AppRouter가 공개 canonical 탭(`/mentors`)으로 바꾼다.
         if (location == home ||
             location == login ||
+            location == onboarding ||
             _isGuestPublicLocation(location)) {
           return null;
         }

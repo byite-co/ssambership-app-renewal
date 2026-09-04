@@ -11,6 +11,7 @@ import '../features/dev/widget_gallery.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/notifications/notifications_screen.dart';
+import '../features/onboarding/onboarding_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import 'app_navigation.dart';
 import 'app_route_paths.dart';
@@ -42,6 +43,10 @@ class AppRouter {
         GoRoute(
           path: EntryGuard.splash,
           builder: (context, state) => const SplashScreen(),
+        ),
+        GoRoute(
+          path: EntryGuard.onboarding,
+          builder: (context, state) => const OnboardingScreen(),
         ),
         GoRoute(
           path: EntryGuard.login,
