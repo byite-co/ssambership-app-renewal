@@ -83,6 +83,40 @@ void main() {
     expect(find.text('게시글을 찾을 수 없어요.'), findsOneWidget);
     expect(find.text('글 수정'), findsNothing);
   });
+
+  testWidgets('board edit ownership is reloaded when the account changes', (
+    WidgetTester tester,
+  ) async {
+    final TestAppAuth auth = TestAppAuth(
+      role: AppRole.student,
+      userId: 'owner-1',
+    );
+    final _RecordingBoardRead read = _RecordingBoardRead(
+      sampleBoard(
+        id: 'post-1',
+        authorId: 'owner-1',
+        updatedAtRaw: '2026-09-05T00:00:00Z',
+      ),
+    );
+    final AppDependencies dependencies = _dependencies(
+      auth: auth,
+      read: read,
+      write: FakeCommunityWrite(uid: 'owner-1'),
+    );
+
+    await tester.pumpWidget(_scopedApp(dependencies, 'post-1'));
+    await tester.pumpAndSettle();
+    expect(read.requestedIds, <String>['post-1']);
+    expect(find.text('글 수정'), findsOneWidget);
+
+    auth.userId = 'viewer-2';
+    await tester.pumpWidget(_scopedApp(dependencies, 'post-1'));
+    await tester.pumpAndSettle();
+
+    expect(read.requestedIds, <String>['post-1', 'post-1']);
+    expect(find.text('게시글을 찾을 수 없어요.'), findsOneWidget);
+    expect(find.text('글 수정'), findsNothing);
+  });
 }
 
 Widget _app({
@@ -91,8 +125,21 @@ Widget _app({
   required FakeCommunityWrite write,
   required String postId,
 }) {
+  final AppDependencies dependencies = _dependencies(
+    auth: auth,
+    read: read,
+    write: write,
+  );
+  return _scopedApp(dependencies, postId);
+}
+
+AppDependencies _dependencies({
+  required TestAppAuth auth,
+  required _RecordingBoardRead read,
+  required FakeCommunityWrite write,
+}) {
   final AppDependencies defaults = testAppDependencies(auth: auth);
-  final AppDependencies dependencies = AppDependencies(
+  return AppDependencies(
     auth: auth,
     supabaseClient: () => null,
     communityRead: read,
@@ -104,11 +151,12 @@ Widget _app({
     deletionNotice: defaults.deletionNotice,
     versionGate: defaults.versionGate,
   );
-  return AppScope(
-    dependencies: dependencies,
-    child: MaterialApp(home: BoardEditRoutePage(postId: postId)),
-  );
 }
+
+Widget _scopedApp(AppDependencies dependencies, String postId) => AppScope(
+      dependencies: dependencies,
+      child: MaterialApp(home: BoardEditRoutePage(postId: postId)),
+    );
 
 class _RecordingBoardRead extends CommunityReadRepository {
   _RecordingBoardRead(this.post);

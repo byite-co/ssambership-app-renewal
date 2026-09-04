@@ -80,7 +80,10 @@ class BoardEditRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AsyncRouteLoader<BoardPost>(
-        key: ValueKey<String>('board-edit/$postId'),
+        key: ValueKey<String>(
+          'board-edit/$postId/'
+          '${AppScope.of(context).auth.currentUserId ?? 'signed-out'}',
+        ),
         load: (dependencies) => _loadOwnedBoardPost(dependencies, postId),
         builder: (context, post, dependencies) => BoardWriteScreen(
             write: dependencies.communityWrite, editing: post),
