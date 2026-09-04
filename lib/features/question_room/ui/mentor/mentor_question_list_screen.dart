@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
+import '../../../../app/app_scope.dart';
 import '../../../../data/mappings/subject_labels.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
@@ -24,14 +25,14 @@ class MentorQuestionListScreen extends StatefulWidget {
     super.key,
     required this.room,
     required this.studentName,
-    this.readRepository = const QuestionRoomReadRepository(),
+    this.readRepository,
   });
 
   final Room room;
   final String studentName;
 
-  /// 테스트 주입 지점(기본: 운영 레포) — NewQuestionScreen 과 동일 패턴.
-  final QuestionRoomReadRepository readRepository;
+  /// 테스트 주입 지점. null 이면 AppScope의 운영 레포를 사용.
+  final QuestionRoomReadRepository? readRepository;
 
   @override
   State<MentorQuestionListScreen> createState() =>
@@ -44,7 +45,7 @@ class MentorQuestionListScreen extends StatefulWidget {
 enum _StatusTab { all, pending, inProgress, done }
 
 class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
-  QuestionRoomReadRepository get _read => widget.readRepository;
+  late final QuestionRoomReadRepository _read;
 
   late Future<List<QuestionThread>> _future;
   _StatusTab _tab = _StatusTab.all; // 첫 진입 = 전체(기존 기록 노출).
@@ -54,6 +55,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
   @override
   void initState() {
     super.initState();
+    _read = widget.readRepository ?? AppScope.of(context).questionRoomRead;
     _future = _read.threads(widget.room.id);
   }
 
