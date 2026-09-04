@@ -175,6 +175,7 @@ Future<_FreeQuestionRouteData?> _loadFreeQuestionRoute(
   AppDependencies dependencies,
   String roomId,
 ) async {
+  if (dependencies.auth.currentRole != AppRole.student) return null;
   final Room? room = await dependencies.questionRoomRead.roomById(roomId);
   if (room == null) return null;
 
