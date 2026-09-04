@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/entitlement/subscription_summary.dart';
-import '../../../../core/supabase/supabase_client.dart';
+import '../../../../app/app_scope.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/typography_tokens.dart';
@@ -38,14 +38,17 @@ class StudentRoomHomeScreen extends StatefulWidget {
 }
 
 class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
-  final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
+  // A-2: 레포지토리·구독 리더·사용자 id 는 AppScope 에서(직접 생성·클라이언트 참조 0).
+  late final AppDependencies _deps;
+  QuestionRoomReadRepository get _repo => _deps.questionRoomRead;
   late Future<_StudentHomeData> _future;
 
-  String? get _uid => SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  String? get _uid => _deps.auth.currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _future = _load();
   }
 
@@ -67,13 +70,10 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
     // 구독 상태(표시만). N38: '첫 요약'(values.first) 임의 선택 대신 이 방의
     // 멘토와 매칭되는 요약을 쓴다 — 다중 구독 학생에서 남의 구독 오표시 제거
     // (멘토 RLS 는 자기 pair 행만 통과하지만, 키 매칭이 정본이다).
-    SubscriptionSummary? sub;
-    final client = SupabaseInit.clientOrNull;
-    if (client != null) {
-      final Map<String, SubscriptionSummary> subs =
-          await SubscriptionReader.fetchForStudent(client, widget.room.studentId);
-      sub = subs[widget.room.mentorId];
-    }
+    // (백엔드 미연결이면 포트가 빈 맵을 돌려줘 sub 는 null — 종전과 동일.)
+    final Map<String, SubscriptionSummary> subs =
+        await _deps.subscriptions.fetchForStudent(widget.room.studentId);
+    final SubscriptionSummary? sub = subs[widget.room.mentorId];
 
     return _StudentHomeData(
       counts: ThreadStatusCounts.from(threads),
