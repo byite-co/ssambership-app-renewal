@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:ssambership_app/app/app_scope.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/design/theme.dart';
@@ -49,10 +50,59 @@ Future<void> pumpGoldenScreen(
     withScope
         ? AppScope(
             dependencies:
-                dependencies ?? goldenDependencies(auth: FakeAppAuth(role: role)),
+                dependencies ??
+                goldenDependencies(auth: FakeAppAuth(role: role)),
             child: app,
           )
         : app,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// [GoRouterState.of]를 읽는 화면을 위한 최소 골든 라우터 하네스.
+///
+/// 앱 전체 라우트 그래프를 띄우지 않고 [routePath] 하나만 등록한다. 테스트가
+/// 명시적으로 만든 [AppDependencies]를 [AppScope]에 주입하므로 운영 폴백이나
+/// 네트워크에 기대지 않는다. [initialLocation]에는 쿼리를 포함할 수 있다.
+Future<void> pumpGoldenRoute(
+  WidgetTester tester, {
+  required String routePath,
+  required Widget screen,
+  required AppRole role,
+  AppDependencies? dependencies,
+  String? initialLocation,
+  Size logicalSize = kGoldenLogicalSize,
+  double devicePixelRatio = kGoldenDevicePixelRatio,
+}) async {
+  tester.view.physicalSize = logicalSize * devicePixelRatio;
+  tester.view.devicePixelRatio = devicePixelRatio;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  final AppDependencies scopedDependencies =
+      dependencies ?? goldenDependencies(auth: FakeAppAuth(role: role));
+  final GoRouter router = GoRouter(
+    initialLocation: initialLocation ?? routePath,
+    routes: <RouteBase>[GoRoute(path: routePath, builder: (_, __) => screen)],
+  );
+  addTearDown(router.dispose);
+
+  await tester.pumpWidget(
+    AppScope(
+      dependencies: scopedDependencies,
+      child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.build(role),
+        locale: const Locale('ko'),
+        supportedLocales: const <Locale>[Locale('ko')],
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        routerConfig: router,
+      ),
+    ),
   );
   await tester.pumpAndSettle();
 }
