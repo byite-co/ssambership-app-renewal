@@ -44,8 +44,10 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         builder: (context, state) {
           final String roomId = state.pathParameters['roomId']!;
           return AsyncRouteLoader<Room>(
-            load: (dependencies) =>
-                dependencies.questionRoomRead.roomById(roomId),
+            load: (dependencies) => _loadNewQuestionRoute(
+              dependencies,
+              roomId,
+            ),
             builder: (context, room, dependencies) => NewQuestionScreen(
               room: room,
               readRepository: dependencies.questionRoomRead,
@@ -170,6 +172,16 @@ List<RouteBase> buildQuestionRoomRoutes() => <RouteBase>[
         },
       ),
     ];
+
+Future<Room?> _loadNewQuestionRoute(
+  AppDependencies dependencies,
+  String roomId,
+) {
+  if (dependencies.auth.currentRole != AppRole.student) {
+    return Future<Room?>.value();
+  }
+  return dependencies.questionRoomRead.roomById(roomId);
+}
 
 Future<_FreeQuestionRouteData?> _loadFreeQuestionRoute(
   AppDependencies dependencies,
