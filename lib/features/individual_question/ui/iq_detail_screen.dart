@@ -2,11 +2,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../../core/auth/auth_service.dart';
+import '../../../app/app_scope.dart';
+import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../core/scan/image_downscaler.dart';
-import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/conversation_ui/conversation_bubble.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
@@ -220,16 +220,20 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   bool _busy = false;
   bool _changed = false;
 
+  // A-2: 인증 상태는 AppScope 에서 받는다(싱글턴·클라이언트 직접 참조 0).
+  late final AppDependencies _deps;
+
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _future = _load();
     _chatController.addListener(_onChatChanged);
     _messages.addListener(_onTimelineChanged);
     // §G: 실시간 보조 채널 + 복귀 재조회(실시간이 유일 소스가 되지 않게).
     _startRealtime();
     WidgetsBinding.instance.addObserver(this);
-    AuthService.instance.addListener(_onAuthChanged);
+    _deps.auth.addListener(_onAuthChanged);
   }
 
   @override
@@ -261,7 +265,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   /// 로그아웃/계정 전환 — 이전 사용자 채널을 정리한다(구독 누수·오배달 방지).
   void _onAuthChanged() {
-    if (AuthService.instance.isSignedIn) return;
+    if (_deps.auth.isSignedIn) return;
     _realtime?.dispose();
     _realtime = null;
   }
@@ -312,7 +316,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
 
   @override
   void dispose() {
-    AuthService.instance.removeListener(_onAuthChanged);
+    _deps.auth.removeListener(_onAuthChanged);
     WidgetsBinding.instance.removeObserver(this);
     _realtime?.dispose();
     _messages.removeListener(_onTimelineChanged);
@@ -836,11 +840,10 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (ok && mounted) Navigator.of(context).pop(_changed);
   }
 
-  AppRole get _role => widget.roleOverride ?? AuthService.instance.currentRole;
+  AppRole get _role => widget.roleOverride ?? _deps.auth.currentRole;
 
-  /// 뷰어 uid. Supabase 미초기화(위젯 테스트)면 null → 거울상 없이 전부 좌측.
-  String? get _viewerId =>
-      widget.currentUserId ?? SupabaseInit.clientOrNull?.auth.currentUser?.id;
+  /// 뷰어 uid. 세션 없음(위젯 테스트)이면 null → 거울상 없이 전부 좌측.
+  String? get _viewerId => widget.currentUserId ?? _deps.auth.currentUserId;
 
   /// §7 초기 위치: 메시지가 있으면 최신 대화 근처에서 시작한다. 질문만 있으면
   /// 맨 위(질문)가 자연스러운 시작점이라 건드리지 않는다. build 중에는 플래그만
