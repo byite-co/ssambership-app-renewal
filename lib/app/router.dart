@@ -10,6 +10,11 @@ import 'app_navigation.dart';
 import 'app_scope.dart';
 import 'entry_guard.dart';
 import 'home_shell.dart';
+import 'routes/community_routes.dart';
+import 'routes/individual_question_routes.dart';
+import 'routes/mentor_routes.dart';
+import 'routes/mypage_routes.dart';
+import 'routes/question_room_routes.dart';
 
 /// 라우팅: 스플래시 → (로그인 | 차단 | 홈). 진입 분기는 EntryGuard 가 결정한다.
 /// AuthService(ChangeNotifier)를 refreshListenable 로 두어 상태 변화 시 재평가.
@@ -42,6 +47,11 @@ class AppRouter {
           path: EntryGuard.blocked,
           builder: (context, state) => const BlockedScreen(),
         ),
+        ...buildQuestionRoomRoutes(),
+        ...buildIndividualQuestionRoutes(),
+        ...buildMentorRoutes(),
+        ...buildCommunityRoutes(),
+        ...buildMyPageRoutes(),
         // ★ 개발 전용 — 출시(release) 빌드에서는 등록되지 않는다(kDevToolsEnabled=false).
         if (kDevToolsEnabled)
           GoRoute(
