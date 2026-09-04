@@ -7,12 +7,12 @@
 
 | 질문 | 답 |
 |---|---|
-| Flutter SDK 로 실제 빌드·테스트를 돌렸는가 | **예 — 테스트·분석은 실제 실행.** 환경에 SDK 가 없어 CI 와 같은 **3.44.6 stable** 을 내려받아 돌렸다. **APK 빌드만 못 돌렸다**(Android SDK 없음 · `dl.google.com` 프록시 403) |
+| Flutter SDK 로 실제 빌드·테스트를 돌렸는가 | **예 — 테스트·분석은 실제 실행.** 환경에 SDK 가 없어 CI 와 같은 **3.44.6 stable** 을 내려받아 돌렸다. **APK 빌드만 이 환경에서 못 돌렸다**(Android SDK 없음 · `dl.google.com` 프록시 403). 대신 GitHub Actions 의 `appbundle --release`(debug 서명) 빌드가 이 브랜치에서 success 로 확인됐다(§4) |
 | 테스트 통과 수 | **1,517 / 1,517** (기준선 1,510 + 골든 7). 실패 0 |
 | analyze | **error 0 · warning 0 · info 79** |
 | 계약 테스트·매니페스트 잠금 | **실재.** `test/contracts/` 6개. 아웃바운드 매니페스트는 RPC 34 · 테이블/뷰 25 · 버킷 6 · 금지 표면 8 을 lib 소스 스캔으로 고정 — `baseline-2026-09-04.md` §2-2 |
 | 골든 테스트 | `test/goldens/` 신설, **PNG 7장** 커밋. 대표 5화면 중 **4개 렌더 성공, 1개(학생 질문방 목록 1뎁스) 렌더 불가** → 대체 화면 + 결합 기록 골든 |
-| CI 가 새 저장소에서 도는가 | `flutter-ci.yml` 은 시크릿 없이 그대로 동작 가능한 구조. **이 저장소에서의 실행 이력은 0건**이었다 — §4 에 이번 실행 결과 |
+| CI 가 새 저장소에서 도는가 | **예 — 실측.** `flutter-ci` 를 이 브랜치에서 수동 실행해 analyze·test(골든 포함)·appbundle·게이트 판정 전부 success (§4). 실행 전 이력은 0건이었다 |
 | 필요한 시크릿 | `flutter-ci`: **없음**. 서명 워크플로(수동 전용): Environment + 시크릿 7종(§4) |
 | `master` 미병합 커밋이 있는 브랜치 | **31개** — `branch-archive-2026-09-04.md` 유지 표. 완전 병합 29개는 **삭제 대상으로 목록화했으나 삭제는 미실행**(세션 권한 정책 차단 — §1) |
 
@@ -115,7 +115,23 @@
 작업 브랜치 push 후 `flutter-ci` 를 `workflow_dispatch` 로 실행해 새 저장소에서 실제로 도는지 확인한다. 결과는 아래에 기록한다.
 
 - 실행 전 상태: Actions 실행 이력 0건(`ci-logs` 브랜치 내용은 원본 저장소 실행분).
-- 실행 결과: _(push 뒤 기록)_
+- 실행: `workflow_dispatch` · ref `claude/new-session-2jl045` · commit `176ace1` · run #1 —
+  <https://github.com/byite-co/ssambership-app-renewal/actions/runs/33855653435>
+- **결과: 전체 success** (08:53:48 → 09:13:10 UTC, 약 19분 20초). 새 저장소에서 CI 가 시크릿 없이 그대로 돈다.
+
+| step | 결론 | 소요 | 비고 |
+|---|---|---|---|
+| checkout · setup-java 17 · flutter-action 3.44.6 · `.env` 자리표시 · pub get | success | 약 1분 20초 | Flutter 캐시 없음(첫 실행) |
+| `flutter analyze` (게이트) | **success** | 23초 | error/warning 0 |
+| `flutter test` (골든 포함, 게이트) | **success** | 4분 48초 | **골든 7장 CI(Linux) 에서 일치** — 로컬 생성 기준 이미지가 CI 와 같은 픽셀임을 확인 |
+| 골든 실패 이미지 업로드 | skipped | — | 실패가 없어 조건상 건너뜀(정상) |
+| 골든 기준 이미지 업로드 | success | 1초 | artifact `golden-screens` (PNG 7장, 14일 보존) |
+| `flutter build appbundle --release` (게이트 아님) | success | 11분 56초 | debug 서명 폴백(`allowInsecureSigning`) — 제출 불가 산출물. **환경에서 못 돌린 Android 빌드를 CI 가 대신 확인** |
+| AAB artifact 업로드 | success | 4초 | `aab-pipeline-check-NOT-for-submission` |
+| 로그 발행(`ci-logs`) | success | 1초 | 이제 `ci-logs` 브랜치는 **이 저장소** 실행분으로 덮어써졌다 |
+| 게이트 판정 | **success** | — | analyze+test 그린 |
+
+남는 CI 과제는 없다. 다음 PR 부터는 `pull_request`(master) 트리거로 자동 실행된다.
 
 ---
 
