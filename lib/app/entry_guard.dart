@@ -53,6 +53,7 @@ class EntryGuard {
   static String? redirect({
     required AccessState access,
     required String location,
+    AppRole role = AppRole.guest,
   }) {
     // dev 라우트는 가드 제외(개발 빌드 한정으로만 등록됨).
     if (location.startsWith('/dev/')) return null;
@@ -72,14 +73,21 @@ class EntryGuard {
         }
         return home;
       case AccessState.full:
-        return _isFullAccessLocation(location) ? null : home;
+        if (!_isFullAccessLocation(location)) return home;
+        // Native shortform creation is a mentor-only write surface. Keep the
+        // public feed/detail URLs shared, but fail closed for a copied URL.
+        if (_path(location) == AppRoutePaths.newShortform &&
+            role != AppRole.mentor) {
+          return AppRoutePaths.community;
+        }
+        return null;
       case AccessState.blocked:
         return location == blocked ? null : blocked;
     }
   }
 
   static bool _isFullAccessLocation(String location) {
-    final String path = Uri.tryParse(location)?.path ?? location;
+    final String path = _path(location);
     for (final String root in _fullAccessRoots) {
       if (path == root || path.startsWith('$root/')) return true;
     }
@@ -87,10 +95,23 @@ class EntryGuard {
   }
 
   static bool _isGuestPublicLocation(String location) {
-    final String path = Uri.tryParse(location)?.path ?? location;
-    for (final String root in guestAllowedTabs) {
-      if (path == root || path.startsWith('$root/')) return true;
+    final List<String> segments = Uri(path: _path(location)).pathSegments;
+    if (segments.length == 1) {
+      return segments.single == 'mentors' || segments.single == 'community';
     }
-    return false;
+    if (segments.length == 2 && segments.first == 'mentors') {
+      return segments[1].isNotEmpty;
+    }
+    if (segments.length != 3 || segments.first != 'community') return false;
+
+    final String collection = segments[1];
+    final String id = segments[2];
+    final bool readableCollection =
+        collection == 'boards' || collection == 'shortforms';
+    // `new` is the reserved mutation URL, not a readable content id.
+    return readableCollection && id.isNotEmpty && id != 'new';
   }
+
+  static String _path(String location) =>
+      Uri.tryParse(location)?.path ?? location;
 }

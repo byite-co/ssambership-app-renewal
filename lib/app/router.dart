@@ -157,6 +157,7 @@ class AppRouter {
     final String? guarded = EntryGuard.redirect(
       access: access,
       location: location,
+      role: dependencies.auth.currentRole,
     );
     final String destination = guarded ?? location;
 
