@@ -2,13 +2,16 @@
 #
 # 정책:
 # - analyze: 에러·경고 0 게이트(flutter analyze 기본 동작 — info 린트는 비차단).
-# - test: 전체 스위트(현재 331+개, DB 비의존).
+# - test: 전체 스위트(2026-09 기준 1,500+개, DB 비의존). 골든 테스트
+#   (test/goldens — 대표 화면 PNG 비교) 포함. 골든 실패 시 diff 이미지를
+#   artifact 로 올려 '무엇이 어떻게 달라졌는지' 눈으로 확인할 수 있게 한다.
 # - appbundle: '빌드 파이프라인이 살아있는지'만 검증(게이트 아님 — 결과만 보고).
 #   ★ .env 는 .env.example 복사(자리표시 값) — 시크릿 아님. 산출 AAB 는
 #   debug 서명+예시 env 라 스토어 제출물이 아니며, 아티팩트로 업로드하지 않는다.
 #   실제 제출용 AAB 는 오너 로컬(운영 .env + release keystore)에서 빌드한다.
 # - 각 단계 로그는 `ci-logs` 브랜치(일회용, force-push)로 발행 — API 없이
 #   git fetch 만으로 실패 원인을 확인할 수 있게 한다.
+# - 이 워크플로는 시크릿을 요구하지 않는다(GITHUB_TOKEN 만 사용).
 name: flutter-ci
 
 on:
@@ -41,7 +44,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.44.6 # 검증 기준 버전(ANDROID_SUBMISSION_READINESS 부록 B)
+          flutter-version: 3.44.6 # 검증 기준 버전(골든 이미지도 이 버전·Linux 에서 생성)
           cache: true
 
       # .env 는 gitignore 대상이지만 pubspec 에셋으로 선언돼 있어(asset_does_not_exist)
@@ -68,13 +71,34 @@ jobs:
             exit 1
           fi
 
-      - name: flutter test
+      - name: flutter test (골든 포함)
         id: test
         if: always()
         continue-on-error: true
         run: |
           set -o pipefail
           flutter test 2>&1 | tee /tmp/test.log
+
+      # 골든 불일치 시 flutter_test 가 test/**/failures/ 에 기대·실제·diff PNG 를
+      # 남긴다. 그대로 올려 리뷰어가 로그 대신 그림으로 판단할 수 있게 한다.
+      - name: 골든 실패 이미지 업로드 (test/**/failures)
+        if: always() && steps.test.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: test/**/failures/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # 기준 골든(현재 커밋)도 매 실행마다 올린다 — 체크아웃 없이 화면을 눈으로 확인.
+      - name: 골든 기준 이미지 업로드 (확인용)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-screens
+          path: test/goldens/images/*.png
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: flutter build appbundle (파이프라인 검증 — 게이트 아님)
         id: build
