@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_scope.dart';
 import '../../core/auth/deletion_notice_controller.dart';
 import '../../design/shape_tokens.dart';
 import '../../design/spacing_tokens.dart';
@@ -37,12 +38,17 @@ class WithdrawalPendingBanner extends StatefulWidget {
 
 class _WithdrawalPendingBannerState extends State<WithdrawalPendingBanner>
     with WidgetsBindingObserver {
-  DeletionNoticeController get _c =>
-      widget.controllerOverride ?? DeletionNoticeController.instance;
+  // A-2: 기본 컨트롤러는 AppScope 에서(싱글턴 직접 참조 0). dispose 에서도 쓰므로
+  // context 조회는 initState/didUpdateWidget 에서만 하고 필드에 보관한다.
+  late DeletionNoticeController _c;
+
+  DeletionNoticeController _resolveController() =>
+      widget.controllerOverride ?? AppScope.of(context).deletionNotice;
 
   @override
   void initState() {
     super.initState();
+    _c = _resolveController();
     _c.addListener(_onChanged);
     // 앱 재시작·재로그인 후에도 서버 상태로만 복원한다(로컬 캐시 의존 0).
     _c.ensureLoaded();
@@ -60,13 +66,12 @@ class _WithdrawalPendingBannerState extends State<WithdrawalPendingBanner>
   @override
   void didUpdateWidget(covariant WithdrawalPendingBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final DeletionNoticeController previous =
-        oldWidget.controllerOverride ?? DeletionNoticeController.instance;
-    final DeletionNoticeController current = _c;
-    if (identical(previous, current)) return;
-    previous.removeListener(_onChanged);
-    current.addListener(_onChanged);
-    current.ensureLoaded();
+    final DeletionNoticeController current = _resolveController();
+    if (identical(_c, current)) return;
+    _c.removeListener(_onChanged);
+    _c = current;
+    _c.addListener(_onChanged);
+    _c.ensureLoaded();
   }
 
   @override
