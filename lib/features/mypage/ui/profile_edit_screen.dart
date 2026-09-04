@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/auth/auth_service.dart';
+import '../../../app/app_scope.dart';
+import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/shape_tokens.dart';
@@ -36,7 +37,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   bool _busy = false;
 
   /// 역할 분기: 멘토는 학년 필드가 없고(웹에서 상세 관리), 학생만 학년을 편집한다.
-  bool get _isMentor => AuthService.instance.currentRole == AppRole.mentor;
+  bool get _isMentor =>
+      AppScope.of(context).auth.currentRole == AppRole.mentor; // A-2
 
   @override
   void dispose() {
