@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/question_room/data/attachments/attachme
 import 'package:ssambership_app/features/question_room/data/models/question_attachment.dart';
 import 'package:ssambership_app/features/question_room/data/models/question_thread.dart';
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// [QA-B5] 여러 페이지 PDF 를 골라도 1장만 첨부됐다.
 ///
@@ -40,8 +41,7 @@ class _FakeRasterizer implements PdfRasterizerPort {
   bool get isAvailable => true;
 
   @override
-  Future<PdfDocumentHandle> open(Uint8List bytes) async =>
-      _FakeDocument(pages);
+  Future<PdfDocumentHandle> open(Uint8List bytes) async => _FakeDocument(pages);
 }
 
 class _FakeDocument implements PdfDocumentHandle {
@@ -51,7 +51,8 @@ class _FakeDocument implements PdfDocumentHandle {
   final int pageCount;
 
   @override
-  Future<Uint8List> renderPage(int pageIndex, {required double longSide}) async =>
+  Future<Uint8List> renderPage(int pageIndex,
+          {required double longSide}) async =>
       Uint8List.fromList(List<int>.filled(64, pageIndex + 1));
 
   @override
@@ -105,7 +106,7 @@ QuestionThread _thread() {
 
 Future<void> _pump(WidgetTester tester, _RecordingUploader uploader,
     _FakeRasterizer rasterizer) async {
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(MaterialApp(
     theme: ThemeData(splashFactory: NoSplash.splashFactory),
     home: ChatScreen(
       thread: _thread(),

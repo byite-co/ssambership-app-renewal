@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/question_room/data/attachments/attachme
 import 'package:ssambership_app/features/question_room/data/models/question_thread.dart';
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// S16 스캔 소스 흐름 — 바텀시트 3택 · 소스별 포트 호출 · PDF 거부 · 취소 무동작 ·
 /// 초과 리사이즈. 전부 fake 포트 주입(플러그인·DB 비접촉).
@@ -81,9 +82,8 @@ Future<void> _openSheet(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('첨부 탭 → 바텀시트 3택(촬영·갤러리·파일) 렌더',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_chat());
+  testWidgets('첨부 탭 → 바텀시트 3택(촬영·갤러리·파일) 렌더', (WidgetTester tester) async {
+    await tester.pumpScopedWidget(_chat());
     await tester.pump();
     await _openSheet(tester);
 
@@ -95,7 +95,7 @@ void main() {
   testWidgets('촬영 선택 → scanPicker.pick(camera) + 미리보기(파일명)',
       (WidgetTester tester) async {
     final _FakeScanPort scan = _FakeScanPort(result: _img('camera.png'));
-    await tester.pumpWidget(_chat(scan: scan));
+    await tester.pumpScopedWidget(_chat(scan: scan));
     await tester.pump();
     await _openSheet(tester);
 
@@ -108,7 +108,7 @@ void main() {
 
   testWidgets('파일 선택 → scanPicker.pick(file)', (WidgetTester tester) async {
     final _FakeScanPort scan = _FakeScanPort(result: _img('scan.png'));
-    await tester.pumpWidget(_chat(scan: scan));
+    await tester.pumpScopedWidget(_chat(scan: scan));
     await tester.pump();
     await _openSheet(tester);
 
@@ -123,7 +123,7 @@ void main() {
       (WidgetTester tester) async {
     final _FakeScanPort scan = _FakeScanPort();
     final _FakeGalleryPort gallery = _FakeGalleryPort(result: _img('g.png'));
-    await tester.pumpWidget(_chat(scan: scan, gallery: gallery));
+    await tester.pumpScopedWidget(_chat(scan: scan, gallery: gallery));
     await tester.pump();
     await _openSheet(tester);
 
@@ -140,22 +140,22 @@ void main() {
     // S19 이후 PDF 는 지원 — 소스 포트의 '미지원 확장자' 일반 방어만 남는다.
     final _FakeScanPort scan = _FakeScanPort(
         error: const AppError('이미지(JPG·PNG·WEBP·HEIC)나 PDF 파일만 올릴 수 있어요.'));
-    await tester.pumpWidget(_chat(scan: scan));
+    await tester.pumpScopedWidget(_chat(scan: scan));
     await tester.pump();
     await _openSheet(tester);
 
     await tester.tap(find.text('파일'));
     await tester.pumpAndSettle();
 
-    expect(find.text('이미지(JPG·PNG·WEBP·HEIC)나 PDF 파일만 올릴 수 있어요.'),
-        findsOneWidget);
+    expect(
+        find.text('이미지(JPG·PNG·WEBP·HEIC)나 PDF 파일만 올릴 수 있어요.'), findsOneWidget);
   });
 
   testWidgets('시트 취소(바깥 탭) → 아무 포트도 호출되지 않는다(무동작)',
       (WidgetTester tester) async {
     final _FakeScanPort scan = _FakeScanPort(result: _img('x.png'));
     final _FakeGalleryPort gallery = _FakeGalleryPort(result: _img('x.png'));
-    await tester.pumpWidget(_chat(scan: scan, gallery: gallery));
+    await tester.pumpScopedWidget(_chat(scan: scan, gallery: gallery));
     await tester.pump();
     await _openSheet(tester);
 
@@ -193,8 +193,8 @@ void main() {
 
     test('초과 사진류 → 장변 캡 + JPEG(품질85) 재인코딩으로 한도 안', () async {
       final Uint8List big = opaquePng(400, 300);
-      final PickedImage src = PickedImage(
-          bytes: big, fileName: 'big.png', mimeType: 'image/png');
+      final PickedImage src =
+          PickedImage(bytes: big, fileName: 'big.png', mimeType: 'image/png');
       final PickedImage out = await downscaleIfOversized(src,
           maxBytes: big.length - 1, maxLongSide: 40);
 

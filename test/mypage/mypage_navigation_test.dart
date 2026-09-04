@@ -4,6 +4,7 @@ import 'package:ssambership_app/app/home_shell.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/shared/constants/app_constants.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 마이페이지 → 알림/받은 질문 보기 '실제 화면 이동' 검증.
 ///
@@ -44,7 +45,7 @@ void main() {
   testWidgets('학생: 마이페이지 → 알림 → 마이페이지 닫힘 + 알림 탭 화면 등장',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: HomeShell(myPageLoaderOverride: () async => _studentData()),
     ));
     await tester.pumpAndSettle();
@@ -55,8 +56,7 @@ void main() {
 
     // 마이페이지 route 닫힘 + 실제 보이는 탭이 알림(4)으로 전환.
     expect(find.text(AppConstants.myPageTitle), findsNothing);
-    expect(
-        find.text(AppConstants.studentBottomTabLabels[4]),
+    expect(find.text(AppConstants.studentBottomTabLabels[4]),
         findsWidgets); // AppBar 제목
     final NavigationBar bar =
         tester.widget<NavigationBar>(find.byType(NavigationBar));
@@ -65,7 +65,7 @@ void main() {
 
   testWidgets('멘토: 마이페이지 → 알림 실제 이동(역할 무관 동일 동작)', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: HomeShell(myPageLoaderOverride: () async => _mentorData()),
     ));
     await tester.pumpAndSettle();
@@ -83,7 +83,7 @@ void main() {
   testWidgets('멘토: 받은 질문 보기 → 마이페이지 닫힘 + 질문방 탭 등장(동일 원인 수정)',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: HomeShell(myPageLoaderOverride: () async => _mentorData()),
     ));
     await tester.pumpAndSettle();
@@ -102,7 +102,7 @@ void main() {
   testWidgets('뒤로가기 스택: 마이페이지를 그냥 닫으면 원래 탭 유지·크래시 없음',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: HomeShell(myPageLoaderOverride: () async => _studentData()),
     ));
     await tester.pumpAndSettle();

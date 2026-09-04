@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// P0-5 개별질문 환불 — 공개 wrapper 계약(허용 상태·멱등·오류 UX) 회귀.
 /// core RPC(refund_individual_question_hold) 는 앱이 호출하지 않는다(레포에 부재).
@@ -41,7 +42,7 @@ Future<void> _pumpDetail(
   required IndividualQuestionStatus status,
   required _FakeRepo repo,
 }) async {
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(MaterialApp(
     home: IqDetailScreen(
       key: ValueKey<String>('iq-${status.name}'), // 상태별 새 State 강제.
       questionId: 'q1',

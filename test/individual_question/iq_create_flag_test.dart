@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/iq_flags.dart';
 import 'package:ssambership_app/features/individual_question/ui/student_iq_list_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 개별질문 '작성' 진입점 ↔ kIndividualQuestionCreateEnabled 연동 상시 검증.
 ///
@@ -26,7 +27,7 @@ void main() {
 
   testWidgets('빈 목록: EmptyState 의 "새 개별질문" 액션이 플래그를 따른다',
       (WidgetTester tester) async {
-    await tester.pumpWidget(wrap(StudentIqListScreen(
+    await tester.pumpScopedWidget(wrap(StudentIqListScreen(
       loaderOverride: () async => <IndividualQuestion>[],
     )));
     await tester.pumpAndSettle();
@@ -41,7 +42,7 @@ void main() {
 
   testWidgets('목록 있음: "새 개별질문 (공개형)" 버튼이 플래그를 따른다 — 목록·상세는 항상 유지',
       (WidgetTester tester) async {
-    await tester.pumpWidget(wrap(StudentIqListScreen(
+    await tester.pumpScopedWidget(wrap(StudentIqListScreen(
       loaderOverride: () async => <IndividualQuestion>[question()],
     )));
     await tester.pumpAndSettle();

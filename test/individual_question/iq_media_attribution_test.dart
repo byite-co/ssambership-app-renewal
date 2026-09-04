@@ -6,6 +6,7 @@ import 'package:ssambership_app/features/individual_question/data/iq_realtime.da
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// §2-1 대화 타임라인 미디어 귀속 렌더 계약.
 ///
@@ -69,8 +70,8 @@ Future<void> _pump(
   tester.view.physicalSize = const Size(1080, 3600);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(const SizedBox.shrink());
+  await tester.pumpScopedWidget(MaterialApp(
     theme: AppTheme.build(role),
     home: IqDetailScreen(
       questionId: 'q1',
@@ -120,8 +121,7 @@ void main() {
         reason: '메시지 연결 첨부가 질문 말풍선으로 합쳐지면 안 된다');
   });
 
-  testWidgets('멘토 답변 첨부는 멘토 메시지 말풍선에 멘토 라벨로 붙는다',
-      (WidgetTester tester) async {
+  testWidgets('멘토 답변 첨부는 멘토 메시지 말풍선에 멘토 라벨로 붙는다', (WidgetTester tester) async {
     await _pump(
       tester,
       role: AppRole.student,
@@ -136,8 +136,7 @@ void main() {
     expect(_bubbleWithBody(tester, '이렇게 풀어요').authorLabel, '멘토');
   });
 
-  testWidgets('최초 질문 첨부(학생 작성·미연결)는 질문 말풍선에 남는다',
-      (WidgetTester tester) async {
+  testWidgets('최초 질문 첨부(학생 작성·미연결)는 질문 말풍선에 남는다', (WidgetTester tester) async {
     await _pump(
       tester,
       role: AppRole.student,
@@ -206,14 +205,16 @@ void main() {
     expect(_inBubble('후속 답글', 'f-img.pdf'), findsOneWidget);
     // 합쳐진 곳 없음 — 각 파일명은 화면 전체에서 1회만 보인다.
     for (final String name in <String>[
-      'q-img.pdf', 's-img.pdf', 'a-img.pdf', 'f-img.pdf',
+      'q-img.pdf',
+      's-img.pdf',
+      'a-img.pdf',
+      'f-img.pdf',
     ]) {
       expect(find.text(name), findsOneWidget);
     }
   });
 
-  testWidgets('학생 뷰 ↔ 멘토 뷰 좌우 거울상(첨부 소속 말풍선 기준)',
-      (WidgetTester tester) async {
+  testWidgets('학생 뷰 ↔ 멘토 뷰 좌우 거울상(첨부 소속 말풍선 기준)', (WidgetTester tester) async {
     final List<IqMessage> messages = <IqMessage>[
       _msg('m-1', kStudentId, '추가 질문', minute: 1),
       _msg('m-2', kMentorId, '첫 답변', minute: 2),

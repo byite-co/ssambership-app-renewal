@@ -15,6 +15,7 @@ import 'package:ssambership_app/features/notifications/notifications_screen.dart
 import 'package:ssambership_app/features/question_room/data/models/connection_note.dart';
 import 'package:ssambership_app/features/question_room/data/models/room.dart';
 import 'package:ssambership_app/features/question_room/ui/connection_notes_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 주요 화면의 상태 3종(로딩/빈/에러)이 작은 뷰포트(320×568)에서
 /// RenderFlex overflow 예외 없이 그려지는지 스모크.
@@ -43,7 +44,7 @@ void main() {
     bool settle = true,
     String? reason,
   }) async {
-    await tester.pumpWidget(wrap(child));
+    await tester.pumpScopedWidget(wrap(child));
     if (settle) {
       await tester.pumpAndSettle();
     } else {

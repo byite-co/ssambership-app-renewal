@@ -5,6 +5,7 @@ import 'package:ssambership_app/features/question_room/data/models/room.dart';
 import 'package:ssambership_app/features/question_room/data/room_safety_repository.dart';
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/mentor/mentor_answer_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// S3-E §5·§6·§8 — 질문방 신고·차단 진입점 계약.
 ///
@@ -111,7 +112,7 @@ void main() {
     testWidgets('학생이 멘토를 신고 — target_type=user, target_id=멘토 id',
         (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -129,7 +130,7 @@ void main() {
 
     testWidgets('멘토가 학생을 신고 — target_id=학생 id', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_mentorScreen(safety));
+      await tester.pumpScopedWidget(_mentorScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -143,7 +144,7 @@ void main() {
 
     testWidgets('시트를 닫으면 쓰기 0회', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -161,7 +162,7 @@ void main() {
         (WidgetTester tester) async {
       final _FakeSafety safety =
           _FakeSafety(reportOutcome: SafetyOutcome.failed);
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -176,7 +177,7 @@ void main() {
 
     testWidgets('상대 raw UUID 는 어디에도 노출되지 않는다', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
       await _openMenu(tester);
       expect(find.textContaining(_mentorId), findsNothing);
@@ -191,7 +192,7 @@ void main() {
     testWidgets('학생이 멘토를 차단 → composer 비활성, 기존 대화 유지',
         (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
       // 대화 영역(백엔드 없는 테스트에선 조회 실패 상태)의 렌더 내용을 기준으로 잡는다.
@@ -218,7 +219,7 @@ void main() {
 
     testWidgets('멘토가 학생을 차단 → blocked_id=학생 id', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_mentorScreen(safety));
+      await tester.pumpScopedWidget(_mentorScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -234,7 +235,7 @@ void main() {
     testWidgets('확인 다이얼로그 취소 → 쓰기 0회, composer 유지',
         (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -250,7 +251,7 @@ void main() {
     testWidgets('차단 후 전송·첨부를 시도해도 append/upload 진입 0회',
         (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety(alreadyBlocked: true);
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pumpAndSettle();
 
       // 입장 시점부터 읽기 전용 — 전송/첨부 버튼 자체가 없다.
@@ -259,10 +260,9 @@ void main() {
       expect(find.byType(TextField), findsNothing);
     });
 
-    testWidgets('중복 차단은 멱등 — 다시 차단해도 행이 늘지 않는다',
-        (WidgetTester tester) async {
+    testWidgets('중복 차단은 멱등 — 다시 차단해도 행이 늘지 않는다', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -286,7 +286,7 @@ void main() {
         (WidgetTester tester) async {
       final _FakeSafety safety =
           _FakeSafety(blockOutcome: SafetyOutcome.failed);
-      await tester.pumpWidget(_studentScreen(safety));
+      await tester.pumpScopedWidget(_studentScreen(safety));
       await tester.pump();
 
       await _openMenu(tester);
@@ -304,7 +304,7 @@ void main() {
     testWidgets('room 없음 → 안전 메뉴 비활성(신고·차단 항목 열리지 않음)',
         (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: ChatScreen(
           thread: _thread(),
           mentorName: '김선생',
@@ -324,7 +324,7 @@ void main() {
 
     testWidgets('이 방의 당사자가 아니면 메뉴 비활성', (WidgetTester tester) async {
       final _FakeSafety safety = _FakeSafety();
-      await tester.pumpWidget(_studentScreen(safety, uid: '제3자-uuid'));
+      await tester.pumpScopedWidget(_studentScreen(safety, uid: '제3자-uuid'));
       await tester.pump();
 
       await tester.tap(find.byIcon(Icons.more_vert));

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/data/profile_edit_repository.dart';
 import 'package:ssambership_app/features/mypage/ui/profile_edit_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 학생 프로필 수정 — 학년 필드의 라벨·초깃값(controller)·저장 payload 가
 /// 전부 `grade_level` 로 일치하는지 고정(학교명 표시·저장 바인딩 오류 없음).
@@ -23,7 +24,7 @@ void main() {
   testWidgets('라벨=학년 (선택) · 초깃값=grade · 저장 payload=grade_level 값',
       (WidgetTester tester) async {
     final Map<String, String?> captured = <String, String?>{};
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: ProfileEditScreen(
         profile: const MyProfile(name: '학생', roleLabel: '학생', grade: '고2'),
         repository: _CapturingRepo(captured),
@@ -49,7 +50,7 @@ void main() {
   testWidgets("학생이 학년을 비우고 저장 → ''(비우기) 전송 — 생략(유지)이 아니다",
       (WidgetTester tester) async {
     final Map<String, String?> captured = <String, String?>{};
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: ProfileEditScreen(
         profile: const MyProfile(name: '학생', roleLabel: '학생', grade: '고2'),
         repository: _CapturingRepo(captured),

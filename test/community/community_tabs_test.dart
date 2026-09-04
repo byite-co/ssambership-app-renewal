@@ -4,6 +4,7 @@ import 'package:ssambership_app/features/community/community_screen.dart';
 import 'package:ssambership_app/features/community/data/community_models.dart';
 
 import 'fakes.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 커뮤니티 탭 셸 — 숏폼/게시판/내활동 탭 + 각 탭 카드 렌더(mock 주입, DB 미접촉).
 Widget _wrap(Widget child) => MaterialApp(home: child);
@@ -19,8 +20,9 @@ void main() {
   testWidgets('상단 탭(숏폼/게시판/내 활동)이 존재하고, 숏폼 카드가 렌더된다',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(_wrap(CommunityScreen(
-      read: FakeCommunityRead(shortformsList: <ShortformPost>[sampleShortform()]),
+    await tester.pumpScopedWidget(_wrap(CommunityScreen(
+      read:
+          FakeCommunityRead(shortformsList: <ShortformPost>[sampleShortform()]),
       write: FakeCommunityWrite(),
     )));
     await tester.pumpAndSettle();
@@ -36,10 +38,9 @@ void main() {
     expect(find.text('69'), findsOneWidget); // 조회수
   });
 
-  testWidgets('게시판 탭 → 카테고리칩 + 글 카드(제목·댓글수)',
-      (WidgetTester tester) async {
+  testWidgets('게시판 탭 → 카테고리칩 + 글 카드(제목·댓글수)', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(_wrap(CommunityScreen(
+    await tester.pumpScopedWidget(_wrap(CommunityScreen(
       read: FakeCommunityRead(boardsList: <BoardPost>[sampleBoard()]),
       write: FakeCommunityWrite(),
     )));
@@ -56,10 +57,9 @@ void main() {
     expect(find.text('7'), findsOneWidget); // 댓글수
   });
 
-  testWidgets('작성 FAB: 게시판 탭에서만 노출(숏폼·내활동 없음)',
-      (WidgetTester tester) async {
+  testWidgets('작성 FAB: 게시판 탭에서만 노출(숏폼·내활동 없음)', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(_wrap(CommunityScreen(
+    await tester.pumpScopedWidget(_wrap(CommunityScreen(
       read: const FakeCommunityRead(),
       write: FakeCommunityWrite(),
     )));

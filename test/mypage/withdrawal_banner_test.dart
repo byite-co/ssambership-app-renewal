@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/mypage/data/account_deletion_repository
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/shared/widgets/withdrawal_pending_banner.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// §5 — 탈퇴 예약 상시 배너.
 ///
@@ -94,7 +95,7 @@ void main() {
     testWidgets('pending 이면 배너를 띄운다', (WidgetTester tester) async {
       final DeletionNoticeController c =
           DeletionNoticeController(port: _FakePort(_pending()));
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
     });
@@ -104,7 +105,7 @@ void main() {
         port: _FakePort(const DeletionStatusResult(
             exists: false, writeBlocked: false, canCancel: false)),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsNothing);
     });
@@ -113,7 +114,7 @@ void main() {
         (WidgetTester tester) async {
       final DeletionNoticeController c =
           DeletionNoticeController(port: _FakePort(null));
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsNothing);
     });
@@ -124,7 +125,7 @@ void main() {
         final DeletionNoticeController c = DeletionNoticeController(
           port: _FakePort(_pending(state: state, canCancel: false)),
         );
-        await tester.pumpWidget(_host(c));
+        await tester.pumpScopedWidget(_host(c));
         await tester.pumpAndSettle();
         expect(find.text(_title), findsNothing, reason: 'state=$state');
       }
@@ -138,7 +139,7 @@ void main() {
       final DeletionNoticeController c = DeletionNoticeController(
         port: _FakePort(_pending(cancelableUntil: until)),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
 
       final DateTime local = until.toLocal();
@@ -156,7 +157,7 @@ void main() {
       final DeletionNoticeController c = DeletionNoticeController(
         port: _FakePort(_pending()),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
       expect(find.textContaining('까지 취소할 수 있어요'), findsNothing);
@@ -167,7 +168,7 @@ void main() {
     testWidgets('can_cancel=true → 버튼 노출', (WidgetTester tester) async {
       final DeletionNoticeController c =
           DeletionNoticeController(port: _FakePort(_pending()));
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(_cancelButton, findsOneWidget);
     });
@@ -177,7 +178,7 @@ void main() {
       final DeletionNoticeController c = DeletionNoticeController(
         port: _FakePort(_pending(canCancel: false)),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
       expect(_cancelButton, findsNothing);
@@ -191,7 +192,7 @@ void main() {
           cancelableUntil: DateTime.utc(2020, 1, 1),
         )),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(_cancelButton, findsNothing);
     });
@@ -201,7 +202,8 @@ void main() {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
       int opened = 0;
-      await tester.pumpWidget(_host(c, onOpenCancel: (BuildContext _) async {
+      await tester
+          .pumpScopedWidget(_host(c, onOpenCancel: (BuildContext _) async {
         opened++;
       }));
       await tester.pumpAndSettle();
@@ -214,7 +216,8 @@ void main() {
     testWidgets('취소 화면에서 돌아오면 서버 상태로 재판정한다', (WidgetTester tester) async {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(_host(c, onOpenCancel: (BuildContext _) async {
+      await tester
+          .pumpScopedWidget(_host(c, onOpenCancel: (BuildContext _) async {
         // 탈퇴 화면에서 취소 성공 → 서버는 더 이상 잡이 없다고 답한다.
         port.status = const DeletionStatusResult(
             exists: false, writeBlocked: false, canCancel: false);
@@ -238,7 +241,7 @@ void main() {
           canCancel: true, // 방어적 이중 게이트 검증(정상 서버는 false 를 준다)
         )),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
       expect(_cancelButton, findsNothing);
@@ -256,7 +259,7 @@ void main() {
           port: _FakePort(
               _pending(state: state, writeBlocked: true, canCancel: true)),
         );
-        await tester.pumpWidget(_host(c));
+        await tester.pumpScopedWidget(_host(c));
         await tester.pumpAndSettle();
         expect(find.text(_title), findsOneWidget, reason: 'state=$state');
         expect(_cancelButton, findsNothing, reason: 'state=$state');
@@ -269,7 +272,7 @@ void main() {
         port: _FakePort(
             _pending(state: 'locked', writeBlocked: false, canCancel: true)),
       );
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(_cancelButton, findsNothing);
     });
@@ -281,18 +284,18 @@ void main() {
       // 1회차 실행.
       final DeletionNoticeController first =
           DeletionNoticeController(port: _FakePort(_pending()));
-      await tester.pumpWidget(_host(first));
+      await tester.pumpScopedWidget(_host(first));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
 
       // 앱 종료 상당 — 위젯·컨트롤러 폐기.
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
 
       // 재시작: 로컬에 남은 것 없이 새 컨트롤러가 서버에서 다시 읽어온다.
       final _FakePort restarted = _FakePort(_pending());
       final DeletionNoticeController second =
           DeletionNoticeController(port: restarted);
-      await tester.pumpWidget(_host(second));
+      await tester.pumpScopedWidget(_host(second));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
       expect(restarted.statusCalls, greaterThan(0), reason: '서버 재조회로 복원');
@@ -302,18 +305,18 @@ void main() {
         (WidgetTester tester) async {
       final DeletionNoticeController first =
           DeletionNoticeController(port: _FakePort(_pending()));
-      await tester.pumpWidget(_host(first));
+      await tester.pumpScopedWidget(_host(first));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
 
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
 
       // 앱이 꺼져 있는 동안 웹에서 탈퇴를 취소했다 → 서버는 잡 없음.
       final DeletionNoticeController second = DeletionNoticeController(
         port: _FakePort(const DeletionStatusResult(
             exists: false, writeBlocked: false, canCancel: false)),
       );
-      await tester.pumpWidget(_host(second));
+      await tester.pumpScopedWidget(_host(second));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsNothing);
     });
@@ -325,7 +328,7 @@ void main() {
       final _FakePort port = _FakePort(_pending());
       port.statusOverride = slow.future;
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pump();
       expect(find.text(_title), findsNothing);
 
@@ -363,7 +366,7 @@ void main() {
         (WidgetTester tester) async {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
 
@@ -381,7 +384,7 @@ void main() {
         (WidgetTester tester) async {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: Column(
             children: <Widget>[
@@ -400,11 +403,11 @@ void main() {
         (WidgetTester tester) async {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(port.statusCalls, 1);
 
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: Column(
             children: <Widget>[
@@ -421,7 +424,7 @@ void main() {
     testWidgets('조회 실패 후에도 마지막 정상 스냅샷을 유지한다', (WidgetTester tester) async {
       final _FakePort port = _FakePort(_pending());
       final DeletionNoticeController c = DeletionNoticeController(port: port);
-      await tester.pumpWidget(_host(c));
+      await tester.pumpScopedWidget(_host(c));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
 
@@ -435,7 +438,7 @@ void main() {
         (WidgetTester tester) async {
       final DeletionNoticeController first =
           DeletionNoticeController(port: _FakePort(_pending()));
-      await tester.pumpWidget(_host(first));
+      await tester.pumpScopedWidget(_host(first));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsOneWidget);
 
@@ -445,7 +448,7 @@ void main() {
         port: _FakePort(const DeletionStatusResult(
             exists: false, writeBlocked: false, canCancel: false)),
       );
-      await tester.pumpWidget(_host(second));
+      await tester.pumpScopedWidget(_host(second));
       await tester.pumpAndSettle();
       expect(find.text(_title), findsNothing);
     });
@@ -457,7 +460,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: HomeShell(
           myPageLoaderOverride: () async => const MyPageData(
             role: AppRole.student,
@@ -479,7 +482,7 @@ void main() {
       port.statusOverride = slow.future;
       final DeletionNoticeController c = DeletionNoticeController(port: port);
       // 마이페이지처럼 스크롤 뷰와 함께 배치했을 때를 재현한다.
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: Column(
             children: <Widget>[
@@ -506,7 +509,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: MyPageScreen(
             loaderOverride: () async => const MyPageData(

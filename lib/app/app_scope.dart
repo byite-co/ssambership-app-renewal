@@ -150,10 +150,8 @@ class AppDependencies {
 /// 화면은 `AppScope.of(context)` 로 읽는다. [of] 는 의존성 등록 없이 조회만 하므로
 /// `initState` 에서도 쓸 수 있다(의존성 묶음은 앱 수명 동안 바뀌지 않는다).
 ///
-/// ★ 폴백: 조상에 AppScope 가 없으면 운영 구성([AppDependencies.production])을 돌려준다.
-///   기존 위젯 테스트(AppScope 없이 화면을 직접 pump)와 부분 트리가 종전과 동일하게
-///   동작하도록 둔 것이다 — A-3(라우팅 교체)에서 진입점이 전부 AppScope 아래로 들어오면
-///   이 폴백은 제거 대상이다.
+/// 조상에 [AppScope]가 없으면 모든 빌드에서 [FlutterError]를 던진다. 운영 구성은
+/// 앱 루트에서만 만들며, 부분 트리와 테스트도 필요한 의존성을 명시적으로 주입한다.
 class AppScope extends InheritedWidget {
   const AppScope({
     super.key,
@@ -163,10 +161,14 @@ class AppScope extends InheritedWidget {
 
   final AppDependencies dependencies;
 
-  static AppDependencies? _fallback;
-
-  static AppDependencies of(BuildContext context) =>
-      maybeOf(context) ?? (_fallback ??= AppDependencies.production());
+  static AppDependencies of(BuildContext context) {
+    final AppDependencies? dependencies = maybeOf(context);
+    if (dependencies != null) return dependencies;
+    throw FlutterError(
+      'AppScope.of() called with a context that does not contain an AppScope. '
+      'Wrap the app or test root in AppScope and provide AppDependencies explicitly.',
+    );
+  }
 
   static AppDependencies? maybeOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<AppScope>()?.dependencies;

@@ -4,6 +4,7 @@ import 'package:ssambership_app/features/mypage/data/notification_settings_repos
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 import 'package:ssambership_app/features/notifications/data/notifications_repository.dart';
 import 'package:ssambership_app/features/notifications/notifications_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// CR 게이트 OFF — 앱 표면에서 맞춤의뢰 알림 2종(exact type)을 노출하지 않는다.
 /// 서버 계약(정본 17종 enum·producer)은 불변 — '앱 출시 표면'만 게이트한다.
@@ -137,7 +138,7 @@ void main() {
         _GatedKeysetFakeRepo(<Map<String, dynamic>>[
       _row(1, '2026-07-24T08:00:00'),
     ]);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: Scaffold(body: NotificationsScreen(repository: repo)),
     ));
     await tester.pumpAndSettle();

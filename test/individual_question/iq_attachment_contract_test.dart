@@ -13,6 +13,7 @@ import 'package:ssambership_app/features/individual_question/data/iq_attachments
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 세션1 §6 — IQ 첨부 계약: 정책(20MB·MIME allowlist·매직바이트), 보상삭제,
 /// 재시도 중복 0, 멘토 첨부 UI(선택·취소·차단), 저장 액션.
@@ -494,7 +495,7 @@ void main() {
       final _FakeSource source =
           _FakeSource(_file('풀이.png', 'image/png', _png()));
       final _FakeUploads uploads = _FakeUploads();
-      await tester.pumpWidget(screen(source: source, uploads: uploads));
+      await tester.pumpScopedWidget(screen(source: source, uploads: uploads));
       await tester.pumpAndSettle();
 
       await pick(tester, '갤러리');
@@ -511,7 +512,7 @@ void main() {
           _FakeSource(_file('풀이.png', 'image/png', _png()));
       final _FakeUploads uploads = _FakeUploads();
       final List<(String, String)> log = <(String, String)>[];
-      await tester.pumpWidget(
+      await tester.pumpScopedWidget(
           screen(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
@@ -531,7 +532,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       final _FakeSource source = _FakeSource(null);
       final _FakeUploads uploads = _FakeUploads();
-      await tester.pumpWidget(screen(source: source, uploads: uploads));
+      await tester.pumpScopedWidget(screen(source: source, uploads: uploads));
       await tester.pumpAndSettle();
       await pick(tester, '촬영');
       expect(uploads.calls, 0);
@@ -545,7 +546,7 @@ void main() {
       final _FakeSource source = _FakeSource(
           _file('big.png', 'image/png', _png(kIqAttachmentMaxBytes + 1)));
       final _FakeUploads uploads = _FakeUploads();
-      await tester.pumpWidget(screen(source: source, uploads: uploads));
+      await tester.pumpScopedWidget(screen(source: source, uploads: uploads));
       await tester.pumpAndSettle();
       await pick(tester, '파일');
       expect(uploads.calls, 0);
@@ -567,7 +568,7 @@ void main() {
         ),
       );
       final List<(String, String)> log = <(String, String)>[];
-      await tester.pumpWidget(
+      await tester.pumpScopedWidget(
           screen(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
@@ -597,7 +598,7 @@ void main() {
             retryObjectPath: 'q-1/ambiguous.png'),
       );
       final List<(String, String)> log = <(String, String)>[];
-      await tester.pumpWidget(
+      await tester.pumpScopedWidget(
           screen(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
@@ -628,9 +629,10 @@ void main() {
         _file('bad.png', 'image/png', _png()),
         _file('ok2.png', 'image/png', _png()),
       ]);
-      final _NameFailUploads uploads = _NameFailUploads(failNames: <String>{'bad.png'});
+      final _NameFailUploads uploads =
+          _NameFailUploads(failNames: <String>{'bad.png'});
       final List<(String, String)> log = <(String, String)>[];
-      await tester.pumpWidget(
+      await tester.pumpScopedWidget(
           screen2(source: source, uploads: uploads, appendLog: log));
       await tester.pumpAndSettle();
 
@@ -664,8 +666,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       final _FakeSource source =
           _FakeSource(_file('풀이.png', 'image/png', _png()));
-      await tester.pumpWidget(
-          screen(source: source, uploads: _FakeUploads()));
+      await tester
+          .pumpScopedWidget(screen(source: source, uploads: _FakeUploads()));
       await tester.pumpAndSettle();
       await pick(tester, '갤러리');
 
@@ -685,7 +687,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       final _FakeSaver saver = _FakeSaver();
-      await tester.pumpWidget(screen(
+      await tester.pumpScopedWidget(screen(
           source: _FakeSource(null), uploads: _FakeUploads(), saver: saver));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('저장'));

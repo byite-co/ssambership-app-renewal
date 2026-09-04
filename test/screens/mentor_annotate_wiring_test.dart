@@ -8,6 +8,7 @@ import 'package:ssambership_app/features/question_room/data/models/question_thre
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/mentor/mentor_answer_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/widgets/chat_input_bar.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// [QA-C3] 멘토 답변 화면에서 이미지 첨부 시 주석 버튼이 나오지 않았다.
 ///
@@ -60,9 +61,8 @@ ChatInputBar _inputBar(WidgetTester tester) =>
     tester.widget<ChatInputBar>(find.byType(ChatInputBar));
 
 void main() {
-  testWidgets('멘토 답변 화면: 대기 이미지에 주석 경로가 배선돼 있다',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(MaterialApp(
+  testWidgets('멘토 답변 화면: 대기 이미지에 주석 경로가 배선돼 있다', (WidgetTester tester) async {
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: MentorAnswerScreen(
         thread: _thread(),
@@ -80,9 +80,8 @@ void main() {
     );
   });
 
-  testWidgets('학생 채팅 화면: 종전 배선이 그대로다(회귀 없음)',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(MaterialApp(
+  testWidgets('학생 채팅 화면: 종전 배선이 그대로다(회귀 없음)', (WidgetTester tester) async {
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: ChatScreen(
         thread: _thread(),

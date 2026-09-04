@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/question_room/data/models/connection_note.dart';
 import 'package:ssambership_app/features/question_room/data/models/room.dart';
 import 'package:ssambership_app/features/question_room/ui/connection_notes_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 연결노트 입력 경계 — 빈/공백 저장 차단, 초장문·이모지·특수문자 렌더.
 /// 저장은 onSaveNote 주입으로 가로채 DB 비접촉.
@@ -30,10 +31,9 @@ void main() {
         home: home,
       );
 
-  testWidgets('빈 문자열·공백만으로는 저장이 호출되지 않는다',
-      (WidgetTester tester) async {
+  testWidgets('빈 문자열·공백만으로는 저장이 호출되지 않는다', (WidgetTester tester) async {
     final List<String> saved = <String>[];
-    await tester.pumpWidget(app(ConnectionNotesScreen(
+    await tester.pumpScopedWidget(app(ConnectionNotesScreen(
       room: room(),
       mentorName: '김멘토',
       currentUserId: 's1',
@@ -57,7 +57,7 @@ void main() {
 
   testWidgets('앞뒤 공백은 trim 되어 저장된다', (WidgetTester tester) async {
     final List<String> saved = <String>[];
-    await tester.pumpWidget(app(ConnectionNotesScreen(
+    await tester.pumpScopedWidget(app(ConnectionNotesScreen(
       room: room(),
       mentorName: '김멘토',
       currentUserId: 's1',
@@ -72,11 +72,10 @@ void main() {
     expect(saved, <String>['중간 내용']);
   });
 
-  testWidgets('초장문(10k자)·이모지·특수문자 노트가 예외 없이 렌더된다',
-      (WidgetTester tester) async {
+  testWidgets('초장문(10k자)·이모지·특수문자 노트가 예외 없이 렌더된다', (WidgetTester tester) async {
     final String long = '가나다라마바사아자차카타파하 ' * 700; // 약 10.5k자
     const String tricky = '😀🧮 √(x²+1) ≤ ∑ <b>&amp;</b> "따옴표" \\백슬래시 %s ﷽';
-    await tester.pumpWidget(app(ConnectionNotesScreen(
+    await tester.pumpScopedWidget(app(ConnectionNotesScreen(
       room: room(),
       mentorName: '김멘토',
       currentUserId: 's1',

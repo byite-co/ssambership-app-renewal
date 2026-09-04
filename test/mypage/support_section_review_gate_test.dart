@@ -5,6 +5,7 @@ import 'package:ssambership_app/core/web_bridge/web_bridge_config.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/features/mypage/ui/sections/support_section.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 리뷰 메뉴 역할 게이트 — 범용 '리뷰 작성' 행 폐기, 멘토에게만 '받은 리뷰'.
 /// 목적지는 웹 멘토 받은 리뷰 화면 계약(/mentor/reviews)과 일치해야 한다.
@@ -22,7 +23,7 @@ void _bigSurface(WidgetTester tester) {
 void main() {
   testWidgets('기본(학생·게스트·관리자): 리뷰 행 미노출 — 리뷰 작성도 받은 리뷰도 없음',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(const SupportSection()));
+    await tester.pumpScopedWidget(_wrap(const SupportSection()));
     expect(find.text('리뷰 작성'), findsNothing);
     expect(find.text('받은 리뷰'), findsNothing);
     expect(find.text('알림'), findsOneWidget); // 나머지 행 유지
@@ -31,8 +32,8 @@ void main() {
 
   testWidgets('멘토: 받은 리뷰 행 노출(라벨은 받은 리뷰 — 리뷰 작성 아님)',
       (WidgetTester tester) async {
-    await tester
-        .pumpWidget(_wrap(const SupportSection(showReceivedReviews: true)));
+    await tester.pumpScopedWidget(
+        _wrap(const SupportSection(showReceivedReviews: true)));
     expect(find.text('받은 리뷰'), findsOneWidget);
     expect(find.text('리뷰 작성'), findsNothing);
   });
@@ -43,7 +44,7 @@ void main() {
 
   testWidgets('역할 배선: 학생 마이페이지엔 리뷰 행 없음', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: Scaffold(
         body: MyPageScreen(
           loaderOverride: () async => const MyPageData(
@@ -60,7 +61,7 @@ void main() {
 
   testWidgets('역할 배선: 멘토 마이페이지엔 받은 리뷰 노출', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: Scaffold(
         body: MyPageScreen(
           loaderOverride: () async => const MyPageData(

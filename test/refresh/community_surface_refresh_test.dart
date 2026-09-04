@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/community/ui/activity/my_activity_view.
 import 'package:ssambership_app/features/community/ui/shortform/shortform_feed_view.dart';
 
 import '../community/fakes.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// §4-3·§4-4 — 커뮤니티 표면별 최신성 수렴.
 ///
@@ -122,7 +123,7 @@ void main() {
       final _MutableRead read = _MutableRead(
         shortformsData: <ShortformPost>[_short('s1'), _short('s2')],
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: CommunityScreen(read: read, write: FakeCommunityWrite())));
       await tester.pumpAndSettle();
       expect(find.text('숏폼s1'), findsOneWidget);
@@ -147,7 +148,7 @@ void main() {
       _bigSurface(tester);
       final _MutableRead read =
           _MutableRead(shortformsData: <ShortformPost>[_short('s1')]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: ShortformFeedView(read: read, write: FakeCommunityWrite())),
       ));
@@ -172,7 +173,7 @@ void main() {
         activityData:
             MyActivity(myPosts: <BoardPost>[_post('p1'), _post('p2')]),
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: CommunityScreen(read: read, write: FakeCommunityWrite())));
       await tester.pumpAndSettle();
       await tester.tap(find.text('내 활동'));
@@ -191,7 +192,7 @@ void main() {
       final _MutableRead read = _MutableRead(
         activityData: MyActivity(myPosts: <BoardPost>[_post('p1')]),
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: MyActivityView(read: read, write: FakeCommunityWrite())),
       ));
@@ -210,7 +211,7 @@ void main() {
     testWidgets('빈 상태에서도 당길 수 있다(PTR 스크롤 물리 보장)', (WidgetTester tester) async {
       _bigSurface(tester);
       final _MutableRead read = _MutableRead();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: MyActivityView(read: read, write: FakeCommunityWrite())),
       ));
@@ -235,7 +236,7 @@ void main() {
       read.activityOverride = slow.future; // 첫 조회를 늦춘다
       final GlobalKey<MyActivityViewState> key =
           GlobalKey<MyActivityViewState>();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body:
               MyActivityView(key: key, read: read, write: FakeCommunityWrite()),
@@ -263,7 +264,7 @@ void main() {
       );
       final GlobalKey<MyActivityViewState> key =
           GlobalKey<MyActivityViewState>();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body:
               MyActivityView(key: key, read: read, write: FakeCommunityWrite()),
@@ -287,7 +288,7 @@ void main() {
       // 마이크로태스크에서 '미처리 비동기 오류'로 보고돼 테스트가 오탐한다.
       final Completer<MyActivity> first = Completer<MyActivity>();
       read.activityOverride = first.future;
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: MyActivityView(read: read, write: FakeCommunityWrite())),
       ));
@@ -304,13 +305,13 @@ void main() {
       final Completer<MyActivity> slow = Completer<MyActivity>();
       final _MutableRead read = _MutableRead();
       read.activityOverride = slow.future;
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: MyActivityView(read: read, write: FakeCommunityWrite())),
       ));
       await tester.pump();
 
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
       slow.complete(MyActivity(myPosts: <BoardPost>[_post('p1')]));
       await tester.pumpAndSettle();
       expect(find.text('글p1'), findsNothing);
@@ -325,7 +326,7 @@ void main() {
         shortformsData: <ShortformPost>[_short('s1')],
         activityData: MyActivity(myPosts: <BoardPost>[_post('p1')]),
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: CommunityScreen(read: read, write: FakeCommunityWrite())));
       await tester.pumpAndSettle();
       // TabBarView 는 지연 생성 — 초기 탭(숏폼)만 살아 있다.
@@ -346,7 +347,7 @@ void main() {
         shortformsData: <ShortformPost>[_short('s1')],
         activityData: MyActivity(myPosts: <BoardPost>[_post('p1')]),
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: CommunityScreen(read: read, write: FakeCommunityWrite())));
       await tester.pumpAndSettle();
       await tester.tap(find.text('내 활동'));

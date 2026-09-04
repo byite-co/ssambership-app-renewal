@@ -6,6 +6,7 @@ import 'package:ssambership_app/design/theme.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// D-10 렌더 계약: 개별질문 상세의 대화 영역이 학생·멘토 작성자를 구분한다.
 ///
@@ -49,7 +50,7 @@ Future<void> _pump(
   IndividualQuestionStatus status = IndividualQuestionStatus.answered,
   String? claimedMentorId = kMentorId,
 }) async {
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(MaterialApp(
     theme: AppTheme.build(role),
     home: IqDetailScreen(
       questionId: 'q1',
