@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
+import '../../../app/app_scope.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/typography_tokens.dart';
@@ -25,6 +26,7 @@ class StudentIqListScreen extends StatefulWidget {
   const StudentIqListScreen({
     super.key,
     this.loaderOverride,
+    this.repositoryOverride,
     this.embedded = false,
     this.webBridgeOverride,
     this.createCtaOverride,
@@ -32,6 +34,9 @@ class StudentIqListScreen extends StatefulWidget {
 
   /// 테스트용 데이터 주입. null 이면 실제 레포 사용.
   final Future<List<IndividualQuestion>> Function()? loaderOverride;
+
+  /// 테스트용 레포 주입. null 이면 AppScope 의 운영 의존성을 사용한다.
+  final IndividualQuestionRepository? repositoryOverride;
 
   /// true: 하단 탭(HomeShell)에 임베드 — 자체 Scaffold/AppBar 없이 본문만.
   /// false(기본): 단독 push 화면 — 기존과 동일하게 AppBar 포함.
@@ -49,9 +54,7 @@ class StudentIqListScreen extends StatefulWidget {
 
 class _StudentIqListScreenState extends State<StudentIqListScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
-  final IndividualQuestionRepository _repo =
-      const IndividualQuestionRepository();
+  late final IndividualQuestionRepository _repo;
   late Future<List<IndividualQuestion>> _future;
 
   /// 질문 유형 필터(전체/지정/공개·확정/공개·대기). 상태 표기와 독립.
@@ -60,6 +63,8 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
   @override
   void initState() {
     super.initState();
+    _repo =
+        widget.repositoryOverride ?? AppScope.of(context).individualQuestions;
     _future = _load();
     // N34: 등록이 웹 전용이라 웹에서 등록 후 앱 복귀 시 목록이 낡은 채였다 —
     // 질문방 탭과 동일하게 resume 시 재조회한다(PTR 의존 제거).
