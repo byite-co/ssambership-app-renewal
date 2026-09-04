@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
 import '../../core/auth/deletion_notice_controller.dart';
 import '../../design/shape_tokens.dart';
@@ -90,8 +92,10 @@ class _WithdrawalPendingBannerState extends State<WithdrawalPendingBanner>
     if (override != null) {
       await override(context);
     } else {
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => const AccountDeleteScreen()),
+      await AppNavigation.push<void>(
+        context,
+        AppRoutePaths.accountDeletion,
+        fallbackBuilder: (_) => const AccountDeleteScreen(),
       );
     }
     // 탈퇴 화면에서 취소했다면 서버 상태가 바뀌었다 — 배너를 서버 기준으로 재판정.

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../core/push/push_ports.dart';
 import '../../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../../design/role_accent.dart';
@@ -113,10 +115,10 @@ class _SettingsSectionState extends State<SettingsSection> {
   /// 회원 탈퇴 — 인앱 탈퇴 화면(P1-10)으로 진입한다.
   /// 위험 고지·재확인·서버 RPC 요청·취소·웹 폴백은 전부 AccountDeleteScreen 담당.
   Future<void> _confirmAccountDelete() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const AccountDeleteScreen(),
-      ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.accountDeletion,
+      fallbackBuilder: (_) => const AccountDeleteScreen(),
     );
   }
 
