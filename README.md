@@ -59,14 +59,14 @@ flutter test test/goldens --update-goldens  # 기준 이미지 갱신 (Linux · 
 
 ```
 lib/
-  app/        GoRouter(4 라우트) · 루트앱 · 홈셸(하단 5탭) · 진입가드
+  app/        GoRouter(4 라우트) · 루트앱 · 홈셸(하단 5탭) · 진입가드 · app_scope(수동 DI — AppDependencies/AppScope)
   core/       auth · supabase · entitlement · version_gate · web_bridge · deeplink · scan · ink · refresh · observability
   design/     색·타이포·간격 토큰 · 테마 · 공용 위젯
   features/   question_room · community · mentors · notifications · individual_question · mypage · auth · scan_annotation · dev
   data/       과목 한글 매핑
   shared/     상수 · 포맷터 · 에러 · 공용 위젯
 test/
-  goldens/    골든 테스트(대표 화면 PNG) — flutter_test_config.dart 가 Pretendard 폰트를 로드한다
+  goldens/    골든 테스트(대표 화면 PNG 14장) — flutter_test_config.dart 가 Pretendard 폰트를 로드하고, 하네스가 fake AppScope 로 감싼다
   contracts/  계약 테스트(아웃바운드 API 매니페스트 · iOS/Android 출시 설정 · 문서 정본)
   …           기능별 단위·위젯 테스트
 docs/
@@ -90,15 +90,17 @@ docs/
    등 3곳이 잠근다), 운영 DB 스키마(앱 저장소에서 마이그레이션하지 않는다).
 3. 서버 표면(RPC·테이블·버킷)을 바꾸면 `test/contracts/outbound_api_manifest_test.dart` 를 같은 PR 에서 갱신한다.
 4. 골든이 깨지면 diff 를 보고 **의도한 변경일 때만** `--update-goldens` 로 갱신하고, 왜 바뀌었는지 PR 에 적는다.
-5. 문서는 `docs/renewal/` 에 날짜를 붙여 쌓는다. 옛 문서는 지우지 않고 `docs/legacy/` 로 보낸다.
+5. **의존성은 `AppScope.of(context)` 로 읽는다.** 화면·위젯에서 `XxxService.instance`·`SupabaseInit.clientOrNull` 을 직접 부르지 않는다(A-2).
+   새 의존성이 필요하면 `AppDependencies` 에 필드를 더하고 `golden_app_fakes.dart` 에 fake 를 짝으로 둔다. 인터페이스는 화면이 쓰는 멤버만.
+6. 문서는 `docs/renewal/` 에 날짜를 붙여 쌓는다. 옛 문서는 지우지 않고 `docs/legacy/` 로 보낸다.
 
 ## 리뉴얼 단계
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | **A-1** 부트스트랩 | 저장소 정리 · 기준선 · 골든/CI 방어선 | 완료 — `docs/renewal/bootstrap-report-2026-09-04.md` |
-| A-2 라우팅 교체 | 라우트 4개 + 명령형 push 44곳 → 화면 수십 개를 감당하는 구조 | 예정 |
-| A-3 상태관리 교체 | 전역 싱글턴 → 수동 DI | 예정 |
+| **A-2** 의존성 주입 전환 | 화면의 싱글턴·클라이언트 직접 참조 → `AppScope` 수동 DI · 골든 14장 · 폰트 결함 수정 | 완료 — `docs/renewal/di-report-2026-09-04.md` |
+| A-3 라우팅 교체 | 라우트 4개 + 명령형 push 44곳 → 화면 수십 개를 감당하는 구조. AppScope 폴백 제거 | 예정 |
 | A-4 기능 개방 | 캐시 충전 외 전 기능 | 예정 |
 | A-5 연결노트 추가 전용 재설계 | | 예정 |
 | A-6 디자인 통일 | | 예정 |
