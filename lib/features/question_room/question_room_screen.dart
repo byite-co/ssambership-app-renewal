@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
-import '../../core/auth/auth_service.dart';
+import '../../core/auth/auth_service.dart' show AppRole;
 import '../../core/commerce/commerce_policy.dart';
 import '../../core/entitlement/subscription_status_display.dart';
 import '../../core/refresh/data_refresh_bus.dart';
 import '../../core/entitlement/subscription_summary.dart';
 import '../../core/entitlement/weekly_question_usage.dart';
-import '../../core/supabase/supabase_client.dart';
 import '../../design/shape_tokens.dart';
 import '../../design/spacing_tokens.dart';
 import '../../design/tokens/color_tokens.dart';
@@ -29,7 +29,7 @@ import '../../shared/widgets/screen_visibility.dart';
 
 /// 질문방 탭(1뎁스). HomeShell 이 AppBar/하단탭을 제공하므로 본문만 구성(자체 Scaffold 없음).
 ///
-/// ★ role 분기:
+/// ★ role 분기(역할은 AppScope 의 auth 에서 읽는다 — A-2):
 ///   - student → 내 멘토방 목록(S4).
 ///   - mentor  → 받은 학생 목록(S5, [MentorInboxScreen]).
 ///   - admin/guest → 차단(이 앱은 학생·멘토 전용).
@@ -38,7 +38,7 @@ class QuestionRoomScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (AuthService.instance.currentRole) {
+    switch (AppScope.of(context).auth.currentRole) {
       case AppRole.mentor:
         return const MentorInboxScreen();
       case AppRole.student:
@@ -88,8 +88,10 @@ class _RoomItem {
 class _StudentRoomListState extends State<_StudentRoomList>
     with WidgetsBindingObserver, ResumeVisibilityGate {
 
-  final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
-  final MentorLookupRepository _mentors = const MentorLookupRepository();
+  // A-2: 레포지토리·구독 리더·사용자 id 는 AppScope 에서 받는다(직접 생성 0).
+  late final AppDependencies _deps;
+  QuestionRoomReadRepository get _repo => _deps.questionRoomRead;
+  MentorLookupRepository get _mentors => _deps.mentorLookup;
 
   late Future<List<_RoomItem>> _future;
   String _query = '';
@@ -97,6 +99,7 @@ class _StudentRoomListState extends State<_StudentRoomList>
   @override
   void initState() {
     super.initState();
+    _deps = AppScope.of(context);
     _future = _load();
     // §4: 웹에서 구독·결제 후 앱 복귀 시 방 목록·구독 상태 재조회
     // (IndexedStack 탭이라 재빌드가 없으므로 lifecycle 신호로 갱신).
@@ -126,11 +129,10 @@ class _StudentRoomListState extends State<_StudentRoomList>
   Future<List<_RoomItem>> _load() async {
     final List<Room> rooms = await _repo.myRooms();
     if (rooms.isEmpty) return <_RoomItem>[];
-    final String? studentId = SupabaseInit.clientOrNull?.auth.currentUser?.id;
+    final String? studentId = _deps.auth.currentUserId;
     final Map<String, SubscriptionSummary> subs = studentId == null
         ? <String, SubscriptionSummary>{}
-        : await SubscriptionReader.fetchForStudent(
-            SupabaseInit.clientOrNull!, studentId);
+        : await _deps.subscriptions.fetchForStudent(studentId);
     final Map<String, MentorPublic> names =
         await _mentors.fetchMany(rooms.map((Room r) => r.mentorId));
     // A2: 멘토별 주간 사용량. ★ 한도값 재하드코딩 없이 RPC 반환만. 실패는 null(표시 생략).
