@@ -205,12 +205,12 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
       t.title?.trim().isNotEmpty == true ? t.title!.trim() : '(제목 없음)';
 
   Future<void> _openQuestions() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorQuestionListScreen(
-          room: widget.room,
-          studentName: widget.studentName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomThreads(widget.room.id),
+      fallbackBuilder: (_) => MentorQuestionListScreen(
+        room: widget.room,
+        studentName: widget.studentName,
       ),
     );
     if (mounted) _refresh();
