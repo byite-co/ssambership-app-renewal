@@ -19,18 +19,9 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
       ),
       GoRoute(
         path: '${AppRoutePaths.boardPosts}/:postId/edit',
-        builder: (context, state) {
-          final String postId = state.pathParameters['postId']!;
-          return AsyncRouteLoader<BoardPost>(
-            key: ValueKey<String>('board-edit/$postId'),
-            load: (dependencies) =>
-                dependencies.communityRead.boardPostById(postId),
-            builder: (context, post, dependencies) => BoardWriteScreen(
-                write: dependencies.communityWrite, editing: post),
-            notFoundMessage: '게시글을 찾을 수 없어요.',
-            errorMessage: '게시글을 불러오지 못했어요.',
-          );
-        },
+        builder: (context, state) => BoardEditRoutePage(
+          postId: state.pathParameters['postId']!,
+        ),
       ),
       GoRoute(
         path: AppRoutePaths.newShortform,
@@ -75,3 +66,42 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
         },
       ),
     ];
+
+/// Re-fetches an edit target and proves that it still belongs to the current
+/// user before the write surface is built.
+///
+/// The update RPC remains the security authority. This route boundary prevents
+/// a copied or stale edit URL from exposing another user's editor or starting
+/// image uploads for that post.
+class BoardEditRoutePage extends StatelessWidget {
+  const BoardEditRoutePage({super.key, required this.postId});
+
+  final String postId;
+
+  @override
+  Widget build(BuildContext context) => AsyncRouteLoader<BoardPost>(
+        key: ValueKey<String>('board-edit/$postId'),
+        load: (dependencies) => _loadOwnedBoardPost(dependencies, postId),
+        builder: (context, post, dependencies) => BoardWriteScreen(
+            write: dependencies.communityWrite, editing: post),
+        // Missing, RLS-hidden, and not-owned targets intentionally converge on
+        // the same neutral response so ownership is not disclosed.
+        notFoundMessage: '게시글을 찾을 수 없어요.',
+        errorMessage: '게시글을 불러오지 못했어요.',
+      );
+}
+
+Future<BoardPost?> _loadOwnedBoardPost(
+  AppDependencies dependencies,
+  String postId,
+) async {
+  final String? userId = dependencies.auth.currentUserId;
+  if (userId == null) return null;
+
+  final BoardPost? post =
+      await dependencies.communityRead.boardPostById(postId);
+  if (post == null || post.id != postId || post.authorId != userId) {
+    return null;
+  }
+  return post;
+}
