@@ -1,8 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/community/data/community_models.dart';
 import '../../features/community/ui/board/board_detail_screen.dart';
 import '../../features/community/ui/board/board_write_screen.dart';
+import '../../features/community/ui/shortform/shortform_detail_screen.dart';
 import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../async_route_loader.dart';
@@ -42,6 +44,24 @@ List<RouteBase> buildCommunityRoutes() => <RouteBase>[
             ),
             notFoundMessage: '게시글을 찾을 수 없어요.',
             errorMessage: '게시글을 불러오지 못했어요.',
+          );
+        },
+      ),
+      GoRoute(
+        path: '${AppRoutePaths.shortforms}/:shortformId',
+        builder: (context, state) {
+          final String shortformId = state.pathParameters['shortformId']!;
+          return AsyncRouteLoader<ShortformPost>(
+            key: ValueKey<String>(shortformId),
+            load: (dependencies) =>
+                dependencies.communityRead.shortformById(shortformId),
+            builder: (context, post, dependencies) => ShortformDetailScreen(
+              post: post,
+              read: dependencies.communityRead,
+              write: dependencies.communityWrite,
+            ),
+            notFoundMessage: '숏폼을 찾을 수 없어요.',
+            errorMessage: '숏폼을 불러오지 못했어요.',
           );
         },
       ),

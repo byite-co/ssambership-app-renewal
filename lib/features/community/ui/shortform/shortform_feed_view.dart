@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../core/web_bridge/shortform_compose_bridge.dart';
@@ -179,13 +181,13 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
   Future<void> _open(ShortformPost post) async {
     // §4-3: 상세에서 변경(작성자 차단 등, pop true)이 있었을 때만 재조회 —
     // 차단한 작성자의 숏폼이 목록에 남아 있으면 안 된다(board 탭과 동일 계약).
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => ShortformDetailScreen(
-          post: post,
-          read: widget.read,
-          write: widget.write,
-        ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.shortform(post.id),
+      fallbackBuilder: (_) => ShortformDetailScreen(
+        post: post,
+        read: widget.read,
+        write: widget.write,
       ),
     );
     if (changed == true && mounted) await _pager.refresh();

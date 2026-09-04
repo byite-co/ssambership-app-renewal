@@ -7,8 +7,6 @@ import '../../../app/routes/mentor_routes.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/deeplink/notification_deep_link_controller.dart';
 import '../../community/data/community_models.dart';
-import '../../community/data/community_read_repository.dart';
-import '../../community/data/community_write_repository.dart';
 import '../../community/ui/board/board_detail_screen.dart';
 import '../../community/ui/shortform/shortform_detail_screen.dart';
 import '../../individual_question/data/individual_question_repository.dart';
@@ -181,16 +179,18 @@ class NotificationTargetOpener {
   }
 
   Future<bool> _openShortform(BuildContext context, String shortformId) async {
-    const CommunityReadRepository read = CommunityReadRepository();
-    final ShortformPost? post = await read.shortformById(shortformId);
+    final AppDependencies dependencies = AppScope.of(context);
+    final ShortformPost? post = await dependencies.communityRead.shortformById(
+      shortformId,
+    );
     if (post == null || !context.mounted) return false;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ShortformDetailScreen(
-          post: post,
-          read: read,
-          write: const CommunityWriteRepository(),
-        ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.shortform(shortformId),
+      fallbackBuilder: (_) => ShortformDetailScreen(
+        post: post,
+        read: dependencies.communityRead,
+        write: dependencies.communityWrite,
       ),
     );
     return true;
