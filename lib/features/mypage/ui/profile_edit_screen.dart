@@ -19,17 +19,20 @@ class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({
     super.key,
     required this.profile,
-    this.repository = const ProfileEditRepository(),
+    this.repository,
   });
 
   final MyProfile profile;
-  final ProfileEditRepository repository;
+
+  /// Optional test seam. Production resolves the repository from [AppScope].
+  final ProfileEditRepository? repository;
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
 }
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  late final ProfileEditRepository _repository;
   late final TextEditingController _name =
       TextEditingController(text: widget.profile.name);
   late final TextEditingController _grade =
@@ -39,6 +42,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   /// 역할 분기: 멘토는 학년 필드가 없고(웹에서 상세 관리), 학생만 학년을 편집한다.
   bool get _isMentor =>
       AppScope.of(context).auth.currentRole == AppRole.mentor; // A-2
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.repository ?? AppScope.of(context).profileEdit;
+  }
 
   @override
   void dispose() {
@@ -56,7 +65,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
     setState(() => _busy = true);
     try {
-      await widget.repository.updateProfile(
+      await _repository.updateProfile(
         nickname: name,
         // 멘토는 p_grade_level 을 payload 에서 제외(null → 레포가 파라미터 생략).
         // 학생이 학년을 비웠으면 ''(빈 문자열) 를 보내 서버가 NULL 로 비운다 —
