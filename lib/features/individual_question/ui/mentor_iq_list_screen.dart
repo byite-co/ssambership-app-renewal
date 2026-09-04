@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/tokens/typography.dart';
@@ -133,10 +135,10 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
         const SnackBar(content: Text('질문을 수락했어요. 답변을 작성해 주세요.')),
       );
       _refresh();
-      await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => IqDetailScreen(questionId: q.id),
-        ),
+      await AppNavigation.push<bool>(
+        context,
+        AppRoutePaths.individualQuestion(q.id),
+        fallbackBuilder: (_) => IqDetailScreen(questionId: q.id),
       );
       if (mounted) _refresh();
     } catch (e) {
@@ -150,10 +152,10 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
   }
 
   Future<void> _openDetail(IndividualQuestion q) async {
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqDetailScreen(questionId: q.id),
-      ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.individualQuestion(q.id),
+      fallbackBuilder: (_) => IqDetailScreen(questionId: q.id),
     );
     if (changed == true && mounted) _refresh();
   }

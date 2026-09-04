@@ -26,8 +26,8 @@ import '../../question_room/ui/mentor/student_room_home_screen.dart';
 import '../../question_room/ui/mentor_room_home_screen.dart';
 
 /// 알림 상세 목적지 열기 — 검증된 route([NotificationDeepLinkRoute])만 받아
-/// 기존 상세 화면 push 로 연다(새 라우팅 체계 없음 — 다른 화면과 같은
-/// Navigator.push 경로).
+/// 상세 화면으로 연다. A-3 전환 대상은 ID URL을, 나머지는 기존
+/// Navigator.push 경로를 사용한다.
 ///
 /// 반환 false = 대상 소실/권한 밖/역할 불일치 — 호출부(알림 화면)가 중립
 /// 폴백(스낵바 + 목록 유지)으로 안내한다. 조회 실패도 false(성공 위장 금지).
@@ -159,10 +159,10 @@ class NotificationTargetOpener {
     final IndividualQuestion? q =
         await const IndividualQuestionRepository().fetch(questionId);
     if (q == null || !context.mounted) return false;
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqDetailScreen(questionId: questionId),
-      ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.individualQuestion(questionId),
+      fallbackBuilder: (_) => IqDetailScreen(questionId: questionId),
     );
     return true;
   }

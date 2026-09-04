@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/typography_tokens.dart';
@@ -101,10 +103,10 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
       openIqCreateWeb(context, bridge: widget.webBridgeOverride);
 
   Future<void> _openDetail(IndividualQuestion q) async {
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqDetailScreen(questionId: q.id),
-      ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.individualQuestion(q.id),
+      fallbackBuilder: (_) => IqDetailScreen(questionId: q.id),
     );
     if (changed == true && mounted) _refresh();
   }
