@@ -7,11 +7,25 @@ import '../core/auth/deletion_notice_controller.dart';
 import '../core/entitlement/subscription_summary_port.dart';
 import '../core/supabase/supabase_client.dart';
 import '../core/version_gate/version_gate_controller.dart';
+import '../features/community/data/community_read_repository.dart';
+import '../features/community/data/community_write_repository.dart';
+import '../features/community/data/user_blocks_repository.dart';
+import '../features/individual_question/data/individual_question_repository.dart';
+import '../features/individual_question/data/iq_attachments_repository.dart';
+import '../features/mentors/data/free_question_entry.dart';
+import '../features/mentors/data/mentor_directory_repository.dart';
+import '../features/mentors/data/mentor_favorites_repository.dart';
+import '../features/mypage/data/account_deletion_repository.dart';
 import '../features/mypage/data/mypage_repository.dart';
+import '../features/mypage/data/notification_settings_repository.dart';
+import '../features/mypage/data/profile_edit_repository.dart';
 import '../features/notifications/data/notification_badge_controller.dart';
+import '../features/notifications/data/notifications_repository.dart';
+import '../features/question_room/data/attachments/attachment_upload.dart';
 import '../features/question_room/data/mentor_lookup_repository.dart';
 import '../features/question_room/data/question_room_read_repository.dart';
 import '../features/question_room/data/question_room_write_repository.dart';
+import '../features/question_room/data/room_safety_repository.dart';
 import '../features/question_room/data/student_lookup_repository.dart';
 
 /// 앱 의존성 묶음 — 수동 DI(A-2). 앱 시작 시 한 번 만들어 [AppScope] 로 내려보낸다.
@@ -26,6 +40,7 @@ import '../features/question_room/data/student_lookup_repository.dart';
 class AppDependencies {
   AppDependencies({
     required this.auth,
+    AccessState Function()? routingAccess,
     SupabaseClient? Function()? supabaseClient,
     this.questionRoomRead = const QuestionRoomReadRepository(),
     this.questionRoomWrite = const QuestionRoomWriteRepository(),
@@ -33,23 +48,51 @@ class AppDependencies {
     this.studentLookup = const StudentLookupRepository(),
     this.subscriptions = const SupabaseSubscriptionSummaryPort(),
     this.myPage = const MyPageRepository(),
+    this.communityRead = const CommunityReadRepository(),
+    this.communityWrite = const CommunityWriteRepository(),
+    this.individualQuestions = const IndividualQuestionRepository(),
+    this.iqAttachments = const SupabaseIqAttachmentsRepository(),
+    this.mentorDirectory = const MentorDirectoryRepository(),
+    this.mentorFavorites = const MentorFavoritesRepository(),
+    this.notificationSettings = const NotificationSettingsRepository(),
+    this.profileEdit = const ProfileEditRepository(),
+    this.accountDeletion = const SupabaseAccountDeletionRepository(),
+    this.attachmentUploader = const SupabaseAttachmentUploader(),
+    this.freeQuestionEntry = const SupabaseFreeQuestionEntryRepository(),
+    this.notifications = const SupabaseNotificationsRepository(),
+    this.roomSafety = const SupabaseRoomSafetyRepository(),
+    this.userBlocks = const UserBlocksRepository(),
     NotificationBadgeController? notificationBadge,
     DeletionNoticeController? deletionNotice,
     VersionGateController? versionGate,
-  })  : _supabaseClient = supabaseClient ?? _productionClient,
+  })  : _routingAccess = routingAccess ?? (() => _inferRoutingAccess(auth)),
+        _supabaseClient = supabaseClient ?? _productionClient,
         notificationBadge =
             notificationBadge ?? NotificationBadgeController.instance,
         deletionNotice = deletionNotice ?? DeletionNoticeController.instance,
         versionGate = versionGate ?? VersionGateController.instance;
 
   /// 운영 구성 — main() 이 부팅한 싱글턴들을 그대로 담는다.
-  factory AppDependencies.production() =>
-      AppDependencies(auth: AuthService.instance);
+  factory AppDependencies.production() {
+    final AuthService auth = AuthService.instance;
+    return AppDependencies(
+      auth: auth,
+      routingAccess: () => auth.access,
+    );
+  }
 
   static SupabaseClient? _productionClient() => SupabaseInit.clientOrNull;
 
   /// 인증·역할 상태(종전 `AuthService.instance`).
   final AppAuth auth;
+
+  final AccessState Function() _routingAccess;
+
+  /// 라우터 redirect가 읽는 접근 상태.
+  ///
+  /// 운영에서는 [AuthService.access]를 그대로 노출하고, 테스트용 fake는 생성자
+  /// seam을 주입하거나 인증 인터페이스의 공개 상태에서 보수적으로 추론한다.
+  AccessState get routingAccess => _routingAccess();
 
   final SupabaseClient? Function() _supabaseClient;
 
@@ -65,11 +108,36 @@ class AppDependencies {
   final StudentLookupRepository studentLookup;
   final SubscriptionSummaryPort subscriptions;
   final MyPageRepository myPage;
+  final CommunityReadRepository communityRead;
+  final CommunityWriteRepository communityWrite;
+  final IndividualQuestionRepository individualQuestions;
+  final IqAttachmentsPort iqAttachments;
+  final MentorDirectoryRepository mentorDirectory;
+  final MentorFavoritesRepository mentorFavorites;
+  final NotificationSettingsPort notificationSettings;
+  final ProfileEditRepository profileEdit;
+  final AccountDeletionPort accountDeletion;
+  final AttachmentUploaderPort attachmentUploader;
+  final FreeQuestionEntryPort freeQuestionEntry;
+  final NotificationsRepository notifications;
+  final RoomSafetyPort roomSafety;
+  final UserBlocksRepository userBlocks;
 
   // ── 앱 전역 컨트롤러(종전 `.instance`) ──
   final NotificationBadgeController notificationBadge;
   final DeletionNoticeController deletionNotice;
   final VersionGateController versionGate;
+
+  static AccessState _inferRoutingAccess(AppAuth auth) {
+    if (auth.isGuest) return AccessState.guest;
+    if (!auth.isSignedIn) return AccessState.loggedOut;
+    if (auth.accountState.allowsAppUse &&
+        (auth.currentRole == AppRole.student ||
+            auth.currentRole == AppRole.mentor)) {
+      return AccessState.full;
+    }
+    return AccessState.blocked;
+  }
 }
 
 /// 의존성을 위젯 트리로 내려보내는 InheritedWidget.

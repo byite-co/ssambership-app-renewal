@@ -1,4 +1,5 @@
 import '../core/auth/auth_service.dart';
+import 'app_route_paths.dart';
 
 /// 진입 가드: AccessState → 가야 할 경로. router.redirect 에서 사용한다.
 ///
@@ -11,12 +12,29 @@ import '../core/auth/auth_service.dart';
 class EntryGuard {
   EntryGuard._();
 
-  static const String splash = '/splash';
-  static const String login = '/login';
-  static const String home = '/home';
-  static const String blocked = '/blocked';
-  static const String devGallery = '/dev/gallery';
-  static const String devS3 = '/dev/s3';
+  static const String splash = AppRoutePaths.splash;
+  static const String login = AppRoutePaths.login;
+  static const String home = AppRoutePaths.home;
+  static const String blocked = AppRoutePaths.blocked;
+  static const String devGallery = AppRoutePaths.devGallery;
+  static const String devS3 = AppRoutePaths.devS3;
+
+  /// A-3 URL graph roots available to a fully authenticated app user.
+  ///
+  /// The routes are registered incrementally. Keeping the guard aware of the
+  /// complete protected surface prevents a newly registered route from being
+  /// collapsed back to legacy `/home` during that migration.
+  static const List<String> _fullAccessRoots = <String>[
+    AppRoutePaths.home,
+    AppRoutePaths.rooms,
+    AppRoutePaths.individualQuestions,
+    AppRoutePaths.mentors,
+    AppRoutePaths.settlements,
+    AppRoutePaths.community,
+    AppRoutePaths.notifications,
+    AppRoutePaths.myPage,
+    '/profile',
+  ];
 
   /// 게스트가 접근 가능한 하단 탭 인덱스.
   /// (0 질문방 · 1 커뮤니티 · 2 멘토찾기 · 3 알림 · 4 개별질문)
@@ -45,9 +63,17 @@ class EntryGuard {
         if (location == home || location == login) return null;
         return home;
       case AccessState.full:
-        return location == home ? null : home;
+        return _isFullAccessLocation(location) ? null : home;
       case AccessState.blocked:
         return location == blocked ? null : blocked;
     }
+  }
+
+  static bool _isFullAccessLocation(String location) {
+    final String path = Uri.tryParse(location)?.path ?? location;
+    for (final String root in _fullAccessRoots) {
+      if (path == root || path.startsWith('$root/')) return true;
+    }
+    return false;
   }
 }

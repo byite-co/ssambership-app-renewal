@@ -1,12 +1,13 @@
 import 'package:go_router/go_router.dart';
 
-import '../core/auth/auth_service.dart';
 import '../features/auth/blocked_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/splash_screen.dart';
 import '../features/dev/dev_flags.dart';
 import '../features/dev/s3_data_inspector.dart';
 import '../features/dev/widget_gallery.dart';
+import 'app_navigation.dart';
+import 'app_scope.dart';
 import 'entry_guard.dart';
 import 'home_shell.dart';
 
@@ -15,41 +16,46 @@ import 'home_shell.dart';
 class AppRouter {
   AppRouter._();
 
-  static final GoRouter router = GoRouter(
-    initialLocation: EntryGuard.splash,
-    refreshListenable: AuthService.instance,
-    redirect: (context, state) => EntryGuard.redirect(
-      access: AuthService.instance.access,
-      location: state.matchedLocation,
-    ),
-    routes: <RouteBase>[
-      GoRoute(
-        path: EntryGuard.splash,
-        builder: (context, state) => const SplashScreen(),
+  /// Creates the single router owned by the root app lifecycle.
+  static GoRouter create(AppDependencies dependencies) {
+    final GoRouter router = GoRouter(
+      initialLocation: EntryGuard.splash,
+      refreshListenable: dependencies.auth,
+      redirect: (context, state) => EntryGuard.redirect(
+        access: dependencies.routingAccess,
+        location: state.matchedLocation,
       ),
-      GoRoute(
-        path: EntryGuard.login,
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: EntryGuard.home,
-        builder: (context, state) => const HomeShell(),
-      ),
-      GoRoute(
-        path: EntryGuard.blocked,
-        builder: (context, state) => const BlockedScreen(),
-      ),
-      // ★ 개발 전용 — 출시(release) 빌드에서는 등록되지 않는다(kDevToolsEnabled=false).
-      if (kDevToolsEnabled)
+      routes: <RouteBase>[
         GoRoute(
-          path: EntryGuard.devGallery,
-          builder: (context, state) => const WidgetGallery(),
+          path: EntryGuard.splash,
+          builder: (context, state) => const SplashScreen(),
         ),
-      if (kDevToolsEnabled)
         GoRoute(
-          path: EntryGuard.devS3,
-          builder: (context, state) => const S3DataInspector(),
+          path: EntryGuard.login,
+          builder: (context, state) => const LoginScreen(),
         ),
-    ],
-  );
+        GoRoute(
+          path: EntryGuard.home,
+          builder: (context, state) => const HomeShell(),
+        ),
+        GoRoute(
+          path: EntryGuard.blocked,
+          builder: (context, state) => const BlockedScreen(),
+        ),
+        // ★ 개발 전용 — 출시(release) 빌드에서는 등록되지 않는다(kDevToolsEnabled=false).
+        if (kDevToolsEnabled)
+          GoRoute(
+            path: EntryGuard.devGallery,
+            builder: (context, state) => const WidgetGallery(),
+          ),
+        if (kDevToolsEnabled)
+          GoRoute(
+            path: EntryGuard.devS3,
+            builder: (context, state) => const S3DataInspector(),
+          ),
+      ],
+    );
+    AppNavigation.markProductionRouter(router);
+    return router;
+  }
 }
