@@ -7,6 +7,7 @@ import 'package:ssambership_app/core/auth/app_auth.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/auth/deletion_notice_controller.dart';
 import 'package:ssambership_app/core/version_gate/version_gate_controller.dart';
+import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_favorites_repository.dart';
@@ -41,10 +42,10 @@ AppDependencies testAppDependencies({
   QuestionRoomReadRepository questionRoomRead =
       const QuestionRoomReadRepository(),
   MentorLookupRepository mentorLookup = const MentorLookupRepository(),
-  MentorDirectoryRepository mentorDirectory =
-      const MentorDirectoryRepository(),
-  MentorFavoritesRepository mentorFavorites =
-      const MentorFavoritesRepository(),
+  MentorDirectoryRepository mentorDirectory = const MentorDirectoryRepository(),
+  MentorFavoritesRepository mentorFavorites = const MentorFavoritesRepository(),
+  IndividualQuestionRepository individualQuestions =
+      const IndividualQuestionRepository(),
 }) =>
     AppDependencies(
       auth: auth,
@@ -53,6 +54,7 @@ AppDependencies testAppDependencies({
       mentorLookup: mentorLookup,
       mentorDirectory: mentorDirectory,
       mentorFavorites: mentorFavorites,
+      individualQuestions: individualQuestions,
       attachmentUrlResolver:
           AttachmentUrlResolver(const _UnavailableAttachmentBackend()),
       notificationBadge:

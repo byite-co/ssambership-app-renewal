@@ -6,6 +6,9 @@ import 'package:ssambership_app/app/app_scope.dart';
 import 'package:ssambership_app/app/router.dart';
 import 'package:ssambership_app/core/auth/account_status.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
+import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
+import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
+import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_favorites_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
@@ -107,6 +110,64 @@ void main() {
       expect(_visibleChat(tester).room?.id, 'room-b');
     },
   );
+
+  testWidgets(
+    'production router recreates IQ detail state when questionId changes',
+    (WidgetTester tester) async {
+      final _RecordingIndividualQuestions questions =
+          _RecordingIndividualQuestions(<String, IndividualQuestion>{
+        'question-a': _individualQuestion('question-a', '가 질문'),
+        'question-b': _individualQuestion('question-b', '나 질문'),
+      });
+      final AppDependencies dependencies = testAppDependencies(
+        auth: TestAppAuth(
+          role: AppRole.student,
+          userId: 'student-user',
+          account: AccountState.active,
+        ),
+        individualQuestions: questions,
+      );
+      final GoRouter router = await _pumpProductionRoute(
+        tester,
+        dependencies,
+        AppRoutePaths.individualQuestion('question-a'),
+      );
+
+      final State<StatefulWidget> firstState =
+          tester.state<State<StatefulWidget>>(find.byType(IqDetailScreen));
+      expect(questions.fetchRequests, <String>['question-a']);
+      expect(find.text('가 질문'), findsWidgets);
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'A 질문의 작성 중 메시지');
+
+      // Re-requesting the same logical entity must retain its state and data.
+      router.go(AppRoutePaths.individualQuestion('question-a'));
+      await tester.pumpAndSettle();
+      expect(questions.fetchRequests, <String>['question-a']);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        'A 질문의 작성 중 메시지',
+      );
+
+      router.go(AppRoutePaths.individualQuestion('question-b'));
+      await tester.pumpAndSettle();
+
+      expect(questions.fetchRequests, <String>['question-a', 'question-b']);
+      expect(find.text('가 질문'), findsNothing);
+      expect(find.text('나 질문'), findsWidgets);
+      expect(
+        identical(
+          firstState,
+          tester.state<State<StatefulWidget>>(find.byType(IqDetailScreen)),
+        ),
+        isFalse,
+      );
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text,
+        isEmpty,
+      );
+    },
+  );
 }
 
 Future<GoRouter> _pumpProductionRoute(
@@ -205,6 +266,27 @@ class _MentorLookup extends MentorLookupRepository {
       MentorPublic(id: mentorId, nickname: '$mentorId 이름');
 }
 
+class _RecordingIndividualQuestions extends IndividualQuestionRepository {
+  _RecordingIndividualQuestions(this.questions);
+
+  final Map<String, IndividualQuestion> questions;
+  final List<String> fetchRequests = <String>[];
+
+  @override
+  Future<IndividualQuestion?> fetch(String questionId) async {
+    fetchRequests.add(questionId);
+    return questions[questionId];
+  }
+
+  @override
+  Future<List<IqMessage>> listMessages(String questionId) async =>
+      const <IqMessage>[];
+
+  @override
+  Future<List<IqAttachment>> listAttachments(String questionId) async =>
+      const <IqAttachment>[];
+}
+
 final DateTime _timestamp = DateTime.utc(2026, 9, 5);
 
 Room _room(String id, String mentorId) => Room(
@@ -223,4 +305,16 @@ QuestionThread _thread(String id, String roomId) => QuestionThread(
       masteryStatus: MasteryStatus.unknown,
       createdAt: _timestamp,
       updatedAt: _timestamp,
+    );
+
+IndividualQuestion _individualQuestion(String id, String title) =>
+    IndividualQuestion(
+      id: id,
+      studentId: 'student-user',
+      type: IndividualQuestionType.open,
+      status: IndividualQuestionStatus.answered,
+      title: title,
+      body: '$title 본문',
+      priceCents: 10000,
+      createdAt: _timestamp,
     );
