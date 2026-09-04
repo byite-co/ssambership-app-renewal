@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_navigation.dart';
 import '../../app/app_route_paths.dart';
+import '../../app/app_scope.dart';
 import '../../design/role_accent.dart';
 import '../../design/tokens/color_tokens.dart';
 import '../../design/typography_tokens.dart';
@@ -22,12 +23,13 @@ import 'ui/shortform/shortform_feed_view.dart';
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({
     super.key,
-    this.read = const CommunityReadRepository(),
-    this.write = const CommunityWriteRepository(),
+    this.read,
+    this.write,
   });
 
-  final CommunityReadRepository read;
-  final CommunityWriteRepository write;
+  /// Optional test seams. Production resolves both repositories from [AppScope].
+  final CommunityReadRepository? read;
+  final CommunityWriteRepository? write;
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
@@ -40,6 +42,8 @@ class _CommunityScreenState extends State<CommunityScreen>
         ResumeVisibilityGate {
   static const int _boardTab = 1;
 
+  late final CommunityReadRepository _read;
+  late final CommunityWriteRepository _write;
   late final TabController _tab;
   final GlobalKey<BoardListViewState> _boardKey =
       GlobalKey<BoardListViewState>();
@@ -51,6 +55,9 @@ class _CommunityScreenState extends State<CommunityScreen>
   @override
   void initState() {
     super.initState();
+    final AppDependencies dependencies = AppScope.of(context);
+    _read = widget.read ?? dependencies.communityRead;
+    _write = widget.write ?? dependencies.communityWrite;
     _tab = TabController(length: 3, vsync: this);
     // 게시판 탭에서만 글쓰기 FAB 노출 → 탭 전환 시 리빌드.
     _tab.addListener(() {
@@ -88,7 +95,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     final bool? created = await AppNavigation.push<bool>(
       context,
       AppRoutePaths.newBoardPost,
-      fallbackBuilder: (_) => BoardWriteScreen(write: widget.write),
+      fallbackBuilder: (_) => BoardWriteScreen(write: _write),
     );
     if (created == true && mounted) {
       await _boardKey.currentState?.reload();
@@ -123,11 +130,9 @@ class _CommunityScreenState extends State<CommunityScreen>
               controller: _tab,
               children: <Widget>[
                 ShortformFeedView(
-                    key: _shortformKey, read: widget.read, write: widget.write),
-                BoardListView(
-                    key: _boardKey, read: widget.read, write: widget.write),
-                MyActivityView(
-                    key: _activityKey, read: widget.read, write: widget.write),
+                    key: _shortformKey, read: _read, write: _write),
+                BoardListView(key: _boardKey, read: _read, write: _write),
+                MyActivityView(key: _activityKey, read: _read, write: _write),
               ],
             ),
           ),
