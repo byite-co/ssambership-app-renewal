@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
@@ -73,7 +75,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
   /// 주간 사용량 조회(읽기전용). 실패해도 화면 흐름은 막지 않는다.
   Future<void> _loadUsage() async {
-    final WeeklyQuestionUsage? u = await _read.weeklyUsage(mentorId: widget.room.mentorId);
+    final WeeklyQuestionUsage? u =
+        await _read.weeklyUsage(mentorId: widget.room.mentorId);
     if (mounted) setState(() => _usage = u);
   }
 
@@ -168,9 +171,9 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                 label: '+ 새로운 질문하기',
                 onPressed: _busy ? null : _openNewQuestion,
               ),
-            // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
-            // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
-            // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
+              // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
+              // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
+              // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
             ] else if (widget.sub?.isActive == true ||
                 (_usage != null && _usage!.limit > 0)) ...<Widget>[
               // 구독 중인데 이번 주 소진 — 안내만(구매 유도 아님).
@@ -191,9 +194,13 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   }
 
   Future<void> _openNewQuestion() async {
-    final bool? created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => NewQuestionScreen(room: widget.room),
+    final bool? created = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.newRoomThread(widget.room.id),
+      fallbackBuilder: (_) => NewQuestionScreen(
+        room: widget.room,
+        readRepository: widget.readRepository,
+        writeRepository: widget.writeRepository,
       ),
     );
     if (created == true && mounted) _refresh();
