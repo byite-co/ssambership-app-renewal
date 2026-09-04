@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/typography_tokens.dart';
@@ -135,13 +137,13 @@ class MyActivityViewState extends State<MyActivityView> {
   Future<void> _open(BoardPost post) async {
     // §4-3: 상세에서 변경(좋아요·스크랩 취소·차단·삭제 등, pop true)이 있었을 때만
     // 재조회 — 내 활동 목록의 구성 자체가 바뀌므로 board 탭과 동일 계약을 쓴다.
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardDetailScreen(
-          post: post,
-          read: widget.read,
-          write: widget.write,
-        ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.boardPost(post.id),
+      fallbackBuilder: (_) => BoardDetailScreen(
+        post: post,
+        read: widget.read,
+        write: widget.write,
       ),
     );
     if (changed == true && mounted) await _load();

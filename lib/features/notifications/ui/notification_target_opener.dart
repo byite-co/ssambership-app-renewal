@@ -26,8 +26,7 @@ import '../../question_room/ui/mentor/student_room_home_screen.dart';
 import '../../question_room/ui/mentor_room_home_screen.dart';
 
 /// 알림 상세 목적지 열기 — 검증된 route([NotificationDeepLinkRoute])만 받아
-/// 상세 화면으로 연다. A-3 전환 대상은 ID URL을, 나머지는 기존
-/// Navigator.push 경로를 사용한다.
+/// A-3에서 등록된 상세 화면은 ID 기반 앱 URL로 연다.
 ///
 /// 반환 false = 대상 소실/권한 밖/역할 불일치 — 호출부(알림 화면)가 중립
 /// 폴백(스낵바 + 목록 유지)으로 안내한다. 조회 실패도 false(성공 위장 금지).
@@ -168,16 +167,16 @@ class NotificationTargetOpener {
   }
 
   Future<bool> _openBoardPost(BuildContext context, String postId) async {
-    const CommunityReadRepository read = CommunityReadRepository();
-    final BoardPost? post = await read.boardPostById(postId);
+    final AppDependencies deps = AppScope.of(context);
+    final BoardPost? post = await deps.communityRead.boardPostById(postId);
     if (post == null || !context.mounted) return false;
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardDetailScreen(
-          post: post,
-          read: read,
-          write: const CommunityWriteRepository(),
-        ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.boardPost(postId),
+      fallbackBuilder: (_) => BoardDetailScreen(
+        post: post,
+        read: deps.communityRead,
+        write: deps.communityWrite,
       ),
     );
     return true;
