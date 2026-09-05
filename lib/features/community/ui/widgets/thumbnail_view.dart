@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
 
 /// 숏폼 썸네일/영상 플레이스홀더. 네트워크 이미지 실패·부재 시 중립 배경으로
 /// 폴백한다(깨진 이미지 금지). 이미지 실패는 이 위젯 안에서 끝나며 상세의
@@ -65,11 +65,12 @@ class _Placeholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 숏폼은 미디어가 주인공 — 플레이스홀더도 어두운 남색(design-v3 §5-6).
     return Container(
-      color: ColorTokens.elevated,
+      color: AppColors.navy,
       alignment: Alignment.center,
       child: showIcon
-          ? const Icon(Icons.movie_outlined, size: 36, color: ColorTokens.muted)
+          ? const Icon(Icons.movie_outlined, size: 36, color: Colors.white54)
           : null,
     );
   }

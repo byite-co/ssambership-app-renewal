@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_scope.dart';
 import '../../../../core/scan/picked_image.dart';
-import '../../../../design/shape_tokens.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/primary_button.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_input_field.dart';
+import '../../../../design/widgets/app_page.dart';
+import '../../../../design/widgets/app_primary_button.dart';
 import '../../../question_room/data/attachments/attachment_upload.dart'
     show ImagePickerPort;
 import '../../../question_room/data/attachments/device_image_picker.dart';
@@ -203,16 +205,19 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  InputDecoration _decoration(String label, {String? hint}) {
+  /// 드롭다운(카테고리) 장식 — 텍스트 입력([AppInputField])과 같은 채움·모서리.
+  InputDecoration _dropdownDecoration() {
     return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      labelStyle: AppType.caption,
       filled: true,
-      fillColor: ColorTokens.elevated,
-      border: const OutlineInputBorder(
-        borderRadius: AppShape.inputRadius,
-        borderSide: BorderSide.none,
+      fillColor: AppColors.inputFill,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        borderSide: const BorderSide(color: AppColors.ring),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        borderSide: const BorderSide(color: AppColors.ring),
       ),
     );
   }
@@ -224,7 +229,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text('이미지 ($_imageCount/$kCommunityPostImageMaxCount)',
-            style: AppType.caption),
+            style: AppTypography.captionSecondary),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -234,7 +239,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
               InputChip(
                 key: ValueKey<String>('existing-${_keptExistingRefs[i]}'),
                 deleteIcon: const Icon(Icons.close, size: 18),
-                label: Text('기존 이미지 ${i + 1}', style: AppType.caption),
+                label: Text('기존 이미지 ${i + 1}', style: AppTypography.caption),
                 onDeleted: _submitting
                     ? null
                     : () => setState(() => _keptExistingRefs.removeAt(i)),
@@ -244,14 +249,15 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
                 key: ValueKey<Object>('new-$i-${_newImages[i].image.fileName}'),
                 deleteIcon: const Icon(Icons.close, size: 18),
                 label: Text(_newImages[i].image.fileName,
-                    style: AppType.caption, overflow: TextOverflow.ellipsis),
+                    style: AppTypography.caption,
+                    overflow: TextOverflow.ellipsis),
                 onDeleted: _submitting
                     ? null
                     : () => setState(() => _newImages.removeAt(i)),
               ),
             ActionChip(
               avatar: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: const Text('이미지 추가', style: AppType.caption),
+              label: const Text('이미지 추가', style: AppTypography.caption),
               onPressed: _submitting ? null : _addImage,
             ),
           ],
@@ -262,50 +268,60 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? '글 수정' : '새 글쓰기')),
+    return AppPage(
+      title: _isEditing ? '글 수정' : '새 글쓰기',
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH, 16, AppSpacing.screenH, 24),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: 16),
         children: <Widget>[
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            decoration: _decoration('카테고리'),
-            style: AppType.body,
-            items: <DropdownMenuItem<String>>[
-              for (final MapEntry<String, String> e in communityCategoryOptions)
-                DropdownMenuItem<String>(value: e.key, child: Text(e.value)),
-            ],
-            onChanged: _submitting
-                ? null
-                : (String? v) {
-                    if (v != null) setState(() => _category = v);
-                  },
+          AppField(
+            label: '어느 게시판에 올릴까요?',
+            child: DropdownButtonFormField<String>(
+              initialValue: _category,
+              decoration: _dropdownDecoration(),
+              style: AppTypography.body,
+              borderRadius: BorderRadius.circular(AppRadius.input),
+              items: <DropdownMenuItem<String>>[
+                for (final MapEntry<String, String> e
+                    in communityCategoryOptions)
+                  DropdownMenuItem<String>(value: e.key, child: Text(e.value)),
+              ],
+              onChanged: _submitting
+                  ? null
+                  : (String? v) {
+                      if (v != null) setState(() => _category = v);
+                    },
+            ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _title,
-            style: AppType.body,
-            decoration: _decoration('제목'),
+          const SizedBox(height: AppSpacing.s20),
+          AppField(
+            label: '제목',
+            child: AppInputField(
+              controller: _title,
+              hintText: '한 줄로 요약해 주세요',
+              textInputAction: TextInputAction.next,
+            ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _body,
-            style: AppType.body,
-            minLines: 8,
-            maxLines: 16,
-            decoration: _decoration('내용', hint: '커뮤니티 가이드에 맞게 작성해 주세요.'),
+          const SizedBox(height: AppSpacing.s20),
+          AppField(
+            label: '내용',
+            child: AppInputField(
+              controller: _body,
+              hintText: '커뮤니티 가이드에 맞게 작성해 주세요.',
+              minLines: 8,
+              maxLines: 16,
+              keyboardType: TextInputType.multiline,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.s20),
           _imagesSection(),
-          const SizedBox(height: AppSpacing.s24),
-          PrimaryButton(
-            label: _submitting
-                ? (_isEditing ? '수정 중…' : '등록 중…')
-                : (_isEditing ? '수정' : '등록'),
-            onPressed: _submitting ? null : _submit,
-          ),
         ],
+      ),
+      bottom: AppPrimaryButton(
+        label: _submitting
+            ? (_isEditing ? '수정 중…' : '등록 중…')
+            : (_isEditing ? '수정' : '등록'),
+        onPressed: _submitting ? null : _submit,
       ),
     );
   }

@@ -106,9 +106,7 @@ class CommunityWriteRepository {
         'p_post_id': postId,
         'p_event_key': eventKey,
       });
-      return data is Map &&
-          data['ok'] == true &&
-          data['incremented'] == true;
+      return data is Map && data['ok'] == true && data['incremented'] == true;
     } catch (_) {
       // RPC 미존재/권한 등 → 조용히 폴백(조회 자체엔 영향 없음).
       return false;

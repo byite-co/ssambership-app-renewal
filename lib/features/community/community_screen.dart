@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../app/app_navigation.dart';
 import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
-import '../../design/role_accent.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/role_theme.dart' show RoleTheme;
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_typography.dart';
 import '../../shared/widgets/screen_visibility.dart';
 import 'data/community_read_repository.dart';
 import 'data/community_write_repository.dart';
@@ -109,16 +109,19 @@ class _CommunityScreenState extends State<CommunityScreen>
   @override
   Widget build(BuildContext context) {
     final bool onBoardTab = _tab.index == _boardTab;
+    final RoleTheme roleTheme = RoleTheme.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Column(
         children: <Widget>[
           TabBar(
             controller: _tab,
-            labelColor: AppAccent.of(context).accent,
-            unselectedLabelColor: ColorTokens.secondary,
-            indicatorColor: AppAccent.of(context).accent,
-            labelStyle: AppType.body,
+            labelColor: roleTheme.color,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: roleTheme.color,
+            dividerColor: AppColors.ring,
+            labelStyle: AppTypography.bodyStrong,
+            unselectedLabelStyle: AppTypography.body,
             tabs: const <Widget>[
               Tab(text: '숏폼'),
               Tab(text: '게시판'),
@@ -138,12 +141,16 @@ class _CommunityScreenState extends State<CommunityScreen>
           ),
         ],
       ),
-      // 게시판 탭에서만 노출. 역할색(학생 파랑/멘토 초록)은 AppAccent 경유.
+      // 게시판 탭에서만 노출. 역할색(학생 파랑/멘토 초록)은 RoleTheme 경유.
       floatingActionButton: onBoardTab
           ? FloatingActionButton.extended(
               onPressed: _openWrite,
-              backgroundColor: AppAccent.of(context).accent,
-              foregroundColor: AppAccent.of(context).onAccent,
+              backgroundColor: roleTheme.color,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               icon: const Icon(Icons.edit_rounded),
               label: const Text('작성'),
             )

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/role_accent.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/shape_tokens.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/app_badge.dart';
+import '../../../../design/role_theme.dart' show RoleTheme;
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_input_field.dart';
+import '../../../../design/widgets/app_page.dart';
+import '../../../../design/widgets/glass_surface.dart';
 import '../../data/board_post_create_gateway.dart'
     show newBoardPostIdempotencyKey;
 import '../../data/community_models.dart';
@@ -417,54 +418,41 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   }
 
   Widget _buildScaffold(ShortformPost p) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('숏폼'),
-        actions: <Widget>[
-          PopupMenuButton<String>(
-            tooltip: '더보기',
-            onSelected: (String v) {
-              if (v == 'block') _blockPostAuthor();
-            },
-            itemBuilder: (BuildContext ctx) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(value: 'block', child: Text('이 사용자 차단')),
-            ],
-          ),
-        ],
-      ),
+    return AppPage(
+      title: '숏폼',
+      actions: <Widget>[
+        PopupMenuButton<String>(
+          tooltip: '더보기',
+          onSelected: (String v) {
+            if (v == 'block') _blockPostAuthor();
+          },
+          itemBuilder: (BuildContext ctx) => const <PopupMenuEntry<String>>[
+            PopupMenuItem<String>(value: 'block', child: Text('이 사용자 차단')),
+          ],
+        ),
+      ],
       body: Column(
         children: <Widget>[
           Expanded(
             child: ListView(
+              clipBehavior: Clip.none,
               padding: EdgeInsets.zero,
               children: <Widget>[
                 // 영상 영역: 재생 준비 완료 시 플레이어(탭=재생/일시정지),
                 // 해석·초기화 중엔 썸네일(9:16) 배경, 실패·영상 없음은
                 // 명시적 문구 폴백(실패만 수동 재시도 제공).
-                _videoArea(),
+                // design-v3 §5-6: 작성자·제목은 미디어 위 오버레이(스크림)로.
+                _mediaWithOverlay(p),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.screenH),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          if (p.authorRole == 'mentor')
-                            const AppBadge(label: '멘토', tinted: true),
-                          if (p.authorRole == 'mentor')
-                            const SizedBox(width: 6),
-                          Text(p.authorName, style: AppType.caption),
-                          const Spacer(),
-                          Text('조회 ${p.viewCount}', style: AppType.caption),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.titleBody),
-                      Text(p.title, style: AppType.title),
                       if (p.description?.trim().isNotEmpty == true) ...<Widget>[
-                        const SizedBox(height: AppSpacing.titleBody),
-                        Text(p.description!.trim(), style: AppType.body),
+                        Text(p.description!.trim(),
+                            style: AppTypography.body.copyWith(height: 1.6)),
+                        const SizedBox(height: AppSpacing.s16),
                       ],
-                      const SizedBox(height: AppSpacing.s16),
                       ReactionBar(
                         liked: _liked,
                         scrapped: _scrapped,
@@ -474,7 +462,10 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
                         onToggleScrap: _toggleScrap,
                         onReport: _report,
                       ),
-                      const Divider(height: 28, color: ColorTokens.border),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: _HairlineRule(),
+                      ),
                       _commentList(),
                     ],
                   ),
@@ -483,6 +474,88 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
             ),
           ),
           _inputBar(),
+        ],
+      ),
+    );
+  }
+
+  /// 미디어 + 오버레이(§5-6) — 아래쪽 스크림 위에 멘토 배지·작성자·조회수·제목.
+  /// 탭은 아래 미디어(재생/일시정지)가 받도록 오버레이는 히트테스트 제외.
+  Widget _mediaWithOverlay(ShortformPost p) {
+    final TextStyle onMedia = AppTypography.captionSecondary.copyWith(
+      color: Colors.white.withValues(alpha: 0.85),
+    );
+    return ColoredBox(
+      color: AppColors.navy,
+      child: Stack(
+        children: <Widget>[
+          _videoArea(),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenH, 40, AppSpacing.screenH, 14),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.72),
+                    ],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        if (p.authorRole == 'mentor') ...<Widget>[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.badge),
+                            ),
+                            child: Text(
+                              '멘토',
+                              style: AppTypography.meta.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(p.authorName,
+                              style: onMedia,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Text('조회 ${p.viewCount}', style: onMedia),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      p.title,
+                      style:
+                          AppTypography.section.copyWith(color: Colors.white),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -565,7 +638,8 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
                       size: 40, color: Colors.white70),
                   const SizedBox(height: 8),
                   Text(message,
-                      style: AppType.caption.copyWith(color: Colors.white)),
+                      style:
+                          AppTypography.caption.copyWith(color: Colors.white)),
                   if (showRetry) ...<Widget>[
                     const SizedBox(height: 4),
                     TextButton(
@@ -596,7 +670,8 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
           );
         }
         if (snap.hasError) {
-          return Text('댓글을 불러오지 못했어요.', style: AppType.caption);
+          return const Text('댓글을 불러오지 못했어요.',
+              style: AppTypography.captionSecondary);
         }
         final List<CommunityComment> comments =
             snap.data ?? <CommunityComment>[];
@@ -604,16 +679,14 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             // 헤더: "댓글 {개수}"(동적 — 현재 리스트 length). 스타일 title.
-            Text('댓글 ${comments.length}', style: AppType.title),
+            Text('댓글 ${comments.length}', style: AppTypography.section),
             const SizedBox(height: AppSpacing.titleBody),
             if (comments.isEmpty)
-              Text('첫 댓글을 남겨보세요.', style: AppType.caption)
+              const Text('첫 댓글을 남겨보세요.', style: AppTypography.captionSecondary)
             else
               // 댓글 항목 '사이에만' 옅은 구분선(첫 위·마지막 아래 없음).
               for (int i = 0; i < comments.length; i++) ...<Widget>[
-                if (i > 0)
-                  const Divider(
-                      height: 1, thickness: 0.5, color: ColorTokens.border),
+                if (i > 0) const _HairlineRule(),
                 CommentTile(
                   comment: comments[i],
                   onReport: () => _reportComment(comments[i].id),
@@ -635,46 +708,45 @@ class ShortformDetailScreenState extends State<ShortformDetailScreen> {
   }
 
   Widget _inputBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        decoration: const BoxDecoration(
-          color: ColorTokens.surface,
-          border: Border(top: BorderSide(color: ColorTokens.border)),
-        ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: _input,
-                style: AppType.body,
-                minLines: 1,
-                maxLines: 3,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: '댓글 입력',
-                  filled: true,
-                  fillColor: ColorTokens.elevated,
-                  border: OutlineInputBorder(
-                    borderRadius: AppShape.inputRadius,
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    // 하단 유리 바(채팅 입력 바와 같은 언어) — 본문이 그 뒤로 지나간다.
+    return GlassSurface.bar(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: AppInputField(
+                  controller: _input,
+                  hintText: '댓글을 남겨 보세요',
+                  minLines: 1,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
                 ),
               ),
-            ),
-            IconButton(
-              icon: Icon(Icons.send_rounded,
-                  color:
-                      _busy ? ColorTokens.muted : AppAccent.of(context).accent),
-              onPressed: _busy ? null : _send,
-            ),
-          ],
+              IconButton(
+                icon: Icon(Icons.send_rounded,
+                    color: _busy
+                        ? AppColors.textSecondary.withValues(alpha: 0.5)
+                        : RoleTheme.of(context).color),
+                onPressed: _busy ? null : _send,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// 댓글 사이 옅은 구분선(1px 링색) — Divider 위젯 대신 v3 링 토큰.
+class _HairlineRule extends StatelessWidget {
+  const _HairlineRule();
+
+  @override
+  Widget build(BuildContext context) =>
+      const SizedBox(height: 1, child: ColoredBox(color: AppColors.ring));
 }

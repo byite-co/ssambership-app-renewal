@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/app_scope.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/app_card.dart';
-import '../../../../design/widgets/empty_state.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
+import '../../../../design/widgets/app_secondary_button.dart';
+import '../../../../design/widgets/glass_card.dart';
 import '../../../../design/widgets/initial_avatar.dart';
-import '../../../../design/widgets/secondary_button.dart';
 import '../../data/user_blocks_repository.dart';
 
 /// 차단 관리 — 내가 차단한 사용자 목록 + 해제. 없으면 EmptyState.
@@ -55,8 +56,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('차단 관리')),
+    return AppPage(
+      title: '차단 관리',
       body: FutureBuilder<List<BlockedUser>>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<List<BlockedUser>> snap) {
@@ -65,18 +66,18 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
           }
           final List<BlockedUser> users = snap.data ?? <BlockedUser>[];
           if (users.isEmpty) {
-            return const EmptyState(
+            return const AppEmptyState(
               icon: Icons.block_rounded,
               title: '차단한 사용자가 없어요',
-              message: '커뮤니티 글·댓글·숏폼의 ⋯ 메뉴에서 사용자를 차단할 수 있어요.',
+              description: '커뮤니티 글·댓글·숏폼의 ⋯ 메뉴에서 사용자를 차단할 수 있어요.',
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+            clipBehavior: Clip.none,
+            padding: AppPage.contentPadding(context),
             itemCount: users.length,
             separatorBuilder: (_, __) =>
-                const SizedBox(height: AppSpacing.cardGap),
+                const SizedBox(height: AppSpacing.listGap),
             itemBuilder: (BuildContext context, int i) => _BlockedRow(
               user: users[i],
               onUnblock: () => _unblock(users[i]),
@@ -95,23 +96,23 @@ class _BlockedRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
       child: Row(
         children: <Widget>[
-          InitialAvatar(name: user.displayName, size: 40),
+          InitialAvatar(name: user.displayName, size: 40, tinted: false),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               user.displayName,
-              style: AppType.body,
+              style: AppTypography.bodyStrong,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
-          SecondaryButton(
+          AppSecondaryButton(
             label: '차단 해제',
-            neutral: true,
             expand: false,
             onPressed: onUnblock,
           ),

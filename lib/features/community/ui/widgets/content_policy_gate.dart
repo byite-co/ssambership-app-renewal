@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_typography.dart';
 
 /// 콘텐츠 게시 전 정책 동의 게이트(UGC 규정 준수 — 게시글·댓글 공통).
 ///
@@ -62,8 +61,7 @@ class _ContentPolicyDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: ColorTokens.surface,
-      title: Text('커뮤니티 이용 규정', style: AppType.title),
+      title: const Text('커뮤니티 이용 규정', style: AppTypography.section),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,13 +69,13 @@ class _ContentPolicyDialog extends StatelessWidget {
           Text(
             '쌤버십은 불쾌하거나 불법·음란·폭력적이거나 타인을 비방·괴롭히는 콘텐츠를 '
             '허용하지 않아요. 위반 콘텐츠는 사전 통지 없이 삭제되고 계정이 제한될 수 있어요.',
-            style: AppType.body,
+            style: AppTypography.body,
           ),
           const SizedBox(height: 12),
           Text(
             '부적절한 게시물은 신고하거나 작성자를 차단할 수 있어요. '
             '게시하면 위 규정에 동의하는 것으로 간주돼요.',
-            style: AppType.caption,
+            style: AppTypography.captionSecondary,
           ),
         ],
       ),

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/empty_state.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
 import '../../data/community_models.dart';
 import '../../data/community_read_repository.dart';
 import '../../data/community_write_repository.dart';
@@ -76,13 +76,10 @@ class MyActivityViewState extends State<MyActivityView> {
     }
     final Object? error = _error;
     if (error != null && _data == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('내 활동을 불러오지 못했어요.\n${friendlyError(error)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: ColorTokens.danger)),
-        ),
+      return AppErrorView(
+        title: '내 활동을 불러오지 못했어요',
+        message: friendlyError(error),
+        onRetry: _load,
       );
     }
     final MyActivity a = _data ?? const MyActivity();
@@ -96,18 +93,18 @@ class MyActivityViewState extends State<MyActivityView> {
               children: const <Widget>[
                 SizedBox(
                   height: 360,
-                  child: EmptyState(
+                  child: AppEmptyState(
                     icon: Icons.history_outlined,
                     title: '아직 활동이 없어요',
-                    message: '글에 좋아요·스크랩하거나 웹에서 글을 쓰면 여기에 모여요.',
+                    description: '글에 좋아요·스크랩하거나 웹에서 글을 쓰면 여기에 모여요.',
                   ),
                 ),
               ],
             )
           : ListView(
+              clipBehavior: Clip.none,
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+              padding: AppPage.contentPadding(context),
               children: <Widget>[
                 _group('내가 쓴 글', a.myPosts),
                 _group('좋아요한 글', a.liked),
@@ -124,11 +121,11 @@ class MyActivityViewState extends State<MyActivityView> {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(left: 4, top: 6, bottom: 8),
-          child: Text(title, style: AppType.caption),
+          child: Text(title, style: AppTypography.captionSecondary),
         ),
         for (final BoardPost p in posts) ...<Widget>[
           BoardPostCard(post: p, onOpen: () => _open(p)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
         ],
       ],
     );

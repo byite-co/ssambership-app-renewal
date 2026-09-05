@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_models.dart';
@@ -38,21 +38,23 @@ class CommentTile extends StatelessWidget {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Text(comment.authorName, style: AppType.caption),
+                    Text(comment.authorName,
+                        style: AppTypography.caption
+                            .copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(width: 8),
                     Text(Formatters.relativeKorean(comment.createdAt),
-                        style: AppType.caption),
+                        style: AppTypography.meta),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(comment.body, style: AppType.body),
+                Text(comment.body, style: AppTypography.body),
               ],
             ),
           ),
           if (onReport != null || onBlock != null || onDelete != null)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_horiz_rounded,
-                  size: 18, color: ColorTokens.muted),
+                  size: 18, color: AppColors.textSecondary),
               tooltip: '더보기',
               onSelected: (String v) {
                 if (v == 'report') onReport?.call();
