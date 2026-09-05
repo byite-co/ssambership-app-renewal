@@ -4,16 +4,18 @@ import 'package:flutter/services.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/tokens/typography.dart';
-import '../../../design/widgets/app_card.dart';
-import '../../../design/widgets/primary_button.dart';
 import '../../../core/scan/image_downscaler.dart';
 import '../../../core/scan/pdf_rasterizer.dart';
 import '../../../core/scan/picked_image.dart';
 import '../../../core/scan/scan_source_picker.dart';
 import '../../../core/scan/widgets/scan_pick_expander.dart';
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_input_field.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/glass_card.dart';
+import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/widgets/v3_page.dart';
 import '../../question_room/data/attachments/attachment_upload.dart'
     show ImagePickerPort, validatePickedImage;
 import '../../question_room/data/attachments/device_image_picker.dart';
@@ -24,7 +26,6 @@ import '../data/individual_question_repository.dart';
 import '../data/iq_attachments_repository.dart';
 import '../data/iq_error_mapper.dart';
 import '../data/models/individual_question_models.dart';
-import '../../../shared/errors/friendly_error.dart';
 
 /// 작성 화면 사전 정보(잔액 + 지정형 가격).
 class IqCreatePrefill {
@@ -36,10 +37,13 @@ class IqCreatePrefill {
   final IqPricing? pricing;
 }
 
-/// 새 개별질문 작성 — 캐시 예치(에스크로).
+/// 새 개별질문 작성 — 캐시 예치(에스크로). A-4a #11 로 네이티브 개방(`/iq/new`).
 /// [mentorId] 가 있으면 지정형(가격은 멘토 가격표에서 서버가 결정),
 /// 없으면 공개형(금액 자유 입력 — 웹과 동일하게 최소/최대 강제 없음).
-/// ★ Commerce-Zero 유지: 잔액 부족 시 안내 문구만(충전 링크·유도 없음).
+///
+/// ★ Commerce-Zero 유지: 잔액 부족은 "잔액이 부족해요" 사실 안내 + 등록 버튼
+///   비활성까지만. 충전 버튼·링크·인앱 브라우저 0. 성공 시 생성된 질문을 pop
+///   결과로 돌려주고, 호출 화면이 상세로 이어간다.
 class IqCreateScreen extends StatefulWidget {
   const IqCreateScreen({
     super.key,
@@ -144,6 +148,12 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
       pricing = await _repo.fetchMentorPricing(widget.mentorId!);
     }
     return IqCreatePrefill(balanceCents: balance, pricing: pricing);
+  }
+
+  void _retryPrefill() {
+    setState(() {
+      _future = _loadPrefill();
+    });
   }
 
   /// 공개형 입력 금액(캐시) → cents. 유효하지 않으면 null.
@@ -285,6 +295,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
     }
   }
 
+  /// 성공 종료 — 생성된 질문을 결과로 돌려준다(호출 화면이 상세로 이어감).
   void _finishSuccess() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -292,7 +303,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         content: Text('질문이 전달됐어요. 캐시는 해결 완료 전까지 안전 보관돼요.'),
       ),
     );
-    Navigator.of(context).pop(true);
+    Navigator.of(context).pop<Object>(_created ?? true);
   }
 
   Future<void> _submit(IqCreatePrefill prefill) async {
@@ -313,6 +324,11 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
       _snack(widget.isDirect
           ? '이 멘토는 아직 개별질문 가격을 설정하지 않았어요.'
           : '질문 금액(캐시)을 입력해 주세요.');
+      return;
+    }
+    // 서버도 거부하지만(에스크로 잔액 검사) 클라이언트에서 먼저 막는다 — 안내만.
+    if (prefill.balanceCents < priceCents) {
+      _snack('잔액이 부족해요');
       return;
     }
 
@@ -391,25 +407,21 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isDirect ? '개별질문 하기 (지정형)' : '새 개별질문 (공개형)'),
-      ),
+    return V3Page(
+      title: widget.isDirect ? '개별질문 하기 (지정형)' : '새 개별질문 (공개형)',
+      // 첨부 버튼을 뷰포트 맨 위로 스크롤하는 기존 테스트 계약 — 앱바 뒤로 늘리지 않는다.
+      bodyBehindAppBar: false,
       body: FutureBuilder<IqCreatePrefill>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<IqCreatePrefill> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const V3LoadingView(cards: 3);
           }
           if (snap.hasError || snap.data == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                    '정보를 불러오지 못했어요.\n${friendlyError(snap.error ?? '')}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
+            return V3ErrorView(
+              title: '정보를 불러오지 못했어요',
+              message: friendlyError(snap.error ?? ''),
+              onRetry: _retryPrefill,
             );
           }
           return _form(snap.data!);
@@ -424,31 +436,41 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
     final bool insufficient =
         priceCents != null && prefill.balanceCents < priceCents;
     final bool directPriceMissing = widget.isDirect && prefill.pricing == null;
+    final bool locked = _created != null;
+    final int? remainingCents =
+        priceCents == null ? null : prefill.balanceCents - priceCents;
+    final TextStyle caption =
+        AppTypography.caption.copyWith(color: AppColors.textSecondary);
 
+    // ★ 레이아웃 예산: 첨부·등록 버튼이 기본 위젯 테스트 표면(800×600)에서 스크롤
+    //   없이(또는 아주 조금만) 닿아야 한다 — 기존 첨부·PDF·첨삭 테스트가 그 전제로
+    //   `ensureVisible` 뒤 곧바로 탭한다. 카드·여백을 늘리지 않는다.
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+      padding: V3Page.contentPadding(context, behindAppBar: false),
       children: <Widget>[
-        AppCard(
+        // ── 누구에게 · 내 캐시 ──
+        GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // 컴플라이언스: 지정형 단가 표시 제거 — 금액은 등록 확인 단계에서만 안내.
-              if (widget.isDirect)
-                Text('${widget.mentorName ?? '멘토'}에게 1건 질문해요.',
-                    style: AppTypography.body)
-              else
-                const Text(
-                  '공개로 올리면 먼저 수락한 멘토가 답변해요.',
-                  style: AppTypography.body,
-                ),
-              const SizedBox(height: 8),
+              Text(
+                widget.isDirect
+                    ? '${widget.mentorName ?? '멘토'}에게 지정 · 멘토가 수락하면 시작돼요'
+                    : '공개 · 먼저 수락한 멘토가 답변해요',
+                style: AppTypography.body,
+              ),
+              const SizedBox(height: 6),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
-                  const Text('내 캐시', style: AppTypography.caption),
-                  Text(formatIqCash(prefill.balanceCents),
-                      style: AppTypography.body),
+                  Text('내 캐시', style: caption),
+                  const Spacer(),
+                  Text(
+                    formatIqCash(prefill.balanceCents),
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -456,78 +478,112 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         ),
         if (directPriceMissing) ...<Widget>[
           const SizedBox(height: 10),
-          const Text(
-            '이 멘토는 아직 개별질문 가격을 설정하지 않아 질문할 수 없어요.',
-            style: TextStyle(color: ColorTokens.danger, fontSize: 13),
+          const V3Callout(
+            tone: V3CalloutTone.danger,
+            text: '이 멘토는 아직 개별질문 가격을 설정하지 않아 질문할 수 없어요.',
           ),
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        // ── 무엇을 ──
         if (!widget.isDirect) ...<Widget>[
-          TextField(
+          AppInputField(
             controller: _amountController,
+            labelText: '질문 금액 (캐시)',
+            hintText: '예: $kIqOpenPricePlaceholderCash',
             keyboardType: TextInputType.number,
             inputFormatters: <TextInputFormatter>[
               FilteringTextInputFormatter.digitsOnly,
             ],
+            enabled: !locked && !_submitting,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: '질문 금액 (캐시)',
-              hintText: '예: $kIqOpenPricePlaceholderCash',
-              border: OutlineInputBorder(),
-            ),
           ),
           const SizedBox(height: 12),
         ],
-        TextField(
+        AppInputField(
           controller: _titleController,
-          decoration: const InputDecoration(
-            labelText: '제목',
-            border: OutlineInputBorder(),
-          ),
+          labelText: '제목',
+          enabled: !locked && !_submitting,
+          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        TextField(
+        AppInputField(
           controller: _bodyController,
-          minLines: 5,
+          labelText: '질문 내용',
+          hintText: '문제 상황과 어디까지 시도했는지 적어 주세요.',
+          enabled: !locked && !_submitting,
+          minLines: 4,
           maxLines: 12,
-          decoration: const InputDecoration(
-            labelText: '질문 내용',
-            hintText: '문제 상황과 어디까지 시도했는지 적어 주세요.',
-            border: OutlineInputBorder(),
-          ),
         ),
         const SizedBox(height: 12),
         _AttachArea(
           images: _images,
           maxImages: _maxImages,
-          locked: _created != null, // 부분 실패 상태: 목록 편집 대신 재시도.
+          locked: locked, // 부분 실패 상태: 목록 편집 대신 재시도.
           onAdd: _submitting ? null : _addImage,
           onRemove: _submitting ? null : _removeImage,
           onAnnotate: _submitting ? null : _annotateImage,
         ),
-        if (_created != null) ...<Widget>[
+        if (locked) ...<Widget>[
           const SizedBox(height: 10),
-          Text(
-            '질문은 등록됐어요. 남은 첨부 ${_images.length}장을 다시 업로드하거나, '
-            '첨부 없이 완료할 수 있어요.',
-            style: const TextStyle(color: ColorTokens.danger, fontSize: 13),
+          V3Callout(
+            tone: V3CalloutTone.warning,
+            text: '질문은 등록됐어요. 남은 첨부 ${_images.length}장을 다시 업로드하거나, '
+                '첨부 없이 완료할 수 있어요.',
           ),
         ],
+        const SizedBox(height: 12),
+        // ── 결제 요약(사실만) ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: <Widget>[
+              Text('결제될 금액', style: caption),
+              const Spacer(),
+              Text(
+                priceCents == null
+                    ? (widget.isDirect ? '—' : '금액을 입력해 주세요')
+                    : formatIqCash(priceCents),
+                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        if (remainingCents != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            child: Row(
+              children: <Widget>[
+                Text('등록 후 남는 캐시', style: caption),
+                const Spacer(),
+                Text(
+                  // formatIqCash 는 절댓값만 찍는다 — 모자라면 부호를 붙여 사실대로.
+                  remainingCents < 0
+                      ? '-${formatIqCash(remainingCents)}'
+                      : formatIqCash(remainingCents),
+                  style: AppTypography.body.copyWith(
+                    color: insufficient ? AppColors.danger : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (insufficient) ...<Widget>[
           const SizedBox(height: 10),
-          // ★ 스토어 정책: 결제 유도 링크 없이 '안내'만.
-          const Text(
-            '캐시가 부족해요. 충전은 웹에서 할 수 있어요.',
-            style: TextStyle(color: ColorTokens.danger, fontSize: 13),
+          // ★ Commerce-Zero: 사실 안내만 — 충전 버튼·링크·인앱 브라우저 없음.
+          const V3Callout(
+            tone: V3CalloutTone.warning,
+            title: '잔액이 부족해요',
+            text: '지금 캐시로는 이 질문을 등록할 수 없어요.',
           ),
         ],
-        const SizedBox(height: 18),
-        PrimaryButton(
-          label: _created == null ? '질문 등록' : '첨부 다시 업로드',
-          onPressed:
-              _submitting || directPriceMissing ? null : () => _submit(prefill),
+        const SizedBox(height: 14),
+        AppPrimaryButton(
+          label: locked ? '첨부 다시 업로드' : '질문 등록',
+          onPressed: _submitting || directPriceMissing || insufficient
+              ? null
+              : () => _submit(prefill),
         ),
-        if (_created != null) ...<Widget>[
+        if (locked) ...<Widget>[
           const SizedBox(height: 8),
           TextButton(
             onPressed: _submitting ? null : _finishSuccess,
@@ -560,12 +616,17 @@ class _AttachArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('문제 스캔 첨부 (${images.length}/$maxImages)',
-              style: AppTypography.caption),
+          Text(
+            '문제 스캔 첨부 (${images.length}/$maxImages)',
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
           if (images.isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
             Wrap(
@@ -585,9 +646,9 @@ class _AttachArea extends StatelessWidget {
                           errorBuilder: (_, __, ___) => Container(
                             width: 72,
                             height: 72,
-                            color: ColorTokens.elevated,
+                            color: AppColors.bgMid,
                             child: const Icon(Icons.image_rounded,
-                                color: ColorTokens.muted),
+                                color: AppColors.textSecondary),
                           ),
                         ),
                       ),

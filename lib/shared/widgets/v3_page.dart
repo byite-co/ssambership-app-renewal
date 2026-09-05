@@ -27,6 +27,7 @@ class V3Page extends StatelessWidget {
     this.showBack = true,
     this.roleOverride,
     this.bottom,
+    this.bodyBehindAppBar = true,
   });
 
   final String title;
@@ -42,15 +43,25 @@ class V3Page extends StatelessWidget {
   /// 하단 고정 영역(저장 버튼 등). 글래스 바로 감싼다.
   final Widget? bottom;
 
+  /// 본문을 글래스 앱바 뒤까지 늘릴지(기본 true — 스크롤이 바 밑으로 비친다).
+  /// false 면 본문이 앱바 아래에서 시작한다 — `ensureVisible` 로 항목을 뷰포트
+  /// 맨 위에 맞추는 기존 위젯 테스트(IQ 등록 첨부)가 앱바에 가려지지 않는다.
+  final bool bodyBehindAppBar;
+
   /// [extendBodyBehindAppBar] 위에서 스크롤 본문이 써야 할 상단 여백.
   static double topInset(BuildContext context) =>
       MediaQuery.paddingOf(context).top + kToolbarHeight;
 
   /// 스크롤 본문 기본 패딩(좌우 20 · 앱바 아래 12 · 하단 24).
-  static EdgeInsets contentPadding(BuildContext context, {double bottom = 24}) =>
+  /// [behindAppBar]=false 면 본문이 이미 앱바 아래라 상단 여백은 12 만.
+  static EdgeInsets contentPadding(
+    BuildContext context, {
+    double bottom = 24,
+    bool behindAppBar = true,
+  }) =>
       EdgeInsets.fromLTRB(
         AppSpacing.screenH,
-        topInset(context) + 12,
+        (behindAppBar ? topInset(context) : 0) + 12,
         AppSpacing.screenH,
         bottom,
       );
@@ -72,7 +83,7 @@ class V3Page extends StatelessWidget {
         child: AppBackground(
           child: Scaffold(
             backgroundColor: Colors.transparent,
-            extendBodyBehindAppBar: true,
+            extendBodyBehindAppBar: bodyBehindAppBar,
             extendBody: bottom != null,
             appBar: GlassAppBar(
               title: Text(title),

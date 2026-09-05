@@ -77,10 +77,14 @@ class AppRoutePaths {
   static String individualQuestion(String questionId) =>
       '$individualQuestions/${_segment(questionId)}';
 
-  /// 멘토 지정형 개별질문 등록 URL(`/iq/new?mentor=<id>`).
-  static String newIndividualQuestionFor(String mentorId) => Uri(
+  /// 멘토 지정형 개별질문 등록 URL(`/iq/new?mentor=<id>[&name=<표시명>]`).
+  static String newIndividualQuestionFor(String mentorId, {String? mentorName}) =>
+      Uri(
         path: newIndividualQuestion,
-        queryParameters: <String, String>{'mentor': mentorId},
+        queryParameters: <String, String>{
+          'mentor': mentorId,
+          if (mentorName != null && mentorName.isNotEmpty) 'name': mentorName,
+        },
       ).toString();
 
   static String mentor(String mentorId) => '$mentors/${_segment(mentorId)}';
