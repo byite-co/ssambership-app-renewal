@@ -5,10 +5,10 @@ import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/push/push_ports.dart';
 import '../../../../core/web_bridge/web_bridge_actions.dart';
-import '../../../../design/role_accent.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/secondary_button.dart';
+import '../../../../design/role_theme.dart' show RoleTheme;
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_secondary_button.dart';
 import '../../../../features/community/ui/blocks/blocked_users_screen.dart';
 import '../../../../shared/constants/app_constants.dart';
 import '../../../../shared/errors/friendly_error.dart';
@@ -151,7 +151,7 @@ class _SettingsSectionState extends State<SettingsSection> {
           children: <Widget>[
             Text(
               '알림 설정을 불러오지 못했어요. ${friendlyError(_loadError!)}',
-              style: AppType.caption.copyWith(color: ColorTokens.danger),
+              style: AppTypography.caption.copyWith(color: AppColors.danger),
             ),
             Align(
               alignment: Alignment.centerLeft,
@@ -165,7 +165,7 @@ class _SettingsSectionState extends State<SettingsSection> {
       );
     }
     final NotificationSettings s = _settings!;
-    final Color accent = AppAccent.of(context).accent;
+    final Color accent = RoleTheme.of(context).color;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -175,7 +175,7 @@ class _SettingsSectionState extends State<SettingsSection> {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               '기기 알림 권한이 꺼져 있어요 — 설정에서 허용해 주세요.',
-              style: AppType.caption.copyWith(color: ColorTokens.danger),
+              style: AppTypography.caption.copyWith(color: AppColors.danger),
             ),
           ),
         _toggleRow(
@@ -213,12 +213,17 @@ class _SettingsSectionState extends State<SettingsSection> {
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Text(label, style: indent ? AppType.caption : AppType.body),
+            child: Text(label,
+                style: indent
+                    ? AppTypography.captionSecondary
+                    : AppTypography.body),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
             activeThumbColor: accent,
+            // 설정 섹션 전체가 800×600 테스트 표면에 들어가야 한다.
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
       ),
@@ -234,7 +239,7 @@ class _SettingsSectionState extends State<SettingsSection> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           _notificationArea(context),
-          const Divider(height: 12, color: ColorTokens.border),
+          const _Rule(),
           MyPageRow(
             icon: Icons.description_rounded,
             label: '이용약관',
@@ -253,7 +258,7 @@ class _SettingsSectionState extends State<SettingsSection> {
           ),
           // 계정: 차단 관리(앱 내) + 회원 탈퇴(웹 링크). 로그인 세션일 때만 노출.
           if (widget.showLogout) ...<Widget>[
-            const Divider(height: 12, color: ColorTokens.border),
+            const _Rule(),
             MyPageRow(
               icon: Icons.block_rounded,
               label: '차단 관리',
@@ -269,7 +274,7 @@ class _SettingsSectionState extends State<SettingsSection> {
               onTap: _confirmAccountDelete,
             ),
             const SizedBox(height: 12),
-            SecondaryButton(
+            AppSecondaryButton(
               label: '로그아웃',
               icon: Icons.logout_rounded,
               onPressed: widget.onLogout,
@@ -279,4 +284,15 @@ class _SettingsSectionState extends State<SettingsSection> {
       ),
     );
   }
+}
+
+/// 설정 항목 묶음 사이 옅은 구분선(1px 링색).
+class _Rule extends StatelessWidget {
+  const _Rule();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 6),
+        child: SizedBox(height: 1, child: ColoredBox(color: AppColors.ring)),
+      );
 }

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/app_tabs.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_primary_button.dart';
+import '../../../../design/widgets/app_secondary_button.dart';
 import '../../../../design/widgets/count_badge.dart';
-import '../../../../design/widgets/empty_state.dart';
-import '../../../../design/widgets/primary_button.dart';
 import '../../../../design/widgets/quota_bar.dart';
-import '../../../../design/widgets/secondary_button.dart';
 import '../../../../design/widgets/status_pill.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/mypage_models.dart';
@@ -43,7 +43,7 @@ class StudentSubscriptionSection extends StatelessWidget {
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text('이용중', style: AppType.caption),
+                const Text('이용중', style: AppTypography.captionSecondary),
                 const SizedBox(width: 6),
                 CountBadge(count: activeCount, tone: StatusTone.success),
               ],
@@ -53,21 +53,26 @@ class StudentSubscriptionSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (subscriptions.isEmpty)
-            EmptyState(
+            AppEmptyState(
               icon: Icons.bookmark_rounded,
               title: '구독 중인 멘토가 없어요',
-              message: '관심 있는 멘토를 구독해 보세요',
+              description: '관심 있는 멘토를 구독해 보세요',
               // 기존 탭 전환 경로만 재사용(멘토 찾기 탭). 결제 유도 아님.
               actionLabel: '멘토 찾기',
               onAction: () => TabNavigator.go(AppTab.mentors),
             )
           else
             for (int i = 0; i < subscriptions.length; i++) ...<Widget>[
-              if (i > 0) const Divider(height: 16, color: ColorTokens.border),
+              if (i > 0)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: SizedBox(
+                      height: 1, child: ColoredBox(color: AppColors.ring)),
+                ),
               _SubCard(info: subscriptions[i]),
             ],
           const SizedBox(height: 12),
-          PrimaryButton(
+          AppPrimaryButton(
             label: '질문하러 가기',
             icon: Icons.forum_rounded,
             onPressed: onGoToQuestions,
@@ -76,10 +81,9 @@ class StudentSubscriptionSection extends StatelessWidget {
           // P0-3 옵션1: 구독 관리 링크는 스토어 빌드에서 숨기고 안내로 대체
           // (kSubscriptionManageLinkEnabled — dev 는 dart-define 주입으로 on).
           if (kSubscriptionManageLinkEnabled)
-            SecondaryButton(
+            AppSecondaryButton(
               label: '구독 관리 (웹)',
               icon: Icons.open_in_new_rounded,
-              neutral: true,
               onPressed: () => openBillingManageWeb(context),
             )
           else
@@ -101,7 +105,12 @@ class _SubCard extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Expanded(child: Text(info.mentorName, style: AppType.title)),
+            Expanded(
+              child: Text(
+                info.mentorName,
+                style: AppTypography.bodyStrong.copyWith(fontSize: 16),
+              ),
+            ),
             const SizedBox(width: 8),
             // D1-B: 상태 도트 + 기존 상태칩(스캔성↑).
             StatusPill(
@@ -117,17 +126,23 @@ class _SubCard extends StatelessWidget {
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            if (info.planLabel != null) AppBadge(label: info.planLabel!, tinted: true),
+            if (info.planLabel != null)
+              AppBadge(label: info.planLabel!, tinted: true),
+            // design-tokens §6: '다음 갱신 7/27' → '7월 27일에 갱신돼요'(해지 예정이면 해지돼요).
             if (info.nextRenewal != null)
-              Text('다음 갱신 ${Formatters.shortDate(info.nextRenewal!)}',
-                  style: AppType.caption),
+              Text(
+                info.status?.trim() == 'cancel_scheduled'
+                    ? '${Formatters.monthDay(info.nextRenewal!)}에 해지돼요'
+                    : '${Formatters.monthDay(info.nextRenewal!)}에 갱신돼요',
+                style: AppTypography.captionSecondary,
+              ),
             // 잔여 바(D1-A)로 못 보여주는 폴백 문구만 텍스트로 유지(한도 정보 없을 때).
             if (info.usage == null || !info.usage!.hasQuota)
               Text(
                 info.remaining != null
                     ? '남은 질문 ${info.remaining}개'
                     : (info.isActive ? '구독 상태로 질문 가능' : '구독이 필요해요'),
-                style: AppType.caption,
+                style: AppTypography.captionSecondary,
               ),
           ],
         ),

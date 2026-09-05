@@ -219,4 +219,3 @@ class MyPageRepository {
     return settlement;
   }
 }
-

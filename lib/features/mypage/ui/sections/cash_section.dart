@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/commerce/commerce_policy.dart';
-import '../../../../design/shape_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/empty_state.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_badge.dart';
+import '../../../../design/widgets/app_empty_state.dart';
 import '../../../../design/widgets/money_display.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../../../shared/widgets/commerce_notice_card.dart';
@@ -30,7 +30,7 @@ class CashSection extends StatelessWidget {
     return MyPageSection(
       icon: Icons.account_balance_wallet_rounded,
       title: '캐시',
-      trailing: const _ReadOnlyBadge(),
+      trailing: const AppBadge(label: '조회만', tone: AppBadgeTone.neutral),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -38,7 +38,7 @@ class CashSection extends StatelessWidget {
             // v19: walletGeneration 은 환불 전용 신호가 아니다(예치·정산도 bump)
             // — 원인을 단정하지 않는 공통 문구만 사용한다.
             Text('캐시 변경은 완료됐지만 최신 잔액을 불러오지 못했습니다.',
-                style: AppType.caption.copyWith(color: ColorTokens.danger)),
+                style: AppTypography.caption.copyWith(color: AppColors.danger)),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -56,13 +56,13 @@ class CashSection extends StatelessWidget {
           const SizedBox(height: 12),
           if (cash.recent.isEmpty)
             // 커머스 제로: 충전 유도 CTA 없이 정보 문구만.
-            const EmptyState(
+            const AppEmptyState(
               icon: Icons.receipt_long_rounded,
               title: '거래 내역이 없어요',
-              message: '구독·충전 내역이 여기에 표시돼요',
+              description: '구독·충전 내역이 여기에 표시돼요',
             )
           else ...<Widget>[
-            Text('최근 내역', style: AppType.caption),
+            const Text('최근 내역', style: AppTypography.captionSecondary),
             const SizedBox(height: 6),
             for (final CashEntry e in cash.recent) _EntryRow(entry: e),
           ],
@@ -82,40 +82,21 @@ class _EntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color amountColor =
-        entry.isCredit ? ColorTokens.success : ColorTokens.secondary;
+        entry.isCredit ? AppColors.success : AppColors.textSecondary;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: <Widget>[
-          Text(entry.kindLabel, style: AppType.body),
+          Text(entry.kindLabel, style: AppTypography.body),
           const SizedBox(width: 8),
-          Text(Formatters.shortDate(entry.createdAt), style: AppType.caption),
+          Text(Formatters.monthDay(entry.createdAt), style: AppTypography.meta),
           const Spacer(),
           Text(
             CashFormat.signedWon(entry.deltaCents),
-            style: AppType.body
-                .copyWith(color: amountColor, fontWeight: FontWeight.w700),
+            style: AppTypography.bodyStrong.copyWith(color: amountColor),
           ),
         ],
       ),
-    );
-  }
-}
-
-/// '조회만' 배지 — 앱에서 결제하지 않음을 명시.
-class _ReadOnlyBadge extends StatelessWidget {
-  const _ReadOnlyBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: ColorTokens.muted.withOpacity(0.16),
-        borderRadius: AppShape.pillRadius,
-      ),
-      child: Text('조회만',
-          style: AppType.caption.copyWith(color: ColorTokens.muted)),
     );
   }
 }

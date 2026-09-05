@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/secondary_button.dart';
+import '../../../../core/commerce/commerce_policy.dart';
+import '../../../../core/web_bridge/web_bridge_actions.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_secondary_button.dart';
+import '../../../../shared/widgets/commerce_notice_card.dart';
 import '../../data/mypage_models.dart';
 import '../../format/cash_format.dart';
 import '../widgets/mypage_section.dart';
-import '../../../../core/commerce/commerce_policy.dart';
-import '../../../../core/web_bridge/web_bridge_actions.dart';
-import '../../../../shared/widgets/commerce_notice_card.dart';
 
 /// 멘토 대시보드 — 답변·정산 요약(조회만). 정산 출금/관리는 웹.
+/// design-v3 §4-2: 금액은 가장 크게, 대기 건수는 한 눈에.
 /// ★ IQ(개별질문)·CR(의뢰결제)는 앱 범위 밖 → 표시하지 않는다. 구독·질문방 중심.
 class MentorDashboardSection extends StatelessWidget {
   const MentorDashboardSection({
@@ -31,21 +33,31 @@ class MentorDashboardSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final int? cents = data.latestSettlementCents;
     return MyPageSection(
       icon: Icons.insights_rounded,
       title: '답변 · 정산 요약',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          // 최근 정산 — 라벨 작게 위, 금액 크게(§4-2). 값은 그대로.
+          const Text('최근 정산', style: AppTypography.captionSecondary),
+          const SizedBox(height: 4),
+          Text(
+            cents != null ? CashFormat.won(cents) : '-',
+            style: AppTypography.bigNumber,
+          ),
+          const SizedBox(height: AppSpacing.s16),
           Row(
             children: <Widget>[
               Expanded(
-                child: _Stat(
-                  label: '구독 학생',
-                  count: data.studentCount,
-                ),
+                child: _Stat(label: '구독 학생', count: data.studentCount),
               ),
-              Container(width: 1, height: 36, color: ColorTokens.border),
+              const SizedBox(
+                width: 1,
+                height: 36,
+                child: ColoredBox(color: AppColors.ring),
+              ),
               Expanded(
                 child: _Stat(
                   label: '답변 대기',
@@ -56,38 +68,25 @@ class MentorDashboardSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          // 최근 정산 — 라벨+금액 한 줄(값은 그대로). 라벨 좌측, 금액 우측 정렬.
-          Row(
-            children: <Widget>[
-              const Text('최근 정산', style: AppType.caption),
-              const Spacer(),
-              Text(
-                data.latestSettlementCents != null
-                    ? CashFormat.won(data.latestSettlementCents!)
-                    : '-',
-                style: AppType.number,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SecondaryButton(
+          const SizedBox(height: AppSpacing.s16),
+          AppSecondaryButton(
             label: '받은 질문 보기',
             icon: Icons.forum_rounded,
             onPressed: onGoToQuestions,
           ),
-          const SizedBox(height: 8),
           // P0-3 잔존 처리: 정산 관리 링크도 스토어 빌드에서 숨기고 안내로 대체
           // (kPayoutManageLinkEnabled — dev 는 dart-define 주입으로 on).
-          if (kPayoutManageLinkEnabled)
-            SecondaryButton(
+          if (kPayoutManageLinkEnabled) ...<Widget>[
+            const SizedBox(height: 8),
+            AppSecondaryButton(
               label: '정산 관리 (웹)',
               icon: Icons.open_in_new_rounded,
-              neutral: true,
               onPressed: () => openPayoutManageWeb(context),
-            )
-          else if (showPayoutNotice)
+            ),
+          ] else if (showPayoutNotice) ...<Widget>[
+            const SizedBox(height: 8),
             const CommerceNoticeCard(text: kPayoutManageNoticeText),
+          ],
         ],
       ),
     );
@@ -114,12 +113,13 @@ class _Stat extends StatelessWidget {
       children: <Widget>[
         Text(
           '$count',
-          style: AppType.number.copyWith(
-            color: warn ? ColorTokens.warning : null,
+          style: AppTypography.title.copyWith(
+            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            color: warn ? AppColors.warning : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 2),
-        Text(label, style: AppType.caption),
+        Text(label, style: AppTypography.captionSecondary),
       ],
     );
   }

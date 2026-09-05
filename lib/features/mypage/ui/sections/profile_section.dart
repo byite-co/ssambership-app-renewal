@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../data/mypage_models.dart';
 
@@ -22,7 +22,7 @@ class ProfileSection extends StatelessWidget {
     ];
     return Row(
       children: <Widget>[
-        InitialAvatar(name: profile.name, size: 56),
+        InitialAvatar(name: profile.name, size: 56, tinted: false),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -31,15 +31,15 @@ class ProfileSection extends StatelessWidget {
             children: <Widget>[
               Text(
                 profile.name.isNotEmpty ? profile.name : '내 정보',
-                style: AppType.title,
+                style: AppTypography.title,
               ),
               if (sub.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 4),
-                Text(sub.join(' · '), style: AppType.caption),
+                Text(sub.join(' · '), style: AppTypography.captionSecondary),
               ],
               if (profile.email != null) ...<Widget>[
                 const SizedBox(height: 2),
-                Text(profile.email!, style: AppType.caption),
+                Text(profile.email!, style: AppTypography.meta),
               ],
             ],
           ),
@@ -49,7 +49,7 @@ class ProfileSection extends StatelessWidget {
             onPressed: onEdit,
             icon: const Icon(Icons.edit_rounded),
             tooltip: '프로필 수정',
-            color: ColorTokens.secondary,
+            color: AppColors.textSecondary,
           ),
       ],
     );

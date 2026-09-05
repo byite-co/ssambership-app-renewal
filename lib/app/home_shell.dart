@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart' show AppRole;
 import '../core/refresh/data_refresh_bus.dart';
 import '../design/role_theme.dart' as design;
-import '../design/spacing_tokens.dart';
+import '../design/tokens/app_spacing.dart';
 import '../design/widgets/app_background.dart';
+import '../design/widgets/app_blocks.dart';
+import '../design/widgets/app_empty_state.dart';
 import '../design/widgets/app_page.dart';
 import '../design/widgets/glass_bars.dart';
 import '../features/community/community_screen.dart';
@@ -19,6 +21,7 @@ import '../features/notifications/data/notification_badge_controller.dart'
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/errors/friendly_error.dart';
 import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_navigation.dart';
@@ -457,43 +460,35 @@ class MentorSettlementsTabBody extends StatelessWidget {
     return AsyncRouteLoader<MentorDashboard>(
       load: (AppDependencies dependencies) async =>
           (await dependencies.myPage.load()).mentor,
-      loadingBuilder: (_) => const Center(child: CircularProgressIndicator()),
-      notFoundBuilder: (_) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('정산 요약을 불러올 수 없어요.'),
-        ),
+      loadingBuilder: (_) => const AppLoadingView(cards: 1),
+      notFoundBuilder: (_) => const AppEmptyState(
+        icon: Icons.receipt_long_rounded,
+        title: '정산 요약을 불러올 수 없어요.',
+        description: '잠시 후 다시 확인해 주세요.',
       ),
       errorBuilder: (BuildContext context, Object error, VoidCallback retry) =>
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  const Text('정산 요약을 불러오지 못했어요.'),
-                  const SizedBox(height: AppSpacing.s12),
-                  TextButton(onPressed: retry, child: const Text('다시 시도')),
-                ],
-              ),
-            ),
+          AppErrorView(
+        title: '정산 요약을 불러오지 못했어요.',
+        message: friendlyError(error),
+        onRetry: retry,
+      ),
+      builder: (
+        BuildContext context,
+        MentorDashboard dashboard,
+        AppDependencies dependencies,
+      ) =>
+          ListView(
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: AppSpacing.s16),
+        children: <Widget>[
+          MentorDashboardSection(
+            data: dashboard,
+            onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
+            // 정산 화면 자체 — 정산 안내 카드는 띄우지 않는다(정산 허브 아이콘이 위에 있다).
+            showPayoutNotice: false,
           ),
-      builder:
-          (
-            BuildContext context,
-            MentorDashboard dashboard,
-            AppDependencies dependencies,
-          ) => ListView(
-            padding: AppPage.contentPadding(context, top: AppSpacing.s16),
-            children: <Widget>[
-              MentorDashboardSection(
-                data: dashboard,
-                onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
-                // 정산 화면 자체 — 정산 안내 카드는 띄우지 않는다(정산 허브 아이콘이 위에 있다).
-                showPayoutNotice: false,
-              ),
-            ],
-          ),
+        ],
+      ),
       notFoundMessage: '정산 요약을 불러올 수 없어요.',
       errorMessage: '정산 요약을 불러오지 못했어요.',
     );
