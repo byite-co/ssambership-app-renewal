@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../data/mappings/subject_labels.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/widgets/glass_card.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/models/question_thread.dart';
 import 'thread_status_pill.dart';
@@ -28,7 +28,7 @@ class ThreadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GlassCard(
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,7 +40,7 @@ class ThreadCard extends StatelessWidget {
                   thread.title?.trim().isNotEmpty == true
                       ? thread.title!.trim()
                       : '(제목 없음)',
-                  style: AppType.title,
+                  style: AppTypography.bodyStrong,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -52,11 +52,14 @@ class ThreadCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: <Widget>[
-              AppBadge(label: subjectLabel(thread.subject)),
+              AppBadge(
+                label: subjectLabel(thread.subject),
+                tone: AppBadgeTone.neutral,
+              ),
               const Spacer(),
               Text(
                 Formatters.relativeKorean(thread.updatedAt),
-                style: AppType.caption,
+                style: AppTypography.meta,
               ),
             ],
           ),

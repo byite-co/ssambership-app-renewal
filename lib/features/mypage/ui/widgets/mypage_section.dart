@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/glass_card.dart';
 
-/// 마이페이지 섹션 컨테이너(제목 + 카드 본문). 세로로 잘게 쪼개지 않게 카드형으로 묶는다.
+/// 마이페이지 섹션 컨테이너(제목 + 유리 카드 본문). 세로로 잘게 쪼개지 않게 카드형으로 묶는다.
 /// 모든 섹션이 같은 헤더/여백을 쓰도록 공통화(중복 제거).
 class MyPageSection extends StatelessWidget {
   const MyPageSection({
@@ -22,7 +22,7 @@ class MyPageSection extends StatelessWidget {
   /// 제목 우측 보조(예: '조회만' 배지).
   final Widget? trailing;
 
-  /// 제목 앞 leading 아이콘(선택). 없으면 기존과 동일(제목만). 색은 secondary 토큰.
+  /// 제목 앞 leading 아이콘(선택). 없으면 제목만. 색은 보조색.
   final IconData? icon;
 
   @override
@@ -33,14 +33,14 @@ class MyPageSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: AppSpacing.titleBody),
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
             child: Row(
               children: <Widget>[
                 if (icon != null) ...<Widget>[
-                  Icon(icon, size: 18, color: ColorTokens.secondary),
+                  Icon(icon, size: 18, color: AppColors.textSecondary),
                   const SizedBox(width: 6),
                 ],
-                Text(title, style: AppType.title),
+                Text(title, style: AppTypography.section),
                 if (trailing != null) ...<Widget>[
                   const SizedBox(width: 8),
                   trailing!,
@@ -48,7 +48,7 @@ class MyPageSection extends StatelessWidget {
               ],
             ),
           ),
-          AppCard(child: child),
+          GlassCard(child: child),
         ],
       ),
     );
@@ -76,19 +76,24 @@ class MyPageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppRadius.input),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        // 8: 설정 섹션 전체(토글 6 + 행 5 + 버튼)가 800×600 테스트 표면에 들어가야 한다.
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: <Widget>[
-            Icon(icon, size: 20, color: ColorTokens.secondary),
+            Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: AppType.body)),
+            Expanded(child: Text(label, style: AppTypography.body)),
             if (trailingText != null)
-              Text(trailingText!, style: AppType.caption),
+              Text(trailingText!, style: AppTypography.captionSecondary),
             if (showChevron && onTap != null) ...<Widget>[
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, size: 18, color: ColorTokens.muted),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
             ],
           ],
         ),

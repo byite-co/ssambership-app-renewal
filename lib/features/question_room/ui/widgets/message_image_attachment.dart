@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
 import '../../data/models/question_attachment.dart';
 
 /// 채팅 말풍선 안/옆의 이미지 첨부 썸네일. 탭 시 [onOpen](전체화면 뷰어).
 ///
 /// 서명 URL 을 [resolver] 로 발급(만료 전 캐시 재사용)해 표시하고, 로딩·실패는
-/// 플레이스홀더로 대체한다(깨진 이미지·크래시 방지).
+/// 플레이스홀더로 대체한다(깨진 이미지·크래시 방지). 말풍선 안에 인라인으로
+/// 들어가므로 모서리 10(design-v3 §3-2 '문제 사진').
 class MessageImageAttachment extends StatefulWidget {
   const MessageImageAttachment({
     super.key,
@@ -48,7 +49,7 @@ class _MessageImageAttachmentState extends State<MessageImageAttachment> {
     return GestureDetector(
       onTap: widget.onOpen,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: SizedBox(
           width: widget.size,
           height: widget.size,
@@ -90,7 +91,7 @@ class _ThumbBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: ColorTokens.elevated,
+      color: AppColors.navy.withValues(alpha: 0.07),
       alignment: Alignment.center,
       child: child,
     );
@@ -112,7 +113,7 @@ class _BrokenIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Icon(
         Icons.broken_image_outlined,
-        color: ColorTokens.muted,
+        color: AppColors.textSecondary,
         size: 28,
       );
 }

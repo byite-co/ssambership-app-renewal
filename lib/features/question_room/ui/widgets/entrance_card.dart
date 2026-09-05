@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/role_accent.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/role_theme.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/glass_card.dart';
 
 /// 방 홈(2뎁스)의 동등한 '큰 입구' 카드. 학생·멘토 홈이 함께 쓴다.
 /// 아이콘 + 제목 (+ 선택 trailing) / 미리보기 child / 우측 chevron.
@@ -27,7 +27,7 @@ class EntranceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GlassCard(
       onTap: onTap,
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -35,15 +35,18 @@ class EntranceCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, color: AppAccent.of(context).accent),
+              Icon(icon, size: 22, color: RoleTheme.of(context).color),
               const SizedBox(width: 8),
-              Text(title, style: AppType.title),
+              Text(title, style: AppTypography.section),
               if (trailing != null) ...<Widget>[
                 const SizedBox(width: 8),
                 trailing!,
               ],
               const Spacer(),
-              const Icon(Icons.chevron_right_rounded, color: ColorTokens.muted),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
           const SizedBox(height: 12),

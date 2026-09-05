@@ -5,6 +5,8 @@ import '../tokens/app_glass.dart';
 import '../tokens/app_spacing.dart';
 
 /// A performant content card built from translucent fill, ring, and shadow.
+///
+/// [onTap] 이 있으면 카드 전체가 눌리는 목록 행이 된다(리플은 카드 모서리 안).
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -14,20 +16,41 @@ class GlassCard extends StatelessWidget {
       Radius.circular(AppRadius.card),
     ),
     this.showHighlight = true,
+    this.onTap,
+    this.onLongPress,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final BorderRadius borderRadius;
   final bool showHighlight;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
+    final Widget card = _surface();
+    if (onTap == null && onLongPress == null) return card;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: borderRadius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: borderRadius,
+        child: card,
+      ),
+    );
+  }
+
+  Widget _surface() {
     return Stack(
       fit: StackFit.passthrough,
       clipBehavior: Clip.none,
       children: <Widget>[
         Container(
+          width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: AppGlass.panelFill),

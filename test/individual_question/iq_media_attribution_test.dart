@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/theme.dart';
+import 'package:ssambership_app/design/app_theme.dart';
+import 'package:ssambership_app/design/role_theme.dart' as design;
 import 'package:ssambership_app/features/individual_question/data/iq_realtime.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
@@ -71,8 +72,10 @@ Future<void> _pump(
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpScopedWidget(const SizedBox.shrink());
-  await tester.pumpScopedWidget(MaterialApp(
-    theme: AppTheme.build(role),
+  await tester.pumpScopedWidget(design.RoleTheme(
+    role: _designRole(role),
+    child: MaterialApp(
+    theme: AppTheme.build(role: _designRole(role)),
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,
@@ -86,6 +89,7 @@ Future<void> _pump(
                 mentorName: '수학멘토',
               ),
     ),
+  ),
   ));
   await tester.pumpAndSettle();
 }
@@ -103,6 +107,10 @@ Finder _inBubble(String body, String text) => find.descendant(
           (Widget w) => w is ConversationBubble && w.body == body),
       matching: find.text(text),
     );
+
+/// 인증 역할 → 테마 역할(멘토만 초록). 화면이 RoleTheme 을 읽으므로 감싼다.
+design.AppRole _designRole(AppRole role) =>
+    role == AppRole.mentor ? design.AppRole.mentor : design.AppRole.student;
 
 void main() {
   testWidgets('학생 후속 메시지 첨부는 그 학생 메시지 말풍선에 붙는다(질문 말풍선 아님)',

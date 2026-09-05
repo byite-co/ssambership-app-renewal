@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/theme.dart';
-import 'package:ssambership_app/design/widgets/app_card.dart';
+import 'package:ssambership_app/design/app_theme.dart';
+import 'package:ssambership_app/design/role_theme.dart' as design;
+import 'package:ssambership_app/design/widgets/glass_card.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
@@ -77,8 +78,10 @@ Future<void> _pump(
   // pumpWidget 은 위젯 타입이 같으면 State 를 재사용해 loader 재주입이
   // 무시된다 — 시나리오마다 완전히 새로 마운트한다.
   await tester.pumpScopedWidget(const SizedBox.shrink());
-  await tester.pumpScopedWidget(MaterialApp(
-    theme: AppTheme.build(role),
+  await tester.pumpScopedWidget(design.RoleTheme(
+    role: _designRole(role),
+    child: MaterialApp(
+    theme: AppTheme.build(role: _designRole(role)),
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,
@@ -95,6 +98,7 @@ Future<void> _pump(
         mentorName: '수학멘토',
       ),
     ),
+  ),
   ));
   await tester.pumpAndSettle();
 }
@@ -118,9 +122,13 @@ void _setView(WidgetTester tester, Size logical) {
   addTearDown(tester.view.reset);
 }
 
+/// 인증 역할 → 테마 역할(멘토만 초록). 화면이 RoleTheme 을 읽으므로 감싼다.
+design.AppRole _designRole(AppRole role) =>
+    role == AppRole.mentor ? design.AppRole.mentor : design.AppRole.student;
+
 void main() {
   group('A. 전체 화면 구조 — 카드 스택이 아니라 대화방', () {
-    testWidgets('AppCard 스택 0 — 질문·첨부·대화 카드와 그 헤더가 모두 사라진다',
+    testWidgets('GlassCard 스택 0 — 질문·첨부·대화 카드와 그 헤더가 모두 사라진다',
         (WidgetTester tester) async {
       await _pump(
         tester,
@@ -129,8 +137,8 @@ void main() {
         attachments: const <IqAttachment>[_image],
       );
 
-      expect(find.byType(AppCard), findsNothing,
-          reason: '상세 화면 어디에도 AppCard 스택이 남으면 안 된다');
+      expect(find.byType(GlassCard), findsNothing,
+          reason: '상세 화면 어디에도 GlassCard 스택이 남으면 안 된다');
       expect(find.text('질문'), findsNothing, reason: '독립 질문 카드 헤더 금지');
       expect(find.text('첨부'), findsNothing, reason: '타임라인 밖 첨부 섹션 금지');
       expect(find.text('대화'), findsNothing, reason: '작은 중첩 대화 카드 금지');

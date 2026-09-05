@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/theme.dart';
+import 'package:ssambership_app/design/app_theme.dart';
+import 'package:ssambership_app/design/role_theme.dart' as design;
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import '../support/app_scope_test_harness.dart';
@@ -65,8 +66,10 @@ Future<void> _pump(
   // pumpWidget 은 위젯 타입이 같으면 State 를 재사용해 loader 재주입이
   // 무시된다 — 시나리오마다 완전히 새로 마운트한다.
   await tester.pumpScopedWidget(const SizedBox.shrink());
-  await tester.pumpScopedWidget(MaterialApp(
-    theme: AppTheme.build(role),
+  await tester.pumpScopedWidget(design.RoleTheme(
+    role: _designRole(role),
+    child: MaterialApp(
+    theme: AppTheme.build(role: _designRole(role)),
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,
@@ -83,6 +86,7 @@ Future<void> _pump(
         mentorName: '수학멘토',
       ),
     ),
+  ),
   ));
   await tester.pumpAndSettle();
 }
@@ -95,6 +99,10 @@ void _setView(WidgetTester tester, Size logical) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 }
+
+/// 인증 역할 → 테마 역할(멘토만 초록). 화면이 RoleTheme 을 읽으므로 감싼다.
+design.AppRole _designRole(AppRole role) =>
+    role == AppRole.mentor ? design.AppRole.mentor : design.AppRole.student;
 
 void main() {
   // [QA-C8·C9] 개별질문 타임라인은 새 항목이 들어오면 끝으로 수렴해야 한다.
