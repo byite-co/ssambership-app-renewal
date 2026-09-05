@@ -65,6 +65,14 @@ abstract class MentorConsolePort {
   Future<MentorOwnProfile> loadOwnProfile();
   Future<void> updateOwnProfile(MentorProfileUpdate update);
 
+  /// A-4b ④ 활동 상태(`api_app_v1.mentor_activity_set`) — 일시중지/복귀/종료 예정.
+  Future<MentorActivityResult> setActivityStatus(MentorActivityRequest request);
+
+  /// A-4b ⑦ 학생증 사후 제출 — 버킷 업로드(user JWT·RLS) 후
+  /// `api_app_v1.mentor_student_id_document_set_self` 로 반영.
+  Future<StudentIdDocumentResult> submitStudentIdDocument(
+      VerifiedMentorDocument document);
+
   /// 아바타 업로드 → F7 에 넘길 public URL.
   Future<String> uploadAvatar(PickedImage image);
 }
@@ -346,7 +354,8 @@ class SupabaseMentorConsoleRepository implements MentorConsolePort {
           'user_id, university_name, department_name, high_school_name, '
           'teaching_subjects, intro_line, bio, answer_style, profile_image_url, '
           'is_open_for_subscriptions, verification_status, activity_status, '
-          'pause_until',
+          'pause_until, pause_reason, last_pause_at, termination_effective_at, '
+          'student_id_image_url',
         )
         .eq('user_id', _uid)
         .maybeSingle();
@@ -360,6 +369,41 @@ class SupabaseMentorConsoleRepository implements MentorConsolePort {
         .schema('api_web_v1')
         .rpc('mentor_profile_update_self', params: update.toParams());
     ApiEnvelope.parse(data).requireOk(mentorProfileMessageForCode);
+  }
+
+  @override
+  Future<MentorActivityResult> setActivityStatus(
+      MentorActivityRequest request) async {
+    final Object? data = await _client
+        .schema('api_app_v1')
+        .rpc('mentor_activity_set', params: request.toParams());
+    final ApiEnvelope env =
+        ApiEnvelope.parse(data).requireOk(activityMessageForCode);
+    return MentorActivityResult.fromBody(env.body);
+  }
+
+  @override
+  Future<StudentIdDocumentResult> submitStudentIdDocument(
+      VerifiedMentorDocument document) async {
+    final String uid = _uid;
+    // 첫 세그먼트 = uid(버킷 RLS `student_id_images_insert_own` · RPC 소유 검증).
+    final String path = '$uid/student-id/${_documentFileName(document)}';
+    await _uploadDocument(path, document);
+    try {
+      final Object? data = await _client.schema('api_app_v1').rpc(
+        'mentor_student_id_document_set_self',
+        params: <String, dynamic>{'p_object_path': path},
+      );
+      final ApiEnvelope env =
+          ApiEnvelope.parse(data).requireOk(studentIdMessageForCode);
+      return StudentIdDocumentResult.fromBody(env.body);
+    } on AppError {
+      await _compensateDocument(path);
+      rethrow;
+    } catch (e) {
+      await _compensateDocument(path);
+      throw AppError('학생증을 제출하지 못했어요. 잠시 후 다시 시도해 주세요.', cause: e);
+    }
   }
 
   @override
@@ -401,6 +445,47 @@ String payoutAccountMessageForCode(String code, Map<String, dynamic> body) {
       return '계좌번호는 숫자 8~24자리로 입력해 주세요.';
   }
   return apiWebV1CommonMessage(code) ?? '계좌 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.';
+}
+
+/// 활동 상태(A-4b ④) 코드 → 문구(웹 `mentorActivityService` 문장과 같은 뜻).
+String activityMessageForCode(String code, Map<String, dynamic> body) {
+  switch (code) {
+    case 'ACTIVITY_STATE_INVALID':
+      return '지금 상태에서는 바꿀 수 없어요. 화면을 새로고침해 주세요.';
+    case 'ACTIVITY_STATUS_INVALID':
+      return '요청 값이 올바르지 않아요. 다시 시도해 주세요.';
+    case 'PAUSE_UNTIL_REQUIRED':
+    case 'PAUSE_UNTIL_INVALID':
+      return '복귀 날짜를 다시 확인해 주세요.';
+    case 'PAUSE_TOO_LONG':
+      final Object? max = body['max_days'];
+      return '일시중지는 최대 ${max is num ? max.toInt() : 7}일까지예요.';
+    case 'PAUSE_REASON_INVALID':
+      return '휴식 사유를 선택해 주세요.';
+    case 'REST_FREQUENCY_LIMIT':
+      final Object? next = body['next_available_at'];
+      final DateTime? at =
+          next is String ? DateTime.tryParse(next)?.toLocal() : null;
+      return at == null
+          ? '일반 휴식은 6개월에 한 번이에요. 질병 등 사유로는 관리자 확인 후 쉴 수 있어요.'
+          : '일반 휴식은 6개월에 한 번이에요. ${at.month}월 ${at.day}일 이후에 다시 신청할 수 있어요.';
+    case 'TERMINATION_DATE_TOO_FAR':
+      return '종료 예정일은 최대 90일 뒤까지 정할 수 있어요.';
+  }
+  return apiWebV1CommonMessage(code) ?? '활동 상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.';
+}
+
+/// 학생증 사후 제출(A-4b ⑦) 코드 → 문구.
+String studentIdMessageForCode(String code, Map<String, dynamic> body) {
+  switch (code) {
+    case 'STORAGE_FILE_TYPE_INVALID':
+      return 'JPG, PNG, PDF 형식의 학생증만 올릴 수 있어요.';
+    case 'STORAGE_PATH_REQUIRED':
+    case 'STORAGE_PATH_INVALID':
+    case 'STORAGE_OBJECT_NOT_OWNED':
+      return '업로드한 파일을 확인하지 못했어요. 다시 올려 주세요.';
+  }
+  return apiWebV1CommonMessage(code) ?? '학생증을 제출하지 못했어요. 잠시 후 다시 시도해 주세요.';
 }
 
 String planPricesMessageForCode(String code, Map<String, dynamic> body) {

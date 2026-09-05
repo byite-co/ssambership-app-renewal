@@ -8,6 +8,7 @@ import 'package:ssambership_app/core/entitlement/subscription_summary.dart';
 import 'package:ssambership_app/core/entitlement/subscription_summary_port.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
+import 'package:ssambership_app/features/mentor_console/data/mentor_console_repository.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_repository.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
 import 'package:ssambership_app/features/notifications/data/notification_badge_controller.dart';
@@ -175,10 +176,12 @@ AppDependencies goldenDependencies({
   StudentLookupRepository? studentLookup,
   SubscriptionSummaryPort? subscriptions,
   MyPageRepository? myPage,
+  MentorConsolePort? mentorConsole,
 }) =>
     AppDependencies(
       auth: auth,
       supabaseClient: () => null,
+      mentorConsole: mentorConsole ?? const SupabaseMentorConsoleRepository(),
       questionRoomRead: questionRoomRead ?? const QuestionRoomReadRepository(),
       mentorLookup: mentorLookup ?? const GoldenMentorLookup(<String, MentorPublic>{}),
       studentLookup:

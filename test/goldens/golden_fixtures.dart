@@ -1,6 +1,7 @@
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/entitlement/subscription_summary.dart';
 import 'package:ssambership_app/core/entitlement/weekly_question_usage.dart';
+import 'package:ssambership_app/features/mentor_console/data/mentor_console_models.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/question_room/data/attachments/attachment_upload.dart';
 import 'package:ssambership_app/features/question_room/data/mentor_lookup_repository.dart';
@@ -264,6 +265,16 @@ MyPageData goldenStudentMyPage() => MyPageData(
           ),
         ],
       ),
+    );
+
+/// 멘토 본인 프로필(A-4b ④⑦ 활동 상태·학생증 섹션용) — 활동 중 · 학생증 미제출.
+MentorOwnProfile goldenMentorOwnProfile() => const MentorOwnProfile(
+      userId: kMentorId,
+      universityName: '서울대학교',
+      departmentName: '수학교육과',
+      teachingSubjects: <String>['math'],
+      verificationStatus: 'approved',
+      activityStatus: 'active',
     );
 
 MyPageData goldenMentorMyPage() => const MyPageData(

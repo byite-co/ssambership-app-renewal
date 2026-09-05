@@ -46,6 +46,8 @@ const Set<String> kExpectedRpcNames = <String>{
   'subscription_cancel_undo',
   'refund_estimate',
   'refund_request_create',
+  'mentor_activity_set', // A-4b ④ 활동 상태(DB-4 201)
+  'mentor_student_id_document_set_self', // A-4b ⑦ 학생증 사후 제출(DB-4 203)
   // 개별질문
   'add_individual_question_attachment',
   'claim_individual_question_as_mentor',

@@ -19,6 +19,7 @@ import 'data/mypage_repository.dart';
 import 'ui/profile_edit_screen.dart';
 import 'ui/sections/cash_section.dart';
 import 'ui/sections/mentor_dashboard_section.dart';
+import 'ui/sections/mentor_self_service_section.dart';
 import 'ui/sections/profile_section.dart';
 import 'ui/sections/settings_section.dart';
 import 'ui/sections/student_subscription_section.dart';
@@ -315,6 +316,8 @@ class _MyPageScreenState extends State<MyPageScreen>
           data: data.mentor!,
           onGoToQuestions: _goToQuestions,
         ),
+      // A-4b ④⑦: 활동 상태 · 학생증 사후 제출(포트는 AppScope 의 mentorConsole).
+      const MentorSelfServiceSections(),
       // 멘토: '받은 리뷰'(웹 /mentor/reviews — 받은 리뷰 관리 화면) 노출.
       SupportSection(
         onOpenNotifications: widget.onOpenNotifications,

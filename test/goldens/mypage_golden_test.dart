@@ -5,6 +5,8 @@ import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/shared/constants/app_constants.dart';
 
+import '../support/fake_mentor_console.dart';
+import 'golden_app_fakes.dart';
 import 'golden_fixtures.dart';
 import 'golden_harness.dart';
 
@@ -38,6 +40,10 @@ void main() {
       tester,
       page(goldenMentorMyPage),
       role: AppRole.mentor,
+      dependencies: goldenDependencies(
+        auth: FakeAppAuth(role: AppRole.mentor),
+        mentorConsole: FakeMentorConsole(profile: goldenMentorOwnProfile()),
+      ),
     );
     await expectScreenGolden(tester, 'mypage_mentor');
   });
