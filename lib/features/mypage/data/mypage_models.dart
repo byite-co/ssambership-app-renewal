@@ -35,6 +35,7 @@ class MyProfile {
   const MyProfile({
     required this.name,
     required this.roleLabel,
+    this.studentStatus,
     this.email,
     this.grade,
   });
@@ -42,6 +43,9 @@ class MyProfile {
   final String name;
   final String roleLabel;
   final String? email;
+
+  /// 재학 상태(`users.student_status` · 자유 텍스트 20자 · 학생만). A-4b ⑥.
+  final String? studentStatus;
 
   /// 학년(예: '고2'). DB grade_level 이 이미 한글 표기라 그대로 쓴다. 없으면 비움.
   final String? grade;
@@ -52,15 +56,27 @@ class SubscriptionCardInfo {
   const SubscriptionCardInfo({
     required this.mentorName,
     required this.isActive,
+    this.subscriptionId,
     this.status,
     this.planTier,
     this.nextRenewal,
     this.remaining,
     this.usage,
+    this.cancelAtPeriodEnd = false,
   });
 
   final String mentorName;
   final bool isActive;
+
+  /// `subscriptions.id` — 해지 예약·취소·환불 신청의 인자(A-4b). null 이면 동작 버튼 없음.
+  final String? subscriptionId;
+
+  /// 해지 예약 플래그(`cancel_at_period_end`). 상태값이 active 여도 true 면 해지 예정.
+  final bool cancelAtPeriodEnd;
+
+  /// 해지 예정 여부 — 플래그 또는 상태값(`cancel_scheduled`).
+  bool get isCancelScheduled =>
+      cancelAtPeriodEnd || status?.trim() == 'cancel_scheduled';
 
   /// 원본 상태값(표시 세분화용). null 이면 [isActive] 로 폴백.
   final String? status;

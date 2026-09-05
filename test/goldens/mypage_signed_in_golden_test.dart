@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/shared/constants/app_constants.dart';
 
+import '../support/fake_mentor_console.dart';
 import 'golden_app_fakes.dart';
 import 'golden_fixtures.dart';
 import 'golden_harness.dart';
@@ -44,10 +45,13 @@ void main() {
       dependencies: goldenDependencies(
         auth: FakeAppAuth(role: AppRole.mentor, userId: kMentorId),
         myPage: GoldenMyPageRepository(goldenMentorMyPage()),
+        mentorConsole: FakeMentorConsole(profile: goldenMentorOwnProfile()),
       ),
     );
     expect(find.byTooltip('프로필 수정'), findsOneWidget);
-    expect(find.text('로그아웃'), findsOneWidget);
+    // A-4b ④⑦: 활동 상태·학생증 섹션이 들어와 로그아웃 버튼은 뷰포트 아래로 내려갔다
+    // (학생 변형과 같은 이유로 여기서 단언하지 않는다). 섹션 노출로 대신 확인.
+    expect(find.text('활동 상태'), findsOneWidget);
     await expectScreenGolden(tester, 'mypage_mentor_signed_in');
   });
 }

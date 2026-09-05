@@ -64,6 +64,10 @@ String? profileUpdateErrorMessage(Object e) {
       return '멘토 계정은 학년을 설정할 수 없어요.';
     case 'GRADE_LEVEL_TOO_LONG':
       return '학년은 20자 이내로 입력해 주세요.';
+    case 'STUDENT_STATUS_NOT_ALLOWED':
+      return '학생 계정만 재학 상태를 설정할 수 있어요.';
+    case 'STUDENT_STATUS_TOO_LONG':
+      return '재학 상태는 20자 이내로 입력해 주세요.';
   }
   return null;
 }
@@ -92,7 +96,7 @@ class ProfileEditRepository {
   ProfileEditBackend get _backend =>
       _backendOverride ?? const SupabaseProfileEditBackend();
 
-  /// 표시명(nickname)·학년(grade_level) 갱신 — RPC 단일 경로.
+  /// 표시명(nickname)·학년(grade_level) 갱신 — v1 RPC 단일 경로(종전 그대로).
   ///
   /// - [nickname] null = 유지(파라미터 미전송). 값이 있으면 항상 전송.
   /// - [gradeLevel] null = **파라미터 자체를 생략**(유지 — 멘토는 항상 이 경로).
@@ -111,6 +115,32 @@ class ProfileEditRepository {
     } catch (e) {
       throw mapProfileUpdateError(e);
     }
+    _requireOk(data);
+  }
+
+  /// A-4b ⑥: 재학 상태까지 갱신 — `user_profile_update_self_v2`(DB-4 203, 학생 전용).
+  /// [studentStatus] 규칙은 학년과 같다('' = 비우기). 화면은 재학 상태가 **바뀌었을 때만**
+  /// 이 경로를 타고, 아니면 [updateProfile](v1)을 그대로 쓴다(감소 0).
+  Future<void> updateProfileWithStudentStatus({
+    String? nickname,
+    String? gradeLevel,
+    required String studentStatus,
+  }) async {
+    final Object? data;
+    try {
+      data = await _backend.rpc('user_profile_update_self_v2', <String, dynamic>{
+        if (nickname != null) 'p_nickname': nickname,
+        if (gradeLevel != null) 'p_grade_level': gradeLevel,
+        'p_student_status': studentStatus,
+      });
+    } catch (e) {
+      throw mapProfileUpdateError(e);
+    }
+    _requireOk(data);
+  }
+
+  /// 성공 봉투 strict 검증(v1·v2 공통).
+  static void _requireOk(Object? data) {
     if (data is! Map || data['ok'] != true || data['contract_version'] != 1) {
       throw const AppError('프로필 저장 결과를 확인하지 못했어요. 다시 시도해 주세요.');
     }

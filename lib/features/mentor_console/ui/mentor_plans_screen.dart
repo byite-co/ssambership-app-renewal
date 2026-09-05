@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
+import '../../../design/role_theme.dart';
 import '../../../design/tokens/app_colors.dart';
 import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
@@ -51,6 +52,10 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
   bool _saving = false;
   String? _saveError;
   int? _loadedIqPrice;
+
+  /// A-4b ⑤: 등급별 활성 여부(서버 값) · 토글 요청 중인 등급(이중 탭 방지).
+  final Map<MentorPlanTier, bool> _active = <MentorPlanTier, bool>{};
+  final Set<MentorPlanTier> _toggling = <MentorPlanTier>{};
 
   @override
   void initState() {
@@ -107,6 +112,37 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
     }
     _iqInput.text = data.iqPriceWon?.toString() ?? '';
     _loadedIqPrice = data.iqPriceWon;
+    for (final MentorPlanTier t in MentorPlanTier.values) {
+      _active[t] = data.prices.isActive(t);
+    }
+  }
+
+  /// A-4b ⑤: 토글 → 즉시 서버 반영. 실패하면 되돌리고 문구 사전으로 안내
+  /// (`LAST_ACTIVE_PLAN` → '요금제 하나는 켜져 있어야 해요').
+  Future<void> _toggleActive(MentorPlanTier tier, bool value) async {
+    if (_toggling.contains(tier) || _saving) return;
+    setState(() {
+      _toggling.add(tier);
+      _active[tier] = value; // 낙관적 표시 — 실패 시 되돌린다.
+    });
+    try {
+      final MentorPlanActiveResult r =
+          await _port.setPlanActive(tier: tier, isActive: value);
+      if (!mounted) return;
+      setState(() => _active[tier] = r.isActive);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(r.isActive
+            ? '${mentorPlanTierLabel(tier)} 요금제를 켰어요. 새 구독을 받아요.'
+            : '${mentorPlanTierLabel(tier)} 요금제를 껐어요. 새 구독만 막히고 기존 구독은 그대로예요.'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _active[tier] = !value);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+    } finally {
+      if (mounted) setState(() => _toggling.remove(tier));
+    }
   }
 
   int? _wonOf(TextEditingController c) {
@@ -221,6 +257,10 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
             help: '${formatWon(PlanPriceBand.of(tier).minWon)} ~ '
                 '${formatWon(PlanPriceBand.of(tier).maxWon)} 사이',
             error: _tierInputs[tier]!.text.isEmpty ? null : _tierError(tier),
+            active: _active[tier] ?? true,
+            onActiveChanged: (_saving || _toggling.contains(tier))
+                ? null
+                : (bool v) => _toggleActive(tier, v),
           ),
           const SizedBox(height: 12),
         ],
@@ -260,6 +300,8 @@ class _PriceCard extends StatelessWidget {
     required this.help,
     this.error,
     this.recommended = false,
+    this.active,
+    this.onActiveChanged,
   });
 
   final String title;
@@ -268,6 +310,10 @@ class _PriceCard extends StatelessWidget {
   final String help;
   final String? error;
   final bool recommended;
+
+  /// A-4b ⑤: 활성 토글(null 이면 토글 없음 — 개별질문 단가 카드).
+  final bool? active;
+  final ValueChanged<bool>? onActiveChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -304,6 +350,29 @@ class _PriceCard extends StatelessWidget {
               color: error != null ? AppColors.danger : AppColors.textSecondary,
             ),
           ),
+          if (active != null) ...<Widget>[
+            const SizedBox(height: 10),
+            const SizedBox(height: 1, child: ColoredBox(color: AppColors.ring)),
+            const SizedBox(height: 6),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    active! ? '새 구독을 받고 있어요' : '꺼짐 · 새 구독만 막히고 기존 구독은 그대로예요',
+                    style: AppTypography.caption.copyWith(
+                      color: active! ? AppColors.textPrimary : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: active!,
+                  onChanged: onActiveChanged,
+                  activeThumbColor: RoleTheme.of(context).color,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

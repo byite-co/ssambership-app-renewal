@@ -66,14 +66,16 @@ class MyPageRepository {
   Future<MyProfile> _loadProfile(AuthService auth) async {
     String? email;
     String? grade;
+    String? studentStatus;
     try {
       final Map<String, dynamic>? row = await _client
           .from('users')
-          .select('email, grade_level')
+          .select('email, grade_level, student_status')
           .eq('id', _uid)
           .maybeSingle();
       email = (row?['email'] as String?)?.trim();
       grade = (row?['grade_level'] as String?)?.trim();
+      studentStatus = (row?['student_status'] as String?)?.trim();
     } catch (_) {
       // 프로필 보강 read 실패는 치명적이지 않다 — 이름/역할만으로도 화면은 뜬다.
     }
@@ -82,6 +84,8 @@ class MyPageRepository {
       roleLabel: auth.roleLabel,
       email: (email?.isEmpty ?? true) ? null : email,
       grade: (grade?.isEmpty ?? true) ? null : grade,
+      studentStatus:
+          (studentStatus?.isEmpty ?? true) ? null : studentStatus,
     );
   }
 
@@ -105,6 +109,8 @@ class MyPageRepository {
         SubscriptionCardInfo(
           mentorName: names[s.mentorId]?.displayName ?? '멘토',
           isActive: s.isActive,
+          subscriptionId: s.id,
+          cancelAtPeriodEnd: s.cancelAtPeriodEnd,
           status: s.status,
           planTier: s.planTier,
           nextRenewal: s.nextRenewal,

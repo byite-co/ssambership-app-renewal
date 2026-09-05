@@ -17,6 +17,10 @@ String? iqErrorMessage(Object e) {
   if (code == null) return null;
   switch (code) {
     // 입력·세션
+    case 'INVALID_SUBJECT':
+      return '과목을 다시 선택해 주세요.';
+    case 'SUBJECT_REQUIRED':
+      return '공개 질문은 과목을 골라야 해요.';
     case 'AUTH_REQUIRED':
       return '로그인이 필요해요.';
     case 'BODY_REQUIRED':

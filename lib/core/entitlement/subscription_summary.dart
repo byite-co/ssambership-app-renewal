@@ -13,13 +13,22 @@ class SubscriptionSummary {
   const SubscriptionSummary({
     required this.mentorId,
     required this.isActive,
+    this.id,
     this.status,
     this.planTier,
     this.nextRenewal,
     this.remaining,
+    this.cancelAtPeriodEnd = false,
   });
 
   final String mentorId;
+
+  /// `subscriptions.id` — 해지 예약·취소·환불 신청 래퍼의 인자(A-4b). 화면 미노출.
+  final String? id;
+
+  /// `subscriptions.cancel_at_period_end` — 해지 예약 플래그. DB-4 199 는 status 를
+  /// 바꾸지 않고 이 플래그만 세우므로(active 유지) 해지 예정 표시는 이 값을 본다.
+  final bool cancelAtPeriodEnd;
 
   /// 구독 자격 보유 여부. ★ 'active 상태'가 아니라 **자격 집합** 판정이다 —
   /// 해지 예약(cancel_scheduled)도 잔여 기간이 살아 있어 true 다.
@@ -34,6 +43,11 @@ class SubscriptionSummary {
 
   /// 질문 가능 여부. 활성 구독 + (잔여 미정이거나 1개 이상).
   bool get canAsk => isActive && (remaining == null || remaining! > 0);
+
+  /// 해지 예정(기간 말 해지) — 플래그 또는 상태값 어느 쪽이든.
+  bool get isCancelScheduled =>
+      cancelAtPeriodEnd ||
+      status?.trim() == SubscriptionStatuses.cancelScheduled;
 }
 
 /// subscriptions 읽기 전용 리더(RLS: 당사자만). 멘토별 1건으로 요약.
@@ -49,8 +63,8 @@ class SubscriptionReader {
   ) async {
     final List<Map<String, dynamic>> rows = await client
         .from('subscriptions')
-        .select(
-            'mentor_id, status, plan_tier, current_period_end, next_billing_at')
+        .select('id, mentor_id, status, plan_tier, current_period_end, '
+            'next_billing_at, cancel_at_period_end')
         .eq('student_id', studentId);
 
     final Map<String, SubscriptionSummary> byMentor =
@@ -63,6 +77,8 @@ class SubscriptionReader {
       final SubscriptionSummary s = SubscriptionSummary(
         mentorId: mentorId,
         isActive: isActive,
+        id: r['id'] as String?,
+        cancelAtPeriodEnd: r['cancel_at_period_end'] == true,
         status: statusRaw,
         planTier: (r['plan_tier'] as String?)?.trim(),
         nextRenewal:

@@ -113,11 +113,29 @@ String mentorPlanTierQuotaLabel(MentorPlanTier tier) {
 
 /// 본인 요금제 현재값(캐시=원). 행이 없는 등급은 null(미설정).
 class MentorPlanPrices {
-  const MentorPlanPrices({this.limitedWon, this.standardWon, this.premiumWon});
+  const MentorPlanPrices({
+    this.limitedWon,
+    this.standardWon,
+    this.premiumWon,
+    this.active = const <MentorPlanTier, bool>{},
+  });
 
   final int? limitedWon;
   final int? standardWon;
   final int? premiumWon;
+
+  /// 등급별 `is_active`(A-4b ⑤). 행이 없거나 값이 없으면 서버 기본(true)과 같이 본다.
+  final Map<MentorPlanTier, bool> active;
+
+  bool isActive(MentorPlanTier tier) => active[tier] ?? true;
+
+  MentorPlanPrices withActive(MentorPlanTier tier, bool value) =>
+      MentorPlanPrices(
+        limitedWon: limitedWon,
+        standardWon: standardWon,
+        premiumWon: premiumWon,
+        active: <MentorPlanTier, bool>{...active, tier: value},
+      );
 
   int? won(MentorPlanTier tier) {
     switch (tier) {
@@ -135,23 +153,67 @@ class MentorPlanPrices {
     int? limited;
     int? standard;
     int? premium;
+    final Map<MentorPlanTier, bool> active = <MentorPlanTier, bool>{};
     for (final Map<String, dynamic> r in rows) {
       final int won = _int(r['amount_cents']) ~/ 100;
+      // ★ 행 값 그대로 — false 만 꺼짐. null·누락은 서버 기본(true).
+      final bool on = r['is_active'] != false;
       switch (_str(r['plan_tier'])) {
         case 'limited':
           limited = won;
+          active[MentorPlanTier.limited] = on;
         case 'standard':
           standard = won;
+          active[MentorPlanTier.standard] = on;
         case 'premium':
           premium = won;
+          active[MentorPlanTier.premium] = on;
       }
     }
     return MentorPlanPrices(
       limitedWon: limited,
       standardWon: standard,
       premiumWon: premium,
+      active: active,
     );
   }
+}
+
+/// `mentor_plan_active_set` 성공 봉투(A-4b ⑤).
+class MentorPlanActiveResult {
+  const MentorPlanActiveResult({
+    required this.tier,
+    required this.isActive,
+    required this.changed,
+    this.activeTiers = const <MentorPlanTier>[],
+  });
+
+  final MentorPlanTier tier;
+  final bool isActive;
+  final bool changed;
+  final List<MentorPlanTier> activeTiers;
+
+  factory MentorPlanActiveResult.fromBody(Map<String, dynamic> b) {
+    final Object? tiers = b['active_tiers'];
+    return MentorPlanActiveResult(
+      tier: mentorPlanTierFromCode(_str(b['plan_tier'])) ?? MentorPlanTier.standard,
+      isActive: b['is_active'] == true,
+      changed: b['changed'] == true,
+      activeTiers: tiers is List
+          ? tiers
+              .map((Object? e) => mentorPlanTierFromCode(e?.toString()))
+              .whereType<MentorPlanTier>()
+              .toList()
+          : const <MentorPlanTier>[],
+    );
+  }
+}
+
+MentorPlanTier? mentorPlanTierFromCode(String? code) {
+  for (final MentorPlanTier t in MentorPlanTier.values) {
+    if (t.name == code) return t;
+  }
+  return null;
 }
 
 /// 정산 월 요약(`mentor_settlement_summary` jsonb). 금액은 전부 cents 원문 보존.
@@ -475,6 +537,10 @@ class MentorOwnProfile {
     this.verificationStatus,
     this.activityStatus,
     this.pauseUntil,
+    this.pauseReason,
+    this.lastPauseAt,
+    this.terminationEffectiveAt,
+    this.studentIdImageUrl,
   });
 
   final String userId;
@@ -492,6 +558,14 @@ class MentorOwnProfile {
   final String? verificationStatus;
   final String? activityStatus;
   final DateTime? pauseUntil;
+
+  /// A-4b ④ 활동 상태 보조 컬럼(103): 휴식 사유 · 마지막 휴식 · 종료 효력일.
+  final String? pauseReason;
+  final DateTime? lastPauseAt;
+  final DateTime? terminationEffectiveAt;
+
+  /// A-4b ⑦ 학생증 사후 제출 결과(`mentor_profiles.student_id_image_url`).
+  final String? studentIdImageUrl;
 
   bool get isApproved {
     switch (verificationStatus?.trim().toLowerCase()) {
@@ -526,6 +600,10 @@ class MentorOwnProfile {
       verificationStatus: _str(map['verification_status']),
       activityStatus: _str(map['activity_status']),
       pauseUntil: _time(map['pause_until']),
+      pauseReason: _str(map['pause_reason']),
+      lastPauseAt: _time(map['last_pause_at']),
+      terminationEffectiveAt: _time(map['termination_effective_at']),
+      studentIdImageUrl: _str(map['student_id_image_url']),
     );
   }
 
@@ -555,8 +633,99 @@ class MentorOwnProfile {
       verificationStatus: verificationStatus,
       activityStatus: activityStatus,
       pauseUntil: pauseUntil,
+      pauseReason: pauseReason,
+      lastPauseAt: lastPauseAt,
+      terminationEffectiveAt: terminationEffectiveAt,
+      studentIdImageUrl: studentIdImageUrl,
     );
   }
+}
+
+/// A-4b ④ `mentor_activity_set` 입력. 상태별 필수 인자만 싣는다(DB-4 201).
+class MentorActivityRequest {
+  const MentorActivityRequest._(
+    this.status, {
+    this.pauseUntil,
+    this.terminationEffectiveAt,
+    this.reason,
+  });
+
+  /// 일시중지 — [pauseUntil] ≤ now+7일 · [reason] `rest`/`illness`.
+  const MentorActivityRequest.pause({
+    required DateTime pauseUntil,
+    String reason = 'rest',
+  }) : this._('paused', pauseUntil: pauseUntil, reason: reason);
+
+  /// 복귀 — 꺼둔 요금제도 전부 켜진다(웹 동일 · 오너 결정 5-a).
+  const MentorActivityRequest.resume() : this._('active');
+
+  /// 종료 예정 — 효력일은 now+14일 이상 · +90일 이하(짧으면 서버가 +14일로 올림).
+  const MentorActivityRequest.terminate({DateTime? effectiveAt})
+      : this._('terminating', terminationEffectiveAt: effectiveAt);
+
+  final String status;
+  final DateTime? pauseUntil;
+  final DateTime? terminationEffectiveAt;
+  final String? reason;
+
+  Map<String, dynamic> toParams() => <String, dynamic>{
+        'p_status': status,
+        if (pauseUntil != null)
+          'p_pause_until': pauseUntil!.toUtc().toIso8601String(),
+        if (terminationEffectiveAt != null)
+          'p_termination_effective_at':
+              terminationEffectiveAt!.toUtc().toIso8601String(),
+        if (reason != null) 'p_reason': reason,
+      };
+}
+
+/// A-4b ④ `mentor_activity_set` 성공 봉투(상태별 필드는 있는 것만).
+class MentorActivityResult {
+  const MentorActivityResult({
+    required this.activityStatus,
+    this.pauseUntil,
+    this.pauseDays = 0,
+    this.subscriptionsExtended = 0,
+    this.terminationEffectiveAt,
+    this.notifiedSubscribers = 0,
+    this.plansReactivated = 0,
+    this.plansDeactivated = 0,
+  });
+
+  final String activityStatus;
+  final DateTime? pauseUntil;
+  final int pauseDays;
+  final int subscriptionsExtended;
+  final DateTime? terminationEffectiveAt;
+  final int notifiedSubscribers;
+  final int plansReactivated;
+  final int plansDeactivated;
+
+  factory MentorActivityResult.fromBody(Map<String, dynamic> b) {
+    return MentorActivityResult(
+      activityStatus: _str(b['activity_status']) ?? '',
+      pauseUntil: _time(b['pause_until']),
+      pauseDays: _int(b['pause_days']),
+      subscriptionsExtended: _int(b['subscriptions_extended']),
+      terminationEffectiveAt: _time(b['termination_effective_at']),
+      notifiedSubscribers: _int(b['notified_subscribers']),
+      plansReactivated: _int(b['plans_reactivated']),
+      plansDeactivated: _int(b['plans_deactivated']),
+    );
+  }
+}
+
+/// A-4b ⑦ `mentor_student_id_document_set_self` 성공 봉투.
+class StudentIdDocumentResult {
+  const StudentIdDocumentResult({required this.storedRef, this.updatedAt});
+  final String storedRef;
+  final DateTime? updatedAt;
+
+  factory StudentIdDocumentResult.fromBody(Map<String, dynamic> b) =>
+      StudentIdDocumentResult(
+        storedRef: _str(b['stored_ref']) ?? '',
+        updatedAt: _time(b['updated_at']),
+      );
 }
 
 /// F7 전면 교체 입력(9필드 그대로). 서버가 allowlist 밖 컬럼을 건드리지 않는다.

@@ -34,6 +34,11 @@ class FakeMentorConsole implements MentorConsolePort {
   MentorOwnProfile? profile;
   String avatarUrl;
 
+  /// A-4b ④⑦: 활동 상태 결과·학생증 결과(쓰기 호출은 [calls] 에 기록).
+  MentorActivityResult? activityResult;
+  StudentIdDocumentResult studentIdResult = const StudentIdDocumentResult(
+      storedRef: 'student-id-images/m1/student-id/x.jpg');
+
   /// 쓰기 호출을 이 오류로 실패시킨다(null 이면 성공).
   Object? failWith;
 
@@ -97,6 +102,21 @@ class FakeMentorConsole implements MentorConsolePort {
       limitedWon: limitedWon,
       standardWon: standardWon,
       premiumWon: premiumWon,
+    );
+  }
+
+  @override
+  Future<MentorPlanActiveResult> setPlanActive({
+    required MentorPlanTier tier,
+    required bool isActive,
+  }) async {
+    _guardWrite('setPlanActive', <String, Object?>{'tier': tier.name, 'isActive': isActive});
+    planPrices = planPrices.withActive(tier, isActive);
+    return MentorPlanActiveResult(
+      tier: tier,
+      isActive: isActive,
+      changed: true,
+      activeTiers: MentorPlanTier.values.where(planPrices.isActive).toList(),
     );
   }
 
@@ -205,6 +225,62 @@ class FakeMentorConsole implements MentorConsolePort {
       profileImageUrl: update.profileImageUrl,
       isOpenForSubscriptions: update.isOpenForSubscriptions,
     );
+  }
+
+  @override
+  Future<MentorActivityResult> setActivityStatus(
+      MentorActivityRequest request) async {
+    _guardWrite('setActivityStatus', <String, Object?>{
+      'status': request.status,
+      'pauseUntil': request.pauseUntil,
+      'terminationEffectiveAt': request.terminationEffectiveAt,
+      'reason': request.reason,
+    });
+    final MentorActivityResult r = activityResult ??
+        MentorActivityResult(
+          activityStatus: request.status,
+          pauseUntil: request.pauseUntil,
+          terminationEffectiveAt: request.terminationEffectiveAt,
+        );
+    final MentorOwnProfile? p = profile;
+    if (p != null) {
+      profile = MentorOwnProfile(
+        userId: p.userId,
+        universityName: p.universityName,
+        departmentName: p.departmentName,
+        teachingSubjects: p.teachingSubjects,
+        verificationStatus: p.verificationStatus,
+        activityStatus: r.activityStatus,
+        pauseUntil: r.pauseUntil,
+        terminationEffectiveAt: r.terminationEffectiveAt,
+        studentIdImageUrl: p.studentIdImageUrl,
+      );
+    }
+    return r;
+  }
+
+  @override
+  Future<StudentIdDocumentResult> submitStudentIdDocument(
+      VerifiedMentorDocument document) async {
+    _guardWrite('submitStudentIdDocument', <String, Object?>{
+      'kind': document.kind.name,
+      'bytes': document.bytes.length,
+    });
+    final MentorOwnProfile? p = profile;
+    if (p != null) {
+      profile = MentorOwnProfile(
+        userId: p.userId,
+        universityName: p.universityName,
+        departmentName: p.departmentName,
+        teachingSubjects: p.teachingSubjects,
+        verificationStatus: p.verificationStatus,
+        activityStatus: p.activityStatus,
+        pauseUntil: p.pauseUntil,
+        terminationEffectiveAt: p.terminationEffectiveAt,
+        studentIdImageUrl: studentIdResult.storedRef,
+      );
+    }
+    return studentIdResult;
   }
 
   @override

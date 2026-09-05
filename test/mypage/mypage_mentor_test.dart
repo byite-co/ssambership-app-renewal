@@ -43,16 +43,9 @@ void main() {
     expect(find.text('2'), findsOneWidget); // CountBadge(답변 대기)
     expect(find.text('최근 정산'), findsOneWidget);
     expect(find.text('4,800원'), findsOneWidget); // 정산 조회 표기
-    // P0-3 잔존 처리: 정산 관리 링크는 kPayoutManageLinkEnabled 를 따르고,
-    // off(스토어 빌드 기본)면 안내 카드로 대체된다(죽은 버튼·빈 공백 금지).
-    // on 상태는 `--dart-define=PAYOUT_MANAGE_LINK_ENABLED=true` 로 같은 테스트 검증.
-    if (kPayoutManageLinkEnabled) {
-      expect(find.text('정산 관리 (웹)'), findsOneWidget);
-      expect(find.text(kPayoutManageNoticeText), findsNothing);
-    } else {
-      expect(find.text('정산 관리 (웹)'), findsNothing);
-      expect(find.text(kPayoutManageNoticeText), findsOneWidget);
-    }
+    // A-4b ⑩: 정산 관리 웹 링크는 삭제 — 사실 안내 카드만(정산 탭이 정본).
+    expect(find.text('정산 관리 (웹)'), findsNothing);
+    expect(find.text(kPayoutManageNoticeText), findsOneWidget);
 
     // 학생 전용 섹션은 없어야 한다.
     expect(find.text('구독 현황'), findsNothing);

@@ -21,6 +21,7 @@ const Set<String> kExpectedRpcNames = <String>{
   'account_deletion_write_blocked',
   // 프로필
   'user_profile_update_self',
+  'user_profile_update_self_v2', // A-4b ⑥ 재학 상태(DB-4 203) — 학생 경로
   // 질문방(qna_*)
   'ensure_free_question_room', // api_app_v1 — 무료질문 첫 진입 시 방 보장(N1)
   'qna_append_message',
@@ -40,10 +41,19 @@ const Set<String> kExpectedRpcNames = <String>{
   'set_individual_question_price', // 개별질문 답변 단가
   'mentor_settlement_summary', // 정산 월 요약
   'mentor_settlement_lines', // 정산 건별 내역
+  // A-4b 구독 결제·해지 예약·환불(api_app_v1 — DB-4 199·200)
+  'subscribe_with_cash',
+  'subscription_cancel_at_period_end',
+  'subscription_cancel_undo',
+  'refund_estimate',
+  'refund_request_create',
+  'mentor_plan_active_set', // A-4b ⑤ 요금제 활성 토글(DB-4 202)
+  'mentor_activity_set', // A-4b ④ 활동 상태(DB-4 201)
+  'mentor_student_id_document_set_self', // A-4b ⑦ 학생증 사후 제출(DB-4 203)
   // 개별질문
   'add_individual_question_attachment',
   'claim_individual_question_as_mentor',
-  'create_individual_question_as_student',
+  'create_individual_question_as_student_v2', // A-4b ⑧ api_app_v1(DB-4 204) — v1 호출 제거(지시서 §2-6)
   'iq_append_message',
   'list_open_individual_questions_for_mentor',
   'refund_individual_question',

@@ -19,6 +19,7 @@ class ProfileSection extends StatelessWidget {
     final List<String> sub = <String>[
       if (profile.roleLabel.isNotEmpty) profile.roleLabel,
       if (profile.grade != null) profile.grade!,
+      if (profile.studentStatus != null) profile.studentStatus!,
     ];
     return Row(
       children: <Widget>[

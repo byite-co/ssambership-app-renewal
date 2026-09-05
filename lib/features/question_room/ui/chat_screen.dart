@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/refresh/data_refresh_bus.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_primary_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_navigation.dart';
@@ -101,6 +104,9 @@ class ChatScreen extends StatefulWidget {
 const String _blockedNotice = '차단한 사용자예요. 새 메시지·첨부를 보낼 수 없어요.'
     ' 지난 대화는 그대로 볼 수 있고, 해제는 설정 > 차단 사용자 관리에서 할 수 있어요.';
 
+/// 확인 완료(confirmed)된 질문의 composer 자리 안내 — 웹 `threadLocked` 와 같은 문장.
+const String _confirmedNotice = '완료된 질문이에요. 새 질문을 작성해 주세요.';
+
 class _ChatScreenState extends State<ChatScreen> {
   late final QuestionRoomReadRepository _read;
   late final QuestionRoomWriteRepository _write;
@@ -129,6 +135,39 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// 내가 상대를 차단했는가 — true 면 이 방은 읽기 전용(전송·첨부 금지).
   bool _blocked = false;
+
+  /// A-4b ⑨: 답변 확인 요청 중(이중 탭 방지).
+  bool _confirming = false;
+
+  /// 확인 완료된 질문 — composer 를 잠근다(서버 `THREAD_LOCKED` 와 같은 상태).
+  bool get _locked => _status == ThreadStatus.confirmed;
+
+  /// 답변 도착(answered) 상태에서만 하단 확인 바를 보인다(웹 대화 화면과 동일 위치).
+  bool get _showConfirmBar =>
+      _status == ThreadStatus.answered && !_blocked && !_loading;
+
+  /// A-4b ⑨: 대화 하단 '답변을 확인했어요' — 기존 `qna_confirm_thread` 그대로.
+  /// 성공하면 상태칩·composer 잠금·질문방 목록 세대를 갱신한다.
+  Future<void> _confirmAnswer() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    try {
+      await _write.confirmThread(widget.thread.id);
+      if (!mounted) return;
+      setState(() => _status = ThreadStatus.confirmed);
+      DataRefreshBus.bumpQuestionRooms();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('답변을 확인했어요. 이 질문은 완료로 표시돼요.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('확인 처리에 실패했어요. ${friendlyError(e)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
 
   @override
   void initState() {
@@ -527,8 +566,16 @@ class _ChatScreenState extends State<ChatScreen> {
             pendingImage: _blocked ? null : _pending,
             onRemovePending: () => setState(() => _pending = null),
             onAnnotate: _annotatePending,
-            enabled: !_blocked,
-            disabledNotice: _blocked ? _blockedNotice : null,
+            enabled: !_blocked && !_locked,
+            disabledNotice: _blocked
+                ? _blockedNotice
+                : (_locked ? _confirmedNotice : null),
+            header: _showConfirmBar
+                ? _ConfirmAnswerBar(
+                    busy: _confirming,
+                    onConfirm: _confirmAnswer,
+                  )
+                : null,
           ),
         ],
       ),
@@ -565,6 +612,37 @@ class _ChatScreenState extends State<ChatScreen> {
       onAttachmentInsert: _reloadAttachments,
       hasEarlier: _hasEarlierMessages,
       onLoadEarlier: _loadEarlierMessages,
+    );
+  }
+}
+
+/// A-4b ⑨ 답변 확인 바(design-v3 §3-2) — 입력 행 위, 같은 유리 바 안.
+/// 확인 뒤에는 이 질문에서 더 대화할 수 없음을 먼저 알린다(웹 문장 동일).
+class _ConfirmAnswerBar extends StatelessWidget {
+  const _ConfirmAnswerBar({required this.busy, required this.onConfirm});
+
+  final bool busy;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Text(
+            '멘토 답변이 도착했어요. 이해됐다면 확인을 눌러 주세요 — 확인 뒤에는 이 질문에서 더 대화할 수 없어요.',
+            style: AppTypography.captionSecondary,
+          ),
+          const SizedBox(height: 8),
+          AppPrimaryButton(
+            label: busy ? '확인 중…' : '답변을 확인했어요',
+            icon: busy ? null : Icons.check_circle_outline_rounded,
+            onPressed: busy ? null : onConfirm,
+          ),
+        ],
+      ),
     );
   }
 }

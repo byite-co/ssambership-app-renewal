@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
-import 'package:ssambership_app/core/commerce/commerce_policy.dart';
 import '../support/app_scope_test_harness.dart';
 
 /// 학생 마이페이지 — mock MyPageData 주입(실제 DB·네트워크 미사용)으로 섹션 렌더 검증.
@@ -88,13 +87,8 @@ void main() {
     // 커머스 제로: 충전 유도('충전하기 (웹)') 제거 → 비상호작용 안내 카드.
     expect(find.text('충전하기 (웹)'), findsNothing);
     expect(find.text('캐시 충전은 앱에서 지원하지 않아요'), findsOneWidget);
-    // 구독 관리 링크는 P0-3 옵션1(2026-07)로 플래그 지배 — 스토어 빌드 기본
-    // off(안내 카드 대체), dev 는 --dart-define=SUBS_MANAGE_LINK_ENABLED=true.
-    // 세부 검증은 test/mypage/subs_manage_link_flag_test.dart.
-    expect(
-      find.text('구독 관리 (웹)'),
-      kSubscriptionManageLinkEnabled ? findsOneWidget : findsNothing,
-    );
+    // A-4b ⑩: 구독 관리 웹 링크는 삭제 — 해지 예약·환불은 구독 카드 안에서.
+    expect(find.text('구독 관리 (웹)'), findsNothing);
   });
 }
 

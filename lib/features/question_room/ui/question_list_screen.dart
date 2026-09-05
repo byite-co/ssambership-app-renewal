@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
-import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
 import '../../../design/role_theme.dart' show RoleTheme;
@@ -15,7 +14,6 @@ import '../../../design/widgets/app_primary_button.dart';
 import '../../../design/widgets/app_secondary_button.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/labels/subscription_copy.dart';
-import '../../../shared/widgets/commerce_notice_card.dart';
 import '../../../app/routes/individual_question_routes.dart';
 import '../../mentors/format/mentor_price_format.dart';
 import '../data/models/question_thread.dart';
@@ -170,8 +168,15 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
           // 유도는 두지 않는다(커머스 제로) — 웹 안내 한 줄만 담백하게.
           _exhaustedBlock(),
         ] else ...<Widget>[
-          // 커머스 제로: 구매 유도(웹에서 구독) 버튼 제거 → 비상호작용 안내.
-          const CommerceNoticeCard(text: kSubscribeNoticeText),
+          // A-4b ⑩: 구독은 앱 안(멘토 상세 결제 시트)에서 — 안내 카드 대신 진입 버튼.
+          AppSecondaryButton(
+            label: '이 멘토 구독하기',
+            icon: Icons.bookmark_add_rounded,
+            onPressed: () => AppNavigation.finishAtLocation(
+              context,
+              AppRoutePaths.mentor(widget.room.mentorId),
+            ),
+          ),
         ],
         // 연결노트는 상단 AppBar 액션(우상단 아이콘) 하나로 통일 — 하단 중복 버튼 제거.
       ],
@@ -208,12 +213,6 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
         AppPrimaryButton(
           label: '개별질문으로 지금 물어보기',
           onPressed: _openIndividualQuestion,
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        const Text(
-          kSubscriptionManageNoticeText,
-          style: AppTypography.meta,
-          textAlign: TextAlign.center,
         ),
       ],
     );

@@ -9,12 +9,11 @@ enum WebOpenResult { opened, notConfigured, failed }
 /// URL 열기 함수(주입 가능 — 테스트에서 fake).
 typedef UrlLauncher = Future<bool> Function(Uri uri);
 
-/// 웹 브릿지 서비스 — 관리/정보/계정 동선을 '웹으로만' 연다(Commerce-Zero).
+/// 웹 브릿지 서비스 — 정보 페이지·본인인증·회원 탈퇴 폴백을 외부 브라우저로 연다.
 ///
-/// ★ 앱은 결제/가격입력/구매를 하지 않는다. 이 서비스는 결제 행위를 하지 않고,
-///   웹의 해당 페이지를 외부 브라우저로 여는 것뿐이다. URL 은 [WebBridgeConfig] 한 곳에서 온다.
+/// ★ A-4b ⑩: 구독·해지·환불·정산·요금제·프로필·개별질문은 앱이 직접 처리한다 —
+///   이 서비스에 결제·관리 동선은 없다. URL 은 [WebBridgeConfig] 한 곳에서 온다.
 ///   baseUrl 미확정이면 아무 URL 도 만들지 않고 [WebOpenResult.notConfigured] 를 돌려준다(날조 없음).
-/// ★ 구매 유도 동선(구독 신청·캐시 충전)은 두지 않는다 — P0-3 死배선 정리(2026-07-12).
 class WebBridge {
   WebBridge({UrlLauncher? launcher, String? baseUrl})
       : _launcher = launcher ?? _defaultLauncher,
@@ -29,18 +28,6 @@ class WebBridge {
   }
 
   bool get isConfigured => _baseUrl.isNotEmpty;
-
-  /// 결제·구독 관리(학생).
-  Future<WebOpenResult> openBillingManage({String source = 'app'}) =>
-      _open(WebBridgeConfig.billingManagePath, <String, String>{'src': source});
-
-  /// 정산 관리(멘토).
-  Future<WebOpenResult> openPayoutManage({String source = 'app'}) =>
-      _open(WebBridgeConfig.payoutManagePath, <String, String>{'src': source});
-
-  /// 프로필 편집(멘토 — 웹 우선).
-  Future<WebOpenResult> openProfileEdit({String source = 'app'}) =>
-      _open(WebBridgeConfig.profileEditPath, <String, String>{'src': source});
 
   /// 이용약관(정보 페이지).
   Future<WebOpenResult> openTerms({String source = 'app'}) =>
@@ -58,20 +45,13 @@ class WebBridge {
   Future<WebOpenResult> openReviews({String source = 'app'}) =>
       _open(WebBridgeConfig.reviewsPath, <String, String>{'src': source});
 
+  /// 본인인증 온보딩(웹 위임 — 앱은 인증 플로우를 두지 않는다).
+  Future<WebOpenResult> openIdentityVerify({String source = 'app'}) =>
+      _open(WebBridgeConfig.identityVerifyPath, <String, String>{'src': source});
+
   /// 회원 탈퇴(계정 삭제) — 웹 페이지만 연다(앱 내 삭제 흐름 없음).
   Future<WebOpenResult> openAccountDelete({String source = 'app'}) =>
       _open(WebBridgeConfig.accountDeletePath, <String, String>{'src': source});
-
-  /// 개별질문 신규 등록 — 경계 확정(2026-08-05): 네이티브 등록 화면 진입 제거,
-  /// 웹 전용. [mentorId] 가 있으면 멘토 지정형 등록 라우트로 간다.
-  Future<WebOpenResult> openIqCreate(
-          {String? mentorId, String source = 'app'}) =>
-      _open(
-        (mentorId == null || mentorId.isEmpty)
-            ? WebBridgeConfig.iqCreatePath
-            : WebBridgeConfig.iqCreateForMentorPath(mentorId),
-        <String, String>{'src': source},
-      );
 
   /// URL 조립(테스트/검토용). baseUrl 미확정/파싱 불가면 null.
   /// ★ 조립만 한다 — 실제 열기 전 검증은 [isAllowedUri] 가 한다.

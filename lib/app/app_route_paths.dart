@@ -29,6 +29,22 @@ class AppRoutePaths {
   static const String accountDeletion = '$myPage/account-deletion';
   static const String blockedUsers = '$myPage/blocked-users';
 
+  /// A-4b ③ 환불 신청 — `/me/subscriptions/:subscriptionId/refund`.
+  static const String subscriptionRefundPattern =
+      '$myPage/subscriptions/:subscriptionId/refund';
+  static String subscriptionRefund(
+    String subscriptionId, {
+    String? mentorName,
+    String? planLabel,
+  }) =>
+      Uri(
+        path: '$myPage/subscriptions/${_segment(subscriptionId)}/refund',
+        queryParameters: <String, String>{
+          if (mentorName != null && mentorName.isNotEmpty) 'mentor': mentorName,
+          if (planLabel != null && planLabel.isNotEmpty) 'plan': planLabel,
+        },
+      ).toString();
+
   // ── A-4a 기능 개방(앱 단독분) — A-3 future slot 을 그대로 쓴다 ──
   /// 멘토 정산 허브(이번 달 금액·소스별·계좌 경고·멘토 관리 진입).
   static const String settlementHistory = '$settlements/history';

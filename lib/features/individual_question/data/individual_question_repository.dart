@@ -22,7 +22,7 @@ class IqAppendResult {
 /// 개별질문(IQ) 레포지토리 — 모든 변경은 SECURITY DEFINER 래퍼 RPC 로만.
 ///
 /// 웹 마이그레이션 계약(091·092, authenticated 부여):
-/// - 생성: `create_individual_question_as_student` (에스크로 홀드 포함)
+/// - 생성: `api_app_v1.create_individual_question_as_student_v2` (에스크로 홀드 포함 · 과목)
 /// - 수락: `claim_individual_question_as_mentor`
 /// - 답변: `answer_individual_question` (메시지 insert + answered 전이 원자화)
 /// - 대화: `iq_append_message` (양 당사자 — 학생 후속·멘토 추가 답글)
@@ -160,6 +160,9 @@ class IndividualQuestionRepository {
 
   /// 학생: 질문 생성 + 캐시 예치. direct 는 멘토 가격표에서 서버가 가격을 정하고,
   /// open 은 [amountCents] 를 보낸다. 성공 시 생성된 질문 행을 돌려준다.
+  ///
+  /// A-4b ⑧: `api_app_v1.create_individual_question_as_student_v2`(DB-4 204) —
+  /// v1 과 같은 raise 규약 + [subject](`subjects.code` 정본 · 공개형 필수 · 지정형 선택).
   Future<IndividualQuestion> createAsStudent({
     required IndividualQuestionType type,
     required String title,
@@ -167,9 +170,10 @@ class IndividualQuestionRepository {
     int? amountCents,
     String? designatedMentorId,
     String? idempotencyKey,
+    String? subject,
   }) async {
-    final dynamic res = await _client.rpc(
-      'create_individual_question_as_student',
+    final dynamic res = await _client.schema('api_app_v1').rpc(
+      'create_individual_question_as_student_v2',
       params: <String, dynamic>{
         'p_question_type':
             type == IndividualQuestionType.open ? 'open' : 'direct',
@@ -178,6 +182,7 @@ class IndividualQuestionRepository {
         'p_amount_cents': amountCents,
         'p_designated_mentor_id': designatedMentorId,
         'p_idempotency_key': idempotencyKey,
+        'p_subject': subject,
       },
     );
     if (res is List && res.isNotEmpty && res.first is Map<String, dynamic>) {
