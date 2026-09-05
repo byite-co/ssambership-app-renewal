@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
 import '../../data/room_counterparty.dart';
 
 /// 질문방 안전 메뉴 항목.
@@ -31,7 +31,7 @@ class RoomSafetyMenu extends StatelessWidget {
       enabled: enabled,
       icon: Icon(
         Icons.more_vert,
-        color: enabled ? null : ColorTokens.muted,
+        color: enabled ? AppColors.textPrimary : AppColors.textSecondary,
       ),
       tooltip: enabled ? '신고·차단' : '상대를 확인할 수 없어요',
       onSelected: onSelected,

@@ -9,7 +9,7 @@ import '../../core/ink/ink_document.dart';
 import '../../core/ink/ink_input_mode.dart';
 import '../../core/ink/scribble_ink_adapter.dart';
 import '../../core/scan/image_downscaler.dart';
-import '../../design/tokens/color_tokens.dart';
+import '../../design/widgets/app_page.dart';
 import '../../core/ink/widgets/ink_toolbar.dart';
 import 'annotation_flattener.dart';
 import 'annotation_sketch.dart';
@@ -203,23 +203,20 @@ class _ScanAnnotationScreenState extends State<ScanAnnotationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ColorTokens.page,
-      appBar: AppBar(
-        title: Text(widget.title ?? '사진에 주석 달기'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: _submitting || _bg == null ? null : _onDone,
-            child: _submitting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('완료'),
-          ),
-        ],
-      ),
+    return AppPage(
+      title: widget.title ?? '사진에 주석 달기',
+      actions: <Widget>[
+        TextButton(
+          onPressed: _submitting || _bg == null ? null : _onDone,
+          child: _submitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('완료'),
+        ),
+      ],
       body: Column(
         children: <Widget>[
           Expanded(child: _canvasArea()),

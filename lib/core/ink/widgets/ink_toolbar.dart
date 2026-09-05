@@ -3,8 +3,9 @@ import 'package:scribble/scribble.dart';
 
 import '../ink_input_mode.dart';
 import '../scribble_ink_adapter.dart';
-import '../../../design/role_accent.dart';
-import '../../../design/tokens/color_tokens.dart';
+import '../../../design/role_theme.dart';
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/widgets/glass_surface.dart';
 
 /// 하단 고정 P0 툴바(모바일 1차).
 ///
@@ -102,8 +103,7 @@ class _InkToolbarState extends State<InkToolbar> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: ColorTokens.surface,
+    return GlassSurface.bar(
       child: SafeArea(
         top: false,
         child: Padding(
@@ -141,7 +141,7 @@ class _InkToolbarState extends State<InkToolbar> {
                     selected: erasing,
                     onPressed: _selectEraser,
                   ),
-                  const _ToolDivider(),
+                  const _ToolSeparator(),
                   // 색 프리셋 3개
                   for (final _InkColor preset in _colorPresets)
                     _ColorSwatch(
@@ -151,7 +151,7 @@ class _InkToolbarState extends State<InkToolbar> {
                           !erasing && selectedColor == preset.color.toARGB32(),
                       onPressed: () => _selectColor(preset.color),
                     ),
-                  const _ToolDivider(),
+                  const _ToolSeparator(),
                   // 굵기 3단
                   for (final _InkWidth preset in _widthPresets)
                     _WidthDot(
@@ -161,7 +161,7 @@ class _InkToolbarState extends State<InkToolbar> {
                       onPressed: () =>
                           widget.notifier.setStrokeWidth(preset.width),
                     ),
-                  const _ToolDivider(),
+                  const _ToolSeparator(),
                   // undo / redo
                   _ToolIconButton(
                     icon: Icons.undo,
@@ -175,7 +175,7 @@ class _InkToolbarState extends State<InkToolbar> {
                     onPressed:
                         widget.notifier.canRedo ? widget.notifier.redo : null,
                   ),
-                  const _ToolDivider(),
+                  const _ToolSeparator(),
                   // 전체 지우기
                   _ToolIconButton(
                     icon: Icons.delete_outline,
@@ -235,8 +235,8 @@ class _ToolIconButton extends StatelessWidget {
       icon: Icon(icon),
       tooltip: tooltip,
       onPressed: onPressed,
-      color: selected ? AppAccent.of(context).accent : ColorTokens.primary,
-      disabledColor: ColorTokens.muted,
+      color: selected ? RoleTheme.of(context).color : AppColors.textPrimary,
+      disabledColor: AppColors.textSecondary,
       iconSize: 22,
       visualDensity: VisualDensity.compact,
     );
@@ -273,7 +273,7 @@ class _ColorSwatch extends StatelessWidget {
               color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? AppAccent.of(context).accent : ColorTokens.border,
+                color: selected ? RoleTheme.of(context).color : AppColors.ring,
                 width: selected ? 3 : 1.4,
               ),
             ),
@@ -312,7 +312,7 @@ class _WidthDot extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? AppAccent.of(context).accent : Colors.transparent,
+              color: selected ? RoleTheme.of(context).color : Colors.transparent,
               width: 2,
             ),
           ),
@@ -320,7 +320,7 @@ class _WidthDot extends StatelessWidget {
             width: 4 + width,
             height: 4 + width,
             decoration: const BoxDecoration(
-              color: ColorTokens.primary,
+              color: AppColors.textPrimary,
               shape: BoxShape.circle,
             ),
           ),
@@ -331,8 +331,8 @@ class _WidthDot extends StatelessWidget {
 }
 
 /// 툴 그룹 구분선.
-class _ToolDivider extends StatelessWidget {
-  const _ToolDivider();
+class _ToolSeparator extends StatelessWidget {
+  const _ToolSeparator();
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +340,7 @@ class _ToolDivider extends StatelessWidget {
       width: 1,
       height: 24,
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      color: ColorTokens.border,
+      color: AppColors.ring,
     );
   }
 }

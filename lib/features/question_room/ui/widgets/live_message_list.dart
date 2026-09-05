@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../design/tokens/app_colors.dart';
 import '../../../../design/tokens/app_spacing.dart';
 import '../../../../design/tokens/app_typography.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
@@ -231,7 +232,7 @@ class _LiveMessageListState extends State<LiveMessageList> {
       final List<Widget> chips = <Widget>[
         for (final QuestionAttachment a
             in linked[m.id] ?? const <QuestionAttachment>[])
-          _attachmentWidget(a, resolver!),
+          _attachmentWidget(a, resolver!, onAccent: mine),
       ];
       rows.add(_Row(
         m.createdAt,
@@ -246,14 +247,18 @@ class _LiveMessageListState extends State<LiveMessageList> {
   }
 
   /// 첨부 1건 위젯(계약 §2-6): image/* → 썸네일+뷰어, 그 외 → 파일 칩(탭=열기).
+  /// [onAccent] = 역할색(불투명) 말풍선 안 — 캡션을 흰색 계열로.
   Widget _attachmentWidget(QuestionAttachment a, AttachmentUrlResolver resolver,
-      {double imageSize = 180}) {
+      {double imageSize = 180, bool onAccent = false}) {
     if (isImageAttachment(a.mimeType)) {
       return MessageImageAttachment(
         attachment: a,
         resolver: resolver,
         onOpen: () => widget.onOpenImage?.call(a),
         size: imageSize,
+        captionColor: onAccent
+            ? Colors.white.withValues(alpha: 0.82)
+            : AppColors.textSecondary,
       );
     }
     return MessageFileAttachment(
