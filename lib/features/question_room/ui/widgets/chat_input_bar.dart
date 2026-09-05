@@ -27,6 +27,7 @@ class ChatInputBar extends StatelessWidget {
     this.onAnnotate,
     this.enabled = true,
     this.disabledNotice,
+    this.header,
   });
 
   final TextEditingController controller;
@@ -51,6 +52,9 @@ class ChatInputBar extends StatelessWidget {
 
   /// 비활성 사유 안내(입력창 자리에 표시). [enabled]=false 일 때만 쓰인다.
   final String? disabledNotice;
+
+  /// 입력 행 위에 같은 유리 바 안에서 그리는 슬롯(A-4b ⑨ 답변 확인 바). null 이면 없음.
+  final Widget? header;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +84,7 @@ class ChatInputBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              if (header != null) header!,
               if (pendingImage != null)
                 _AttachmentPreview(
                   image: pendingImage!,
