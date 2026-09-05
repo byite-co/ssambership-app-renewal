@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/typography_tokens.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_empty_state.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
 import '../../../design/widgets/chip_scroll.dart';
-import '../../../design/widgets/empty_state.dart';
-import '../../../design/widgets/primary_button.dart';
 import '../data/individual_question_repository.dart';
 import '../data/models/individual_question_models.dart';
 import '../iq_flags.dart';
@@ -143,10 +143,7 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
   Widget build(BuildContext context) {
     final Widget body = _buildBody();
     if (widget.embedded) return body;
-    return Scaffold(
-      appBar: AppBar(title: const Text('개별질문')),
-      body: body,
-    );
+    return AppPage(title: '개별질문', body: body);
   }
 
   Widget _buildBody() {
@@ -155,25 +152,22 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
       builder:
           (BuildContext context, AsyncSnapshot<List<IndividualQuestion>> snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return const AppLoadingView();
         }
         if (snap.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('개별질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: ColorTokens.danger)),
-            ),
+          return AppErrorView(
+            title: '개별질문을 불러오지 못했어요',
+            message: friendlyError(snap.error!),
+            onRetry: _refresh,
           );
         }
         final List<IndividualQuestion> items =
             snap.data ?? const <IndividualQuestion>[];
         if (items.isEmpty) {
-          return EmptyState(
+          return AppEmptyState(
             icon: Icons.help_outline,
             title: '아직 개별질문이 없어요',
-            message: '구독 없이 1건씩 캐시로 질문할 수 있어요.',
+            description: '구독 없이 1건씩 캐시로 질문할 수 있어요.',
             actionLabel: _createCtaVisible ? '새 개별질문' : null,
             onAction: _createCtaVisible ? _openCreate : null,
           );
@@ -184,11 +178,11 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
         return RefreshIndicator(
           onRefresh: () async => _refresh(),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenH, 12, AppSpacing.screenH, 24),
+            clipBehavior: Clip.none,
+            padding: AppPage.contentPadding(context),
             children: <Widget>[
               if (_createCtaVisible) ...<Widget>[
-                PrimaryButton(
+                AppPrimaryButton(
                   label: '새 개별질문 (공개형)',
                   icon: Icons.add,
                   onPressed: _openCreate,
@@ -203,7 +197,7 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
                   child: Text(
                     '이 조건의 질문이 없어요.',
                     textAlign: TextAlign.center,
-                    style: AppType.caption,
+                    style: AppTypography.captionSecondary,
                   ),
                 )
               else

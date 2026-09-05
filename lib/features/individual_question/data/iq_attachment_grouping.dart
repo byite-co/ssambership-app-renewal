@@ -53,8 +53,7 @@ class IqAttachmentGroups {
     required String studentId,
     required String? mentorId,
   }) {
-    final Set<String> messageIds =
-        messages.map((IqMessage m) => m.id).toSet();
+    final Set<String> messageIds = messages.map((IqMessage m) => m.id).toSet();
     final Map<String, List<IqAttachment>> byMessage =
         <String, List<IqAttachment>>{};
     final List<IqAttachment> initial = <IqAttachment>[];

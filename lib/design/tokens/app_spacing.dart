@@ -18,6 +18,11 @@ abstract class AppSpacing {
 
   /// 카드와 카드 사이(목록). v3 는 링·그림자로 카드를 분리하므로 12 면 충분하다.
   static const double listGap = 12;
+
+  /// 옛 시맨틱 별칭(기존 화면 이관용) — 값은 v3 스케일과 같다.
+  static const double cardGap = listGap;
+  static const double cardPad = 16;
+  static const double titleBody = 8;
 }
 
 /// Canonical v3 corner radii.

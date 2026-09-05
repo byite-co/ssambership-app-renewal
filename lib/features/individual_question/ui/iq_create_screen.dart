@@ -560,7 +560,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
                       ? '-${formatIqCash(remainingCents)}'
                       : formatIqCash(remainingCents),
                   style: AppTypography.body.copyWith(
-                    color: insufficient ? AppColors.danger : AppColors.textPrimary,
+                    color:
+                        insufficient ? AppColors.danger : AppColors.textPrimary,
                   ),
                 ),
               ],

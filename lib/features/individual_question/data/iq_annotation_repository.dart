@@ -51,7 +51,8 @@ class IqAnnotationRepository {
     required InkDocument document,
   }) async {
     await _store.upsertDocument(
-      path: InkStoragePaths.iqAnnotationDocument(questionId, sourceAttachmentId),
+      path:
+          InkStoragePaths.iqAnnotationDocument(questionId, sourceAttachmentId),
       bytes: Uint8List.fromList(utf8.encode(document.toJsonString())),
     );
   }
@@ -63,7 +64,8 @@ class IqAnnotationRepository {
     required String sourceAttachmentId,
   }) async {
     final Uint8List? bytes = await _store.downloadDocumentOrNull(
-      path: InkStoragePaths.iqAnnotationDocument(questionId, sourceAttachmentId),
+      path:
+          InkStoragePaths.iqAnnotationDocument(questionId, sourceAttachmentId),
     );
     if (bytes == null) return null;
     try {

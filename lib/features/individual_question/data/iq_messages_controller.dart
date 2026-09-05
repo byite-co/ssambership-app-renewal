@@ -9,8 +9,7 @@ import 'models/individual_question_models.dart';
 /// ★ 중복 id 는 무시(같은 메시지가 재조회 + 실시간으로 두 번 와도 1개만).
 ///   순서는 created_at 오름차순(시각 미상 행은 도착 순서 유지). append 전용.
 class IqMessagesController extends ChangeNotifier {
-  IqMessagesController(
-      [List<IqMessage> initial = const <IqMessage>[]]) {
+  IqMessagesController([List<IqMessage> initial = const <IqMessage>[]]) {
     resetTo(initial, notify: false);
   }
 
