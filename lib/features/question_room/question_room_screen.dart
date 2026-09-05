@@ -20,6 +20,7 @@ import '../../design/widgets/glass_card.dart';
 import '../../design/widgets/initial_avatar.dart';
 import '../../design/widgets/status_pill.dart';
 import '../../shared/format/formatters.dart';
+import '../../shared/labels/subscription_copy.dart';
 import '../../shared/widgets/commerce_notice_card.dart';
 import '../mentors/format/mentor_price_format.dart';
 import 'data/mentor_lookup_repository.dart';
@@ -332,17 +333,9 @@ class _RoomTile extends StatelessWidget {
     final List<String> bits = <String>[];
     final String? tier = sub?.planTier?.trim();
     if (tier != null && tier.isNotEmpty) bits.add(planTierLabel(tier));
-    final String? quota = quotaSentence(usage);
+    final String? quota = SubscriptionCopy.quotaSentence(usage);
     if (quota != null) bits.add(quota);
     return bits.isEmpty ? null : bits.join(' · ');
-  }
-
-  /// 주간 사용량 → 문장(design-tokens §6). 한도 정보 없으면 null.
-  static String? quotaSentence(WeeklyQuestionUsage? usage) {
-    if (usage == null || !usage.hasQuota) return null;
-    if (usage.isEffectivelyUnlimited) return '질문 무제한';
-    if (usage.remaining <= 0) return '이번 주 질문을 다 썼어요';
-    return '이번 주 ${usage.limit}개 중 ${usage.remaining}개 남았어요';
   }
 
   @override

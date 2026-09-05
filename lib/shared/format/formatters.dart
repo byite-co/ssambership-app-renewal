@@ -16,6 +16,11 @@ class Formatters {
   /// '9월 5일' — 문장 안에 넣는 날짜(예: '9월 5일까지', '9월 9일에 갱신돼요').
   static String monthDay(DateTime dt) => '${dt.month}월 ${dt.day}일';
 
+  /// 요일 — '목요일'.
+  static String weekday(DateTime dt) =>
+      const <String>['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'][
+          dt.weekday - 1];
+
   /// 상대 시간(방금/N분 전/N시간 전/N일 전/그 이전은 날짜). 채팅·목록 활동시각용.
   static String relativeKorean(DateTime dt, {DateTime? now}) {
     final DateTime ref = now ?? DateTime.now();
