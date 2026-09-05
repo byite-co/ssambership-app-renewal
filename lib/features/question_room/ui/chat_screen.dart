@@ -109,6 +109,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   late final ThreadRealtimePort _realtime;
   late ThreadStatus _status; // 실시간 상태 변경(멘토 답변 등)으로 갱신.
+
+  /// 오답 표시(A-4a α6) — 서버 정본은 mastery_status='wrong'. 토글 성공 시 즉시 반영.
+  late bool _wrong;
+  bool _flaggingWrong = false;
   ThreadMessagesController? _messages;
   bool _loading = true;
   Object? _loadError;
@@ -139,6 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _safety = widget.safety ?? dependencies.roomSafety;
     _resolver = dependencies.attachmentUrlResolver;
     _status = widget.thread.status;
+    _wrong = widget.thread.masteryStatus == MasteryStatus.wrong;
     _counterparty = RoomCounterparty.of(
       widget.room,
       currentUid: _uid,
@@ -164,9 +169,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _onSafetyAction(RoomSafetyAction action) async {
+    // 오답 표시는 상대 확인과 무관(내 질문의 학습 상태).
+    if (action == RoomSafetyAction.markWrong ||
+        action == RoomSafetyAction.unmarkWrong) {
+      await _setWrong(action == RoomSafetyAction.markWrong);
+      return;
+    }
     final RoomCounterparty? cp = _counterparty;
     if (cp == null) return; // 상대 미확인 — 실행하지 않는다.
     switch (action) {
+      case RoomSafetyAction.markWrong:
+      case RoomSafetyAction.unmarkWrong:
+        return; // 위에서 처리.
       case RoomSafetyAction.report:
         await reportRoomCounterparty(context,
             counterparty: cp, safety: _safety);
@@ -180,11 +194,40 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  /// 스레드 상태 변경(실시간) → 최신 상태 재조회해 상태칩 갱신.
+  /// 오답 표시 토글(학생) — 성공/실패를 모두 스낵바로 알리고 배너를 갱신한다.
+  Future<void> _setWrong(bool isWrong) async {
+    if (_flaggingWrong) return;
+    setState(() => _flaggingWrong = true);
+    try {
+      final bool applied = await _write.flagWrongAnswer(
+        threadId: widget.thread.id,
+        isWrong: isWrong,
+      );
+      if (!mounted) return;
+      setState(() => _wrong = applied);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(applied ? '오답으로 표시했어요.' : '오답 표시를 해제했어요.'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('오답 표시를 저장하지 못했어요. ${friendlyError(e)}'),
+      ));
+    } finally {
+      if (mounted) setState(() => _flaggingWrong = false);
+    }
+  }
+
+  /// 스레드 상태 변경(실시간) → 최신 상태 재조회해 상태칩·오답 배너 갱신.
   Future<void> _onThreadUpdate() async {
     try {
       final QuestionThread? t = await _read.threadById(widget.thread.id);
-      if (t != null && mounted) setState(() => _status = t.status);
+      if (t != null && mounted) {
+        setState(() {
+          _status = t.status;
+          _wrong = t.masteryStatus == MasteryStatus.wrong;
+        });
+      }
     } catch (_) {
       // 무시 — 상태칩은 다음 갱신에서 반영.
     }
@@ -514,12 +557,16 @@ class _ChatScreenState extends State<ChatScreen> {
           RoomSafetyMenu(
             counterparty: _counterparty,
             blocked: _blocked,
+            // 학생 채팅 화면 — 내 질문의 오답 표시 토글(A-4a α6).
+            wrongAnswerToggle: true,
+            wrongAnswer: _wrong,
             onSelected: _onSafetyAction,
           ),
         ],
       ),
       body: Column(
         children: <Widget>[
+          if (_wrong) const _WrongAnswerBanner(),
           Expanded(child: _list()),
           ChatInputBar(
             controller: _input,
@@ -565,6 +612,32 @@ class _ChatScreenState extends State<ChatScreen> {
       onAttachmentInsert: _reloadAttachments,
       hasEarlier: _hasEarlierMessages,
       onLoadEarlier: _loadEarlierMessages,
+    );
+  }
+}
+
+/// 오답 표시 배너 — 표시된 질문임을 채팅 상단에서 항상 드러낸다(해제는 메뉴).
+class _WrongAnswerBanner extends StatelessWidget {
+  const _WrongAnswerBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: ColorTokens.elevated,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: const Row(
+        children: <Widget>[
+          Icon(Icons.flag_rounded, size: 16, color: ColorTokens.danger),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '오답으로 표시한 질문이에요. 복습할 때 다시 보세요.',
+              style: TextStyle(fontSize: 12, color: ColorTokens.secondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

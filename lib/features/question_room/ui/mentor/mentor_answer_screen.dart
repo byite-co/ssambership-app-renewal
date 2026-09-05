@@ -167,6 +167,9 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     final RoomCounterparty? cp = _counterparty;
     if (cp == null) return; // 상대 미확인 — 실행하지 않는다.
     switch (action) {
+      case RoomSafetyAction.markWrong:
+      case RoomSafetyAction.unmarkWrong:
+        return; // 오답 표시는 학생 화면 전용(멘토 메뉴에는 항목이 없다).
       case RoomSafetyAction.report:
         await reportRoomCounterparty(context,
             counterparty: cp, safety: _safety);

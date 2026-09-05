@@ -27,6 +27,7 @@ const Set<String> kExpectedRpcNames = <String>{
   'qna_confirm_thread',
   'qna_create_free_question_thread',
   'qna_create_question_thread',
+  'qna_flag_wrong_answer', // A-4a α6 — 학생 오답 표시(mastery_status 정본)
   'qna_register_attachment',
   'weekly_question_usage_self',
   'weekly_question_usage_self_batch',

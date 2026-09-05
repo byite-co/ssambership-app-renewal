@@ -182,6 +182,30 @@ class QuestionRoomWriteRepository {
     }
   }
 
+  /// 학생 오답 표시(A-4a α6) — RPC `qna_flag_wrong_answer(p_thread_id, p_is_wrong)`.
+  /// 서버가 `is_wrong_answer` 와 `mastery_status`('wrong' / 'unknown')를 함께 바꾼다.
+  /// 학생만(STUDENT_ONLY) · 직접 UPDATE 금지. 반환값은 서버 정본 is_wrong_answer.
+  Future<bool> flagWrongAnswer({
+    required String threadId,
+    required bool isWrong,
+  }) async {
+    try {
+      final dynamic data = await _client.rpc(
+        'qna_flag_wrong_answer',
+        params: <String, dynamic>{
+          'p_thread_id': threadId,
+          'p_is_wrong': isWrong,
+        },
+      );
+      if (data is Map && data['is_wrong_answer'] is bool) {
+        return data['is_wrong_answer'] as bool;
+      }
+      return isWrong;
+    } catch (e) {
+      throw mapQnaError(e);
+    }
+  }
+
   /// 내 연결노트 추가/수정. 본인(author_id=현재 사용자) 행만 다룬다.
   /// 같은 방에 내 노트가 있으면 body 갱신, 없으면 새 행 삽입.
   /// author_role 은 현재 사용자 역할에서 채운다(남의 노트는 RLS가 차단).
