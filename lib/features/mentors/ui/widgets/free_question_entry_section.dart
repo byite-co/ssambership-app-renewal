@@ -4,9 +4,8 @@ import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/auth/auth_service.dart' show AppRole;
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
-import '../../../../design/widgets/secondary_button.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_secondary_button.dart';
 import '../../../../shared/errors/friendly_error.dart';
 import '../../data/free_question_entry.dart';
 import '../free_question_compose_screen.dart';
@@ -177,7 +176,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
       case FreeQuestionCtaStatus.loading:
         return const Padding(
           padding: EdgeInsets.only(top: 10),
-          child: SecondaryButton(
+          child: AppSecondaryButton(
             label: '무료 질문하기',
             icon: Icons.chat_bubble_outline_rounded,
             onPressed: null, // 조회 전 활성화 금지.
@@ -190,10 +189,9 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text('무료 질문 가능 여부를 확인하지 못했어요.',
-                  style:
-                      AppType.caption.copyWith(color: ColorTokens.secondary)),
+                  style: AppTypography.captionSecondary),
               const SizedBox(height: 6),
-              SecondaryButton(
+              AppSecondaryButton(
                 label: '다시 시도',
                 icon: Icons.refresh_rounded,
                 onPressed: _fetch,
@@ -207,7 +205,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              SecondaryButton(
+              AppSecondaryButton(
                 label: '무료 질문하기',
                 icon: Icons.chat_bubble_outline_rounded,
                 // 방 부재 — 탭 시 ensureRoom RPC 로 방을 만들고 작성 진입.
@@ -215,15 +213,14 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
               ),
               const SizedBox(height: 6),
               Text('아직 이 멘토와 연결된 질문방이 없어요. 첫 무료 질문을 보내면 질문방이 함께 만들어져요.',
-                  style:
-                      AppType.caption.copyWith(color: ColorTokens.secondary)),
+                  style: AppTypography.captionSecondary),
             ],
           ),
         );
       case FreeQuestionCtaStatus.ready:
         return Padding(
           padding: const EdgeInsets.only(top: 10),
-          child: SecondaryButton(
+          child: AppSecondaryButton(
             label: '무료 질문하기',
             icon: Icons.chat_bubble_outline_rounded,
             onPressed: _creating ? null : _open,
