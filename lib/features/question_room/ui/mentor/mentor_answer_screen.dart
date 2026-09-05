@@ -27,6 +27,11 @@ import '../widgets/room_safety_actions.dart';
 import '../widgets/room_safety_menu.dart';
 import '../widgets/scan_source_sheet.dart';
 import '../widgets/live_message_list.dart';
+import '../widgets/mentor_note_banner.dart';
+import '../widgets/note_compose_sheet.dart';
+import '../connection_notes_screen.dart';
+import '../../data/connection_note_errors.dart';
+import '../../data/models/connection_note.dart';
 import '../widgets/thread_status_pill.dart';
 import '../../../../core/scan/image_downscaler.dart';
 import '../../../../core/scan/scan_source_picker.dart';
@@ -109,6 +114,13 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
 
   late final ThreadRealtimePort _realtime;
   late ThreadStatus _status;
+
+  /// A-5 §2-1 노트 배너 — 이 방에 내가 남긴 노트(최신순). room 이 없으면 배너 없음.
+  List<ConnectionNote> _myNotes = const <ConnectionNote>[];
+  bool _noteBannerExpanded = false;
+
+  /// §2-2 답변 직후 시트는 화면당 한 번만(답변마다 띄우면 무시된다).
+  bool _noteSheetShown = false;
   ThreadMessagesController? _messages;
   bool _loading = true;
   Object? _loadError;
@@ -145,6 +157,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
       displayName: widget.studentName,
     );
     _realtime = widget.realtimeFactory(widget.thread.id);
+    _loadMyNotes();
     _load();
     _loadBlockState();
   }
@@ -320,6 +333,66 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     }
   }
 
+  /// [keep]: 방금 INSERT 한 노트 — 재조회가 아직 그 행을 못 돌려줘도 배너에 남긴다.
+  Future<void> _loadMyNotes({ConnectionNote? keep}) async {
+    final Room? room = widget.room;
+    final String? uid = _uid;
+    if (room == null || uid == null) return;
+    try {
+      final List<ConnectionNote> notes = await _read.notes(room.id);
+      final List<ConnectionNote> mine = notes
+          .where((ConnectionNote n) => n.authorId == uid)
+          .toList();
+      if (keep != null && !mine.any((ConnectionNote n) => n.id == keep.id)) {
+        mine.add(keep);
+      }
+      mine.sort((ConnectionNote a, ConnectionNote b) =>
+          b.createdAt.compareTo(a.createdAt));
+      if (mounted) setState(() => _myNotes = mine);
+    } catch (_) {
+      // 노트는 보조 맥락 — 못 읽어도 답변 화면은 그대로.
+    }
+  }
+
+  Future<void> _openNotes() async {
+    final Room? room = widget.room;
+    if (room == null) return;
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomNotes(room.id),
+      fallbackBuilder: (_) => ConnectionNotesScreen(
+        room: room,
+        mentorName: widget.studentName,
+      ),
+    );
+    if (mounted) _loadMyNotes();
+  }
+
+  /// 답변 전송 직후(§2-2): 시트 → 저장하면 INSERT, '나중에'면 아무것도 안 한다.
+  Future<void> _promptNoteAfterAnswer() async {
+    final Room? room = widget.room;
+    if (room == null || _noteSheetShown) return;
+    _noteSheetShown = true;
+    final String? body =
+        await showNoteComposeSheet(context, studentName: widget.studentName);
+    if (body == null || !mounted) return;
+    try {
+      final ConnectionNote created =
+          await _write.insertMyNote(roomId: room.id, body: body);
+      if (!mounted) return;
+      setState(() => _myNotes = <ConnectionNote>[created, ..._myNotes]);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('노트를 남겼어요.')),
+      );
+      await _loadMyNotes(keep: created);
+    } catch (e) {
+      final Object mapped = mapNoteInsertError(e);
+      _showError(mapped is NoteAlreadyExistsError
+          ? mapped.userMessage
+          : '노트를 저장하지 못했어요. ${friendlyError(mapped)}');
+    }
+  }
+
   Future<void> _send() async {
     if (_blocked) {
       _showError(_blockedNotice); // append/첨부 RPC 호출 0회.
@@ -330,6 +403,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
     if ((body.isEmpty && pending == null) || _sending) return;
     setState(() => _sending = true);
     bool attachmentDone = pending == null; // 첨부 없으면 정리할 것도 없음.
+    bool promptNote = false; // 텍스트 답변이 실제로 등록됐을 때만 노트 시트.
     try {
       QuestionMessage? sent;
       if (body.isNotEmpty) {
@@ -349,6 +423,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
         // 첨부 성공 시에만 pending 제거(P2-19) — 실패하면 미리보기 유지.
         attachmentDone = await _uploadPending(pending, messageId: sent?.id);
       }
+      promptNote = sent != null;
     } catch (e) {
       _showError('전송에 실패했어요. ${friendlyError(e)}');
     } finally {
@@ -359,6 +434,7 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
         });
       }
     }
+    if (promptNote && mounted) await _promptNoteAfterAnswer();
   }
 
   /// 대기 첨부 업로드. 성공(=pending 정리 가능)이면 true.
@@ -537,6 +613,15 @@ class _MentorAnswerScreenState extends State<MentorAnswerScreen> {
       ),
       body: Column(
         children: <Widget>[
+          if (widget.room != null)
+            MentorNoteBanner(
+              latest: _myNotes.isEmpty ? null : _myNotes.first,
+              noteCount: _myNotes.length,
+              expanded: _noteBannerExpanded,
+              onToggle: () =>
+                  setState(() => _noteBannerExpanded = !_noteBannerExpanded),
+              onOpenAll: _openNotes,
+            ),
           Expanded(child: _list()),
           ChatInputBar(
             controller: _input,

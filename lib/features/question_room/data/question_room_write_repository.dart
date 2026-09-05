@@ -5,6 +5,7 @@ import '../../../core/supabase/supabase_client.dart';
 import '../../../shared/errors/app_error.dart';
 import 'models/connection_note.dart';
 import 'models/question_message.dart';
+import 'connection_note_errors.dart';
 import 'qna_error_mapper.dart';
 
 /// 질문 생성 RPC 결과(서버는 전체 행이 아니라 id·경로만 돌려준다).
@@ -206,69 +207,32 @@ class QuestionRoomWriteRepository {
     }
   }
 
-  /// 내 연결노트 추가/수정. 본인(author_id=현재 사용자) 행만 다룬다.
-  /// 같은 방에 내 노트가 있으면 body 갱신, 없으면 새 행 삽입.
-  /// author_role 은 현재 사용자 역할에서 채운다(남의 노트는 RLS가 차단).
+  /// 내 연결노트 **추가**(A-5 §2 · 지시서 2-6) — INSERT 전용. 수정·삭제 경로 없음.
+  /// 노트는 쌓이는 이력이라 고쳐 쓰지 않는다. author_role 은 현재 사용자 역할.
   ///
-  /// ★ 중복 내성(2026-08 실측): DB 에 (room, author) UNIQUE 가 없어 과거
-  ///   레이스(이중 탭 등)로 내 노트가 2건 이상 존재할 수 있다. 이때 기존
-  ///   `maybeSingle()` 은 multiple-rows 예외를 던져 **저장이 영구 실패**했다
-  ///   (iOS 학생 계정 실측). 최신 1건을 갱신 대상으로 삼고, 성공 후 내 나머지
-  ///   중복 행은 best-effort 로 정리한다(정리 실패해도 저장은 성공).
-  Future<ConnectionNote> upsertMyNote({
+  /// DB 에 `UNIQUE(mentor_student_room_id, author_id)` 가 아직 살아 있어 두 번째
+  /// 노트는 23505 로 실패한다 → [NoteAlreadyExistsError](지시서 문구). 제약은 앱
+  /// 배포 후 DB 배치에서 푼다.
+  Future<ConnectionNote> insertMyNote({
     required String roomId,
     required String body,
   }) async {
     final String uid = _uid;
-
-    // 내 기존 노트 찾기(본인 것만) — 중복이 있어도 죽지 않게 목록으로 받아
-    // 최신(updated_at desc) 1건을 대상으로 한다.
-    final List<Map<String, dynamic>> existing = await _client
-        .from('connection_notes')
-        .select('id')
-        .eq('mentor_student_room_id', roomId)
-        .eq('author_id', uid)
-        .order('updated_at', ascending: false);
-
-    if (existing.isNotEmpty) {
+    try {
       final Map<String, dynamic> row = await _client
           .from('connection_notes')
-          .update(<String, dynamic>{
+          .insert(<String, dynamic>{
+            'mentor_student_room_id': roomId,
+            'author_id': uid,
+            'author_role': _currentAuthorRoleCode(),
             'body': body,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', existing.first['id'] as String)
           .select()
           .single();
-      // 내 오래된 중복 행 정리(RLS: 본인 행만 삭제 가능). 실패해도 무시 —
-      // 다음 저장에서 재시도되고, 화면은 최신 행(updated_at desc)만 쓴다.
-      if (existing.length > 1) {
-        try {
-          await _client.from('connection_notes').delete().inFilter(
-            'id',
-            <String>[
-              for (final Map<String, dynamic> e in existing.skip(1))
-                e['id'] as String,
-            ],
-          );
-        } catch (_) {
-          // best-effort 정리 실패 — 저장 성공에는 영향 없음.
-        }
-      }
       return ConnectionNote.fromMap(row);
+    } catch (e) {
+      throw mapNoteInsertError(e);
     }
-
-    final Map<String, dynamic> row = await _client
-        .from('connection_notes')
-        .insert(<String, dynamic>{
-          'mentor_student_room_id': roomId,
-          'author_id': uid,
-          'author_role': _currentAuthorRoleCode(),
-          'body': body,
-        })
-        .select()
-        .single();
-    return ConnectionNote.fromMap(row);
   }
 
   /// 현재 사용자 역할 → connection_notes.author_role 코드(student|mentor).

@@ -260,7 +260,8 @@ class QuestionRoomReadRepository {
         .from('connection_notes')
         .select('*')
         .eq('mentor_student_room_id', roomId)
-        .order('updated_at', ascending: false);
+        // A-5: 노트는 INSERT 전용 이력 — created_at 최신순(수정 시각 없음).
+        .order('created_at', ascending: false);
     return rows.map(ConnectionNote.fromMap).toList();
   }
 
