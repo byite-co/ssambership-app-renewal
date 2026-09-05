@@ -113,11 +113,29 @@ String mentorPlanTierQuotaLabel(MentorPlanTier tier) {
 
 /// 본인 요금제 현재값(캐시=원). 행이 없는 등급은 null(미설정).
 class MentorPlanPrices {
-  const MentorPlanPrices({this.limitedWon, this.standardWon, this.premiumWon});
+  const MentorPlanPrices({
+    this.limitedWon,
+    this.standardWon,
+    this.premiumWon,
+    this.active = const <MentorPlanTier, bool>{},
+  });
 
   final int? limitedWon;
   final int? standardWon;
   final int? premiumWon;
+
+  /// 등급별 `is_active`(A-4b ⑤). 행이 없거나 값이 없으면 서버 기본(true)과 같이 본다.
+  final Map<MentorPlanTier, bool> active;
+
+  bool isActive(MentorPlanTier tier) => active[tier] ?? true;
+
+  MentorPlanPrices withActive(MentorPlanTier tier, bool value) =>
+      MentorPlanPrices(
+        limitedWon: limitedWon,
+        standardWon: standardWon,
+        premiumWon: premiumWon,
+        active: <MentorPlanTier, bool>{...active, tier: value},
+      );
 
   int? won(MentorPlanTier tier) {
     switch (tier) {
@@ -135,23 +153,67 @@ class MentorPlanPrices {
     int? limited;
     int? standard;
     int? premium;
+    final Map<MentorPlanTier, bool> active = <MentorPlanTier, bool>{};
     for (final Map<String, dynamic> r in rows) {
       final int won = _int(r['amount_cents']) ~/ 100;
+      // ★ 행 값 그대로 — false 만 꺼짐. null·누락은 서버 기본(true).
+      final bool on = r['is_active'] != false;
       switch (_str(r['plan_tier'])) {
         case 'limited':
           limited = won;
+          active[MentorPlanTier.limited] = on;
         case 'standard':
           standard = won;
+          active[MentorPlanTier.standard] = on;
         case 'premium':
           premium = won;
+          active[MentorPlanTier.premium] = on;
       }
     }
     return MentorPlanPrices(
       limitedWon: limited,
       standardWon: standard,
       premiumWon: premium,
+      active: active,
     );
   }
+}
+
+/// `mentor_plan_active_set` 성공 봉투(A-4b ⑤).
+class MentorPlanActiveResult {
+  const MentorPlanActiveResult({
+    required this.tier,
+    required this.isActive,
+    required this.changed,
+    this.activeTiers = const <MentorPlanTier>[],
+  });
+
+  final MentorPlanTier tier;
+  final bool isActive;
+  final bool changed;
+  final List<MentorPlanTier> activeTiers;
+
+  factory MentorPlanActiveResult.fromBody(Map<String, dynamic> b) {
+    final Object? tiers = b['active_tiers'];
+    return MentorPlanActiveResult(
+      tier: mentorPlanTierFromCode(_str(b['plan_tier'])) ?? MentorPlanTier.standard,
+      isActive: b['is_active'] == true,
+      changed: b['changed'] == true,
+      activeTiers: tiers is List
+          ? tiers
+              .map((Object? e) => mentorPlanTierFromCode(e?.toString()))
+              .whereType<MentorPlanTier>()
+              .toList()
+          : const <MentorPlanTier>[],
+    );
+  }
+}
+
+MentorPlanTier? mentorPlanTierFromCode(String? code) {
+  for (final MentorPlanTier t in MentorPlanTier.values) {
+    if (t.name == code) return t;
+  }
+  return null;
 }
 
 /// 정산 월 요약(`mentor_settlement_summary` jsonb). 금액은 전부 cents 원문 보존.

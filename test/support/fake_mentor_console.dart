@@ -106,6 +106,21 @@ class FakeMentorConsole implements MentorConsolePort {
   }
 
   @override
+  Future<MentorPlanActiveResult> setPlanActive({
+    required MentorPlanTier tier,
+    required bool isActive,
+  }) async {
+    _guardWrite('setPlanActive', <String, Object?>{'tier': tier.name, 'isActive': isActive});
+    planPrices = planPrices.withActive(tier, isActive);
+    return MentorPlanActiveResult(
+      tier: tier,
+      isActive: isActive,
+      changed: true,
+      activeTiers: MentorPlanTier.values.where(planPrices.isActive).toList(),
+    );
+  }
+
+  @override
   Future<int?> loadIndividualQuestionPriceWon() async {
     _guardLoad();
     return iqPriceWon;

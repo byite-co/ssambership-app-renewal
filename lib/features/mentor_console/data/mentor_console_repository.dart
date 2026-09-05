@@ -43,6 +43,13 @@ abstract class MentorConsolePort {
     required int premiumWon,
   });
 
+  /// 요금제 활성 토글(A-4b ⑤ — `api_app_v1.mentor_plan_active_set`).
+  /// 끄면 새 구독만 막히고 기존 구독은 유지된다.
+  Future<MentorPlanActiveResult> setPlanActive({
+    required MentorPlanTier tier,
+    required bool isActive,
+  });
+
   Future<int?> loadIndividualQuestionPriceWon();
   Future<void> setIndividualQuestionPriceWon(int won);
 
@@ -148,9 +155,23 @@ class SupabaseMentorConsoleRepository implements MentorConsolePort {
   Future<MentorPlanPrices> loadPlanPrices() async {
     final List<Map<String, dynamic>> rows = await _client
         .from('mentor_plans')
-        .select('plan_tier, amount_cents')
+        .select('plan_tier, amount_cents, is_active')
         .eq('mentor_id', _uid);
     return MentorPlanPrices.fromRows(rows);
+  }
+
+  @override
+  Future<MentorPlanActiveResult> setPlanActive({
+    required MentorPlanTier tier,
+    required bool isActive,
+  }) async {
+    final Object? data = await _client.schema('api_app_v1').rpc(
+      'mentor_plan_active_set',
+      params: <String, dynamic>{'p_tier': tier.name, 'p_is_active': isActive},
+    );
+    final ApiEnvelope env =
+        ApiEnvelope.parse(data).requireOk(planActiveMessageForCode);
+    return MentorPlanActiveResult.fromBody(env.body);
   }
 
   @override
@@ -486,6 +507,22 @@ String studentIdMessageForCode(String code, Map<String, dynamic> body) {
       return '업로드한 파일을 확인하지 못했어요. 다시 올려 주세요.';
   }
   return apiWebV1CommonMessage(code) ?? '학생증을 제출하지 못했어요. 잠시 후 다시 시도해 주세요.';
+}
+
+/// 요금제 활성 토글(A-4b ⑤) 코드 → 문구.
+String planActiveMessageForCode(String code, Map<String, dynamic> body) {
+  switch (code) {
+    case 'LAST_ACTIVE_PLAN':
+      return '요금제 하나는 켜져 있어야 해요';
+    case 'MENTOR_TERMINATED':
+      return '활동 종료 절차 중에는 요금제를 바꿀 수 없어요.';
+    case 'PLAN_NOT_FOUND':
+      return '요금제 정보를 찾을 수 없어요. 요금을 먼저 저장해 주세요.';
+    case 'PLAN_TIER_INVALID':
+    case 'PLAN_ACTIVE_VALUE_REQUIRED':
+      return '요청 값이 올바르지 않아요. 다시 시도해 주세요.';
+  }
+  return apiWebV1CommonMessage(code) ?? '요금제 상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.';
 }
 
 String planPricesMessageForCode(String code, Map<String, dynamic> body) {
