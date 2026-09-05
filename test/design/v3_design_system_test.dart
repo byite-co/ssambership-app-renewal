@@ -14,7 +14,7 @@ import 'package:ssambership_app/design/widgets/app_input_field.dart';
 import 'package:ssambership_app/design/widgets/app_primary_button.dart';
 import 'package:ssambership_app/design/widgets/app_secondary_button.dart';
 import 'package:ssambership_app/design/widgets/app_skeleton.dart';
-import 'package:ssambership_app/design/widgets/glass_badge.dart';
+import 'package:ssambership_app/design/widgets/app_badge.dart';
 import 'package:ssambership_app/design/widgets/glass_bars.dart';
 import 'package:ssambership_app/design/widgets/glass_card.dart';
 import 'package:ssambership_app/design/widgets/glass_inner.dart';
@@ -65,7 +65,7 @@ void main() {
     expect(surface.contains('BackdropFilter('), isTrue);
   });
 
-  testWidgets('RoleTheme exposes role colors and rejects an absent scope',
+  testWidgets('RoleTheme exposes role colors and falls back to student',
       (WidgetTester tester) async {
     late RoleTheme studentTheme;
     await tester.pumpWidget(
@@ -91,11 +91,14 @@ void main() {
       RoleColors.student.withValues(alpha: AppGlass.tintAlpha),
     );
 
+    // 조상에 RoleTheme 이 없으면(화면을 단독 pump 하는 테스트) 학생 기본값.
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (BuildContext context) {
-            expect(() => RoleTheme.of(context), throwsFlutterError);
+            expect(RoleTheme.maybeOf(context), isNull);
+            expect(RoleTheme.of(context).role, AppRole.student);
+            expect(RoleTheme.of(context).color, RoleColors.student);
             return const SizedBox();
           },
         ),

@@ -18,7 +18,8 @@ import '../../../design/widgets/glass_inner.dart';
 import '../../question_room/data/attachments/attachment_upload.dart'
     show validatePickedImage;
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
 import 'academic_record_change_screen.dart';
@@ -238,16 +239,16 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '프로필 편집',
       body: FutureBuilder<MentorOwnProfile>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<MentorOwnProfile> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 3);
+            return const AppLoadingView(cards: 3);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '프로필을 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _retry,
@@ -262,7 +263,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
   Widget _form(BuildContext context, MentorOwnProfile profile) {
     final bool busy = _saving || _uploading;
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         // ── 사진 + 구독 열림 ──
         GlassCard(
@@ -311,7 +312,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
               ),
               if (_avatarError != null) ...<Widget>[
                 const SizedBox(height: 8),
-                V3Callout(tone: V3CalloutTone.danger, text: _avatarError!),
+                AppCallout(tone: AppCalloutTone.danger, text: _avatarError!),
               ],
             ],
           ),
@@ -337,14 +338,14 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
               const SizedBox(height: AppSpacing.base),
               _LockedField(label: '학과', value: profile.departmentName),
               const SizedBox(height: 6),
-              V3EntryRow(
+              AppEntryRow(
                 icon: Icons.swap_horiz_rounded,
                 label: '학적 변경 요청하기',
                 caption: '대학교·학과는 웹과 같이 학적 변경 요청으로만 바꿔요',
                 onTap: _openAcademicRecordChange,
               ),
               const SizedBox(height: 6),
-              V3Field(
+              AppField(
                 label: '출신 고등학교',
                 error: _highSchoolError,
                 child: AppInputField(
@@ -365,7 +366,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
             children: <Widget>[
               const Text('소개', style: AppTypography.section),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
+              AppField(
                 label: '한줄 소개',
                 help: '${_introLine.text.trim().length}/$kMentorIntroLineMax',
                 error: _introLineError,
@@ -377,7 +378,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
+              AppField(
                 label: '상세 소개',
                 help: '${_bio.text.trim().length}/$kMentorBioMax',
                 error: _bioError,
@@ -409,8 +410,8 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
               if (_subjects.isEmpty &&
                   (profile.isOpenForSubscriptions)) ...<Widget>[
                 const SizedBox(height: 8),
-                const V3Callout(
-                  tone: V3CalloutTone.warning,
+                const AppCallout(
+                  tone: AppCalloutTone.warning,
                   text: '담당 과목이 없으면 저장할 때 새 구독 받기가 닫혀요(웹과 동일).',
                 ),
               ],
@@ -428,7 +429,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
         ),
         if (_saveError != null) ...<Widget>[
           const SizedBox(height: 12),
-          V3Callout(tone: V3CalloutTone.danger, text: _saveError!),
+          AppCallout(tone: AppCalloutTone.danger, text: _saveError!),
         ],
         const SizedBox(height: AppSpacing.section),
         AppPrimaryButton(
@@ -592,7 +593,7 @@ class _LockedField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool empty = value == null || value!.trim().isEmpty;
-    return V3Field(
+    return AppField(
       label: label,
       child: GlassInner(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

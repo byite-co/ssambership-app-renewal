@@ -10,7 +10,8 @@ import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_primary_button.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
 import 'academic_record_change_screen.dart';
@@ -110,16 +111,16 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '정산',
       body: FutureBuilder<SettlementSummary>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<SettlementSummary> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 3);
+            return const AppLoadingView(cards: 3);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '정산 정보를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _reload,
@@ -136,7 +137,7 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
     return RefreshIndicator(
       onRefresh: () async => _reload(),
       child: ListView(
-        padding: V3Page.contentPadding(context),
+        padding: AppPage.contentPadding(context),
         children: <Widget>[
           GlassCard(
             child: Column(
@@ -167,8 +168,8 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
           ),
           const SizedBox(height: 12),
           if (!s.payoutAccountRegistered) ...<Widget>[
-            V3Callout(
-              tone: V3CalloutTone.warning,
+            AppCallout(
+              tone: AppCalloutTone.warning,
               title: '정산 계좌를 등록해 주세요',
               text: '등록하지 않으면 $runDate 지급이 다음 달로 미뤄져요.',
             ),
@@ -180,7 +181,7 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
             ),
             const SizedBox(height: AppSpacing.section),
           ],
-          const V3SectionTitle('무엇으로 벌었나요'),
+          const AppSectionTitle('무엇으로 벌었나요'),
           GlassCard(
             child: Column(
               children: <Widget>[
@@ -214,20 +215,20 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(
               children: <Widget>[
-                V3KeyValueRow(
+                AppKeyValueRow(
                   label: '적립 중 · ${s.accruingCount}건',
                   value: settlementWon(s.accruingNetCents),
                 ),
-                V3KeyValueRow(
+                AppKeyValueRow(
                   label: '보류 · ${s.heldCount}건',
                   value: settlementWon(s.heldMentorAmountCents),
                   valueColor: s.heldCount > 0 ? AppColors.warning : null,
                 ),
-                V3KeyValueRow(
+                AppKeyValueRow(
                   label: '지금까지 지급 · ${s.paidTotalCount}건',
                   value: settlementWon(s.paidTotalNetCents),
                 ),
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.receipt_long_rounded,
                   label: '건별 내역 보기',
                   onTap: _openLines,
@@ -236,33 +237,33 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.section),
-          const V3SectionTitle('멘토 관리'),
+          const AppSectionTitle('멘토 관리'),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(
               children: <Widget>[
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.account_balance_rounded,
                   label: '정산 계좌',
                   caption: s.payoutAccountRegistered ? '등록됨' : '미등록',
                   onTap: _openAccount,
                 ),
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.sell_outlined,
                   label: '요금제 · 개별질문 단가',
                   onTap: _openPlans,
                 ),
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.school_outlined,
                   label: '학력 인증',
                   onTap: _openEducationVerification,
                 ),
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.swap_horiz_rounded,
                   label: '학적 변경 요청',
                   onTap: _openAcademicRecordChange,
                 ),
-                V3EntryRow(
+                AppEntryRow(
                   icon: Icons.badge_outlined,
                   label: '프로필 편집',
                   caption: '소개 · 담당 과목 · 사진 · 구독 열림',

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ssambership_app/app/app_chrome.dart';
 import 'package:ssambership_app/app/app_scope.dart';
+import 'package:ssambership_app/app/home_shell.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
-import 'package:ssambership_app/design/theme.dart';
 
 import 'golden_app_fakes.dart';
 
@@ -13,8 +14,9 @@ import 'golden_app_fakes.dart';
 const Size kGoldenLogicalSize = Size(390, 844);
 const double kGoldenDevicePixelRatio = 2.0;
 
-/// 화면 위젯을 **실제 앱과 같은 껍데기**(AppScope·AppTheme·Pretendard·ko 로케일)로
-/// 감싸 고정 뷰포트에 렌더한다. 네트워크·전역 싱글턴에 닿지 않는 픽스처만 넘길 것.
+/// 화면 위젯을 **실제 앱과 같은 껍데기**(AppScope·RoleTheme·v3 AppTheme·배경·
+/// Pretendard·ko 로케일)로 감싸 고정 뷰포트에 렌더한다 — `lib/app/app_chrome.dart`
+/// 의 같은 함수를 쓴다. 네트워크·전역 싱글턴에 닿지 않는 픽스처만 넘길 것.
 ///
 /// - [dependencies]: AppScope 에 실을 의존성. 생략하면 [role] 의 fake 인증(세션 없음)
 ///   + '없음' fake 컨트롤러로 채운 [goldenDependencies].
@@ -34,17 +36,21 @@ Future<void> pumpGoldenScreen(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  final Widget app = MaterialApp(
-    debugShowCheckedModeBanner: false,
-    theme: AppTheme.build(role),
-    locale: const Locale('ko'),
-    supportedLocales: const <Locale>[Locale('ko')],
-    localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    home: screen,
+  final Widget app = appChrome(
+    role: themeRoleOf(role),
+    child: (ThemeData theme) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: theme,
+      locale: const Locale('ko'),
+      supportedLocales: const <Locale>[Locale('ko')],
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: appBackgroundBuilder,
+      home: screen,
+    ),
   );
   await tester.pumpWidget(
     withScope
@@ -90,17 +96,21 @@ Future<void> pumpGoldenRoute(
   await tester.pumpWidget(
     AppScope(
       dependencies: scopedDependencies,
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.build(role),
-        locale: const Locale('ko'),
-        supportedLocales: const <Locale>[Locale('ko')],
-        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        routerConfig: router,
+      child: appChrome(
+        role: themeRoleOf(role),
+        child: (ThemeData theme) => MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          locale: const Locale('ko'),
+          supportedLocales: const <Locale>[Locale('ko')],
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          builder: appBackgroundBuilder,
+          routerConfig: router,
+        ),
       ),
     ),
   );
@@ -115,3 +125,18 @@ Future<void> expectScreenGolden(WidgetTester tester, String name) {
     matchesGoldenFile('images/$name.png'),
   );
 }
+
+/// 탭 본문 골든용 홈 셸 껍데기 — [HomeShellChrome] 과 같은 배경·유리 앱바·탭바.
+/// [selectedIndex] 탭이 선택된 상태로 [child] 를 본문에 넣는다.
+Widget goldenTabFrame({
+  required AppRole role,
+  required int selectedIndex,
+  required Widget child,
+}) =>
+    HomeShellChrome(
+      title: HomeShell.tabItemsFor(role)[selectedIndex].label,
+      tabs: HomeShell.tabItemsFor(role),
+      selectedIndex: selectedIndex,
+      onSelected: (_) {},
+      body: child,
+    );

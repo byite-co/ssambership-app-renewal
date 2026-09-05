@@ -8,11 +8,12 @@ import '../../../design/tokens/app_colors.dart';
 import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_primary_button.dart';
-import '../../../design/widgets/glass_badge.dart';
+import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/format/formatters.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/document_validation.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
@@ -120,7 +121,7 @@ class _EducationVerificationScreenState
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '학력 인증',
       body: FutureBuilder<List<SchoolVerificationRecord>>(
         future: _future,
@@ -129,10 +130,10 @@ class _EducationVerificationScreenState
           AsyncSnapshot<List<SchoolVerificationRecord>> snap,
         ) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 2);
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '인증 상태를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _reload,
@@ -153,13 +154,13 @@ class _EducationVerificationScreenState
     final bool formVisible = !locked && (!approved || _showResubmitForm);
 
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         _StatusHero(latest: latest),
         const SizedBox(height: 12),
         if (locked) ...<Widget>[
-          V3Callout(
-            tone: V3CalloutTone.neutral,
+          AppCallout(
+            tone: AppCalloutTone.neutral,
             text: latest.hasDocument
                 ? '검토가 끝나면 다른 서류로 다시 제출할 수 있어요.'
                 : '서류 없이 관리자 확정을 기다리는 상태예요. 확정되면 결과가 여기에 반영돼요.',
@@ -197,7 +198,7 @@ class _EducationVerificationScreenState
                 ),
                 if (_submitError != null) ...<Widget>[
                   const SizedBox(height: 10),
-                  V3Callout(tone: V3CalloutTone.danger, text: _submitError!),
+                  AppCallout(tone: AppCalloutTone.danger, text: _submitError!),
                 ],
                 const SizedBox(height: AppSpacing.base),
                 AppPrimaryButton(
@@ -213,7 +214,7 @@ class _EducationVerificationScreenState
         ],
         if (records.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.section),
-          const V3SectionTitle('제출 기록'),
+          const AppSectionTitle('제출 기록'),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             child: Column(
@@ -239,12 +240,12 @@ class _StatusHero extends StatelessWidget {
     final SchoolVerificationRecord? r = latest;
     final String headline;
     final String sub;
-    final V3CalloutTone tone;
+    final AppCalloutTone tone;
     final IconData icon;
     if (r == null) {
       headline = '아직 인증하지 않았어요';
       sub = '인증한 멘토는 학생이 더 믿고 구독해요';
-      tone = V3CalloutTone.neutral;
+      tone = AppCalloutTone.neutral;
       icon = Icons.school_outlined;
     } else {
       switch (r.status) {
@@ -261,34 +262,34 @@ class _StatusHero extends StatelessWidget {
             if (values.isNotEmpty) values.join(' · '),
             if (when.isNotEmpty) when,
           ].join('\n');
-          tone = V3CalloutTone.success;
+          tone = AppCalloutTone.success;
           icon = Icons.verified_rounded;
         case ReviewStatus.pending:
           headline = '서류를 확인하고 있어요';
           sub = r.hasDocument
               ? '보통 영업일 2일 안에 끝나요. 결과는 알림으로 알려드릴게요.'
               : '서류 없음 · 관리자 확정 대기';
-          tone = V3CalloutTone.warning;
+          tone = AppCalloutTone.warning;
           icon = Icons.hourglass_top_rounded;
         case ReviewStatus.rejected:
           headline = '서류가 반려됐어요';
           sub = r.rejectReason ?? '사유가 기록되지 않았어요. 서류를 다시 제출해 주세요.';
-          tone = V3CalloutTone.danger;
+          tone = AppCalloutTone.danger;
           icon = Icons.cancel_outlined;
         case ReviewStatus.resubmitRequired:
           headline = '서류를 다시 보내 주세요';
           sub = r.rejectReason ?? '안내에 맞춰 서류를 다시 제출해 주세요.';
-          tone = V3CalloutTone.warning;
+          tone = AppCalloutTone.warning;
           icon = Icons.replay_rounded;
         case ReviewStatus.superseded:
           headline = '이전 인증 기록이에요';
           sub = '새 서류를 제출하면 다시 검토돼요.';
-          tone = V3CalloutTone.neutral;
+          tone = AppCalloutTone.neutral;
           icon = Icons.history_rounded;
         case ReviewStatus.unknown:
           headline = '상태를 확인하고 있어요';
           sub = '상태 확인 필요 · 잠시 후 다시 열어 주세요.';
-          tone = V3CalloutTone.warning;
+          tone = AppCalloutTone.warning;
           icon = Icons.help_outline_rounded;
       }
     }
@@ -318,15 +319,15 @@ class _StatusHero extends StatelessWidget {
     );
   }
 
-  static Color _toneColor(BuildContext context, V3CalloutTone tone) {
+  static Color _toneColor(BuildContext context, AppCalloutTone tone) {
     switch (tone) {
-      case V3CalloutTone.success:
+      case AppCalloutTone.success:
         return RoleTheme.of(context).color;
-      case V3CalloutTone.warning:
+      case AppCalloutTone.warning:
         return AppColors.warning;
-      case V3CalloutTone.danger:
+      case AppCalloutTone.danger:
         return AppColors.danger;
-      case V3CalloutTone.neutral:
+      case AppCalloutTone.neutral:
         return AppColors.textSecondary;
     }
   }

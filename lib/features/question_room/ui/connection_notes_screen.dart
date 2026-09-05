@@ -8,13 +8,14 @@ import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_empty_state.dart';
 import '../../../design/widgets/app_input_field.dart';
 import '../../../design/widgets/app_primary_button.dart';
-import '../../../design/widgets/glass_badge.dart';
+import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../design/widgets/glass_inner.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/format/formatters.dart';
 import '../../../shared/labels/question_room_labels.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/connection_note_errors.dart';
 import '../data/mentor_note_format.dart';
 import '../data/models/connection_note.dart';
@@ -147,16 +148,16 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: _isMentor ? '연결노트 · ${widget.mentorName}' : '연결노트',
       body: FutureBuilder<List<ConnectionNote>>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<List<ConnectionNote>> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 2);
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '노트를 불러오지 못했어요',
               message: friendlyError(snap.error!),
               onRetry: _reload,
@@ -187,7 +188,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
         if (!identical(n, latestMentor)) n,
     ];
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         if (latestMentor == null)
           const AppEmptyState(
@@ -198,7 +199,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
         else
           _MentorSummaryCard(note: latestMentor, mentorName: widget.mentorName),
         const SizedBox(height: AppSpacing.section),
-        const V3SectionTitle('내가 정리한 것'),
+        const AppSectionTitle('내가 정리한 것'),
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -220,7 +221,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
         ),
         if (rest.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.section),
-          V3SectionTitle('지난 노트 ${rest.length}개'),
+          AppSectionTitle('지난 노트 ${rest.length}개'),
           for (final ConnectionNote n in rest) ...<Widget>[
             _NoteCard(note: n, mine: _uid != null && n.authorId == _uid),
             const SizedBox(height: 10),
@@ -235,7 +236,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
     // 시계 의존(DateTime.now) 없이 고정 사실만 — 골든이 날짜에 따라 흔들리지 않는다.
     final String since = Formatters.koreanDate(widget.room.createdAt.toLocal());
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 10),
@@ -257,7 +258,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
                 style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
+              AppField(
                 label: '오늘 무엇이 약했나요?',
                 child: AppInputField(
                   controller: _weakness,
@@ -268,7 +269,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              V3Field(
+              AppField(
                 label: '다음에 어떤 유형을 풀면 좋을까요?',
                 child: AppInputField(
                   controller: _next,
@@ -288,7 +289,7 @@ class _ConnectionNotesScreenState extends State<ConnectionNotesScreen> {
         ),
         if (notes.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.section),
-          const V3SectionTitle('타임라인'),
+          const AppSectionTitle('타임라인'),
           for (final ConnectionNote n in notes) ...<Widget>[
             _NoteCard(note: n, mine: _uid != null && n.authorId == _uid),
             const SizedBox(height: 10),

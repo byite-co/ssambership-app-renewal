@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../design/tokens/color_tokens.dart';
 import '../../shared/constants/app_constants.dart';
 
 /// 부팅 스플래시(세션 복원/프로필 로드 중). 로드 끝나면 진입 가드가 이동시킨다.
-/// 브랜드 로고 + 로딩 인디케이터(순백 배경).
+/// 브랜드 로고 + 로딩 인디케이터(배경은 앱 루트 그라디언트).
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -22,7 +21,7 @@ class SplashScreen extends StatelessWidget {
               filterQuality: FilterQuality.medium,
             ),
             SizedBox(height: 24),
-            CircularProgressIndicator(color: ColorTokens.accent),
+            CircularProgressIndicator(),
           ],
         ),
       ),

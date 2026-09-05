@@ -1,153 +1,43 @@
 import 'package:flutter/material.dart';
 
-import '../../app/app_scope.dart';
-import '../../core/auth/auth_service.dart' as auth;
-import '../../design/app_theme.dart' as v3;
-import '../../design/role_theme.dart';
-import '../../design/tokens/app_colors.dart';
-import '../../design/tokens/app_spacing.dart';
-import '../../design/tokens/app_typography.dart';
-import '../../design/widgets/app_background.dart';
-import '../../design/widgets/app_empty_state.dart';
-import '../../design/widgets/app_skeleton.dart';
-import '../../design/widgets/glass_bars.dart';
-import '../../design/widgets/glass_inner.dart';
+import '../role_theme.dart';
+import '../tokens/app_colors.dart';
+import '../tokens/app_spacing.dart';
+import '../tokens/app_typography.dart';
+import 'app_empty_state.dart';
+import 'app_page.dart';
+import 'app_skeleton.dart';
+import 'glass_bars.dart';
+import 'glass_inner.dart';
 
-/// A-4a 새 화면의 공통 껍데기 — A-6a 컴포넌트만으로 합성한다.
-///
-/// 앱 트리는 아직 v3 테마에 연결돼 있지 않다(A-6b). 그래서 각 새 화면이 이 위젯으로
-/// v3 [AppTheme]·[RoleTheme]·[AppBackground]·[GlassAppBar] 를 스스로 두른다.
-/// 역할색은 [AppScope] 의 현재 역할에서 정한다(멘토 초록·그 외 학생 파랑).
-class V3Page extends StatelessWidget {
-  const V3Page({
-    super.key,
-    required this.title,
-    required this.body,
-    this.actions = const <Widget>[],
-    this.showBack = true,
-    this.roleOverride,
-    this.bottom,
-    this.bodyBehindAppBar = true,
-  });
+/// 화면 조립용 작은 블록들 — A-4a 가 `V3Page` 옆에 두었던 것을 디자인 시스템으로 옮겼다.
 
-  final String title;
-  final Widget body;
-  final List<Widget> actions;
-
-  /// 뒤로 가기 표시. pushed 화면은 true, 탭 본문에 임베드하면 false.
-  final bool showBack;
-
-  /// 테스트·갤러리용 역할 강제. null 이면 AppScope 의 현재 역할.
-  final AppRole? roleOverride;
-
-  /// 하단 고정 영역(저장 버튼 등). 글래스 바로 감싼다.
-  final Widget? bottom;
-
-  /// 본문을 글래스 앱바 뒤까지 늘릴지(기본 true — 스크롤이 바 밑으로 비친다).
-  /// false 면 본문이 앱바 아래에서 시작한다 — `ensureVisible` 로 항목을 뷰포트
-  /// 맨 위에 맞추는 기존 위젯 테스트(IQ 등록 첨부)가 앱바에 가려지지 않는다.
-  final bool bodyBehindAppBar;
-
-  /// [extendBodyBehindAppBar] 위에서 스크롤 본문이 써야 할 상단 여백.
-  static double topInset(BuildContext context) =>
-      MediaQuery.paddingOf(context).top + kToolbarHeight;
-
-  /// 스크롤 본문 기본 패딩(좌우 20 · 앱바 아래 12 · 하단 24).
-  /// [behindAppBar]=false 면 본문이 이미 앱바 아래라 상단 여백은 12 만.
-  static EdgeInsets contentPadding(
-    BuildContext context, {
-    double bottom = 24,
-    bool behindAppBar = true,
-  }) =>
-      EdgeInsets.fromLTRB(
-        AppSpacing.screenH,
-        (behindAppBar ? topInset(context) : 0) + 12,
-        AppSpacing.screenH,
-        bottom,
-      );
-
-  static AppRole roleOf(BuildContext context) {
-    final AppDependencies? deps = AppScope.maybeOf(context);
-    return deps?.auth.currentRole == auth.AppRole.mentor
-        ? AppRole.mentor
-        : AppRole.student;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final AppRole role = roleOverride ?? roleOf(context);
-    return Theme(
-      data: v3.AppTheme.build(),
-      child: RoleTheme(
-        role: role,
-        child: AppBackground(
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            extendBodyBehindAppBar: bodyBehindAppBar,
-            extendBody: bottom != null,
-            appBar: GlassAppBar(
-              title: Text(title),
-              leading: showBack
-                  ? IconButton(
-                      tooltip: '뒤로',
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 20,
-                        color: AppColors.textPrimary,
-                      ),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    )
-                  : null,
-              actions: actions,
-            ),
-            body: body,
-            bottomNavigationBar: bottom == null
-                ? null
-                : GlassBottomSheet(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                    child: bottom!,
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// v3 글래스 바텀시트 — 호출 화면의 역할·테마를 시트 서브트리에 다시 두른다
-/// (모달 시트는 Navigator 아래에 붙어 [V3Page] 의 [RoleTheme] 을 상속하지 못한다).
-Future<T?> showV3BottomSheet<T>(
+/// v3 글래스 바텀시트. 역할·테마는 앱 루트가 [MaterialApp] 위에 두르므로 시트
+/// 서브트리에 다시 두르지 않는다.
+Future<T?> showAppBottomSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   bool isDismissible = true,
   bool enableDrag = true,
 }) {
-  // 호출 컨텍스트가 [V3Page] 의 State 처럼 RoleTheme 위에 있을 수 있다 —
-  // 그때는 AppScope 의 현재 역할로 정한다.
-  final AppRole role =
-      context.getInheritedWidgetOfExactType<RoleTheme>()?.role ??
-          V3Page.roleOf(context);
   return GlassBottomSheet.show<T>(
     context,
     isDismissible: isDismissible,
     enableDrag: enableDrag,
-    builder: (BuildContext sheetContext) => Theme(
-      data: v3.AppTheme.build(),
-      child: RoleTheme(role: role, child: builder(sheetContext)),
-    ),
+    builder: builder,
   );
 }
 
-/// 로딩 자리표시 — 카드 실루엣 3장.
-class V3LoadingView extends StatelessWidget {
-  const V3LoadingView({super.key, this.cards = 3});
+/// 로딩 자리표시 — 카드 실루엣 N장.
+class AppLoadingView extends StatelessWidget {
+  const AppLoadingView({super.key, this.cards = 3});
 
   final int cards;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         for (int i = 0; i < cards; i++) ...<Widget>[
           const AppSkeleton(),
@@ -159,8 +49,8 @@ class V3LoadingView extends StatelessWidget {
 }
 
 /// 실패 상태 — 사유 + 다시 시도. 조용히 실패하지 않는다.
-class V3ErrorView extends StatelessWidget {
-  const V3ErrorView({
+class AppErrorView extends StatelessWidget {
+  const AppErrorView({
     super.key,
     required this.message,
     required this.onRetry,
@@ -173,22 +63,19 @@ class V3ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(top: V3Page.topInset(context)),
-      child: AppEmptyState(
-        icon: Icons.cloud_off_rounded,
-        title: title,
-        description: message,
-        actionLabel: '다시 시도',
-        onAction: onRetry,
-      ),
+    return AppEmptyState(
+      icon: Icons.cloud_off_rounded,
+      title: title,
+      description: message,
+      actionLabel: '다시 시도',
+      onAction: onRetry,
     );
   }
 }
 
 /// 필드 라벨 + 입력(또는 임의 child).
-class V3Field extends StatelessWidget {
-  const V3Field({
+class AppField extends StatelessWidget {
+  const AppField({
     super.key,
     required this.label,
     required this.child,
@@ -229,21 +116,21 @@ class V3Field extends StatelessWidget {
   }
 }
 
-enum V3CalloutTone { neutral, warning, danger, success }
+enum AppCalloutTone { neutral, warning, danger, success }
 
 /// 안내 블록(내부 글래스). 톤에 따라 아이콘·글자색만 바뀐다.
-class V3Callout extends StatelessWidget {
-  const V3Callout({
+class AppCallout extends StatelessWidget {
+  const AppCallout({
     super.key,
     required this.text,
-    this.tone = V3CalloutTone.neutral,
+    this.tone = AppCalloutTone.neutral,
     this.title,
     this.trailing,
   });
 
   final String text;
   final String? title;
-  final V3CalloutTone tone;
+  final AppCalloutTone tone;
   final Widget? trailing;
 
   @override
@@ -252,16 +139,16 @@ class V3Callout extends StatelessWidget {
     final Color color;
     final IconData icon;
     switch (tone) {
-      case V3CalloutTone.neutral:
+      case AppCalloutTone.neutral:
         color = AppColors.textSecondary;
         icon = Icons.info_outline_rounded;
-      case V3CalloutTone.warning:
+      case AppCalloutTone.warning:
         color = AppColors.warning;
         icon = Icons.warning_amber_rounded;
-      case V3CalloutTone.danger:
+      case AppCalloutTone.danger:
         color = AppColors.danger;
         icon = Icons.error_outline_rounded;
-      case V3CalloutTone.success:
+      case AppCalloutTone.success:
         color = roleTheme.color;
         icon = Icons.check_circle_outline_rounded;
     }
@@ -306,8 +193,8 @@ class V3Callout extends StatelessWidget {
 }
 
 /// 라벨·값 한 줄(표 행). 숫자는 tabular figures 로 우측 정렬.
-class V3KeyValueRow extends StatelessWidget {
-  const V3KeyValueRow({
+class AppKeyValueRow extends StatelessWidget {
+  const AppKeyValueRow({
     super.key,
     required this.label,
     required this.value,
@@ -349,8 +236,8 @@ class V3KeyValueRow extends StatelessWidget {
 }
 
 /// 탭 가능한 진입 행(아이콘 · 라벨 · 보조 · chevron) — 허브 화면의 목록용.
-class V3EntryRow extends StatelessWidget {
-  const V3EntryRow({
+class AppEntryRow extends StatelessWidget {
+  const AppEntryRow({
     super.key,
     required this.icon,
     required this.label,
@@ -416,8 +303,8 @@ class V3EntryRow extends StatelessWidget {
 }
 
 /// 섹션 제목(카드 위).
-class V3SectionTitle extends StatelessWidget {
-  const V3SectionTitle(this.text, {super.key, this.trailing});
+class AppSectionTitle extends StatelessWidget {
+  const AppSectionTitle(this.text, {super.key, this.trailing});
 
   final String text;
   final Widget? trailing;

@@ -8,7 +8,7 @@ import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/glass_inner.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/document_validation.dart';
 
 /// 학력 인증·학적 변경 공용 서류 선택 — 소스 시트(촬영/갤러리/파일) → 매직바이트
@@ -37,7 +37,7 @@ class MentorDocumentField extends StatelessWidget {
   Widget build(BuildContext context) {
     final RoleTheme roleTheme = RoleTheme.of(context);
     final PickedImage? file = picked;
-    return V3Field(
+    return AppField(
       label: '증명 서류',
       help: file == null ? 'JPG, PNG, PDF · 최대 $kMentorDocumentMaxBytesLabel' : null,
       error: problem,
@@ -133,7 +133,7 @@ Future<PickedImage?> pickMentorDocument(
   String title = '서류 올리기',
   bool includeFile = true,
 }) async {
-  final ScanSource? source = await showV3BottomSheet<ScanSource>(
+  final ScanSource? source = await showAppBottomSheet<ScanSource>(
     context,
     builder: (BuildContext sheet) =>
         _DocumentSourceSheet(title: title, includeFile: includeFile),
@@ -207,7 +207,7 @@ class _SourceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return V3EntryRow(
+    return AppEntryRow(
       icon: icon,
       label: label,
       caption: caption,

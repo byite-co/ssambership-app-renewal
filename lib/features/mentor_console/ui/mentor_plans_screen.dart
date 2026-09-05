@@ -6,10 +6,11 @@ import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_input_field.dart';
 import '../../../design/widgets/app_primary_button.dart';
-import '../../../design/widgets/glass_badge.dart';
+import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../../mentors/format/mentor_price_format.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
@@ -181,16 +182,16 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '요금제',
       body: FutureBuilder<_PlansLoad>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<_PlansLoad> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 3);
+            return const AppLoadingView(cards: 3);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '요금제를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _retry,
@@ -204,7 +205,7 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
 
   Widget _form(BuildContext context) {
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         Text(
           '요금제마다 정할 수 있는 범위가 달라요',
@@ -232,7 +233,7 @@ class _MentorPlansScreenState extends State<MentorPlansScreen> {
         ),
         if (_saveError != null) ...<Widget>[
           const SizedBox(height: 12),
-          V3Callout(tone: V3CalloutTone.danger, text: _saveError!),
+          AppCallout(tone: AppCalloutTone.danger, text: _saveError!),
         ],
         const SizedBox(height: AppSpacing.section),
         AppPrimaryButton(

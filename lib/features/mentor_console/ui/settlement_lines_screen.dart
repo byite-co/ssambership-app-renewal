@@ -4,10 +4,11 @@ import '../../../app/app_scope.dart';
 import '../../../design/tokens/app_colors.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_empty_state.dart';
-import '../../../design/widgets/glass_badge.dart';
+import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
 import 'settlement_format.dart';
@@ -42,17 +43,17 @@ class _SettlementLinesScreenState extends State<SettlementLinesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '건별 내역',
       body: FutureBuilder<List<SettlementLine>>(
         future: _future,
         builder:
             (BuildContext context, AsyncSnapshot<List<SettlementLine>> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 4);
+            return const AppLoadingView(cards: 4);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '정산 내역을 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _reload,
@@ -60,13 +61,10 @@ class _SettlementLinesScreenState extends State<SettlementLinesScreen> {
           }
           final List<SettlementLine> lines = snap.data!;
           if (lines.isEmpty) {
-            return Padding(
-              padding: EdgeInsets.only(top: V3Page.topInset(context)),
-              child: const AppEmptyState(
-                icon: Icons.receipt_long_rounded,
-                title: '아직 정산 내역이 없어요',
-                description: '구독·개별질문이 확정되면 여기에 쌓여요',
-              ),
+            return const AppEmptyState(
+              icon: Icons.receipt_long_rounded,
+              title: '아직 정산 내역이 없어요',
+              description: '구독·개별질문이 확정되면 여기에 쌓여요',
             );
           }
           return _list(context, lines);
@@ -96,7 +94,7 @@ class _SettlementLinesScreenState extends State<SettlementLinesScreen> {
     return RefreshIndicator(
       onRefresh: () async => _reload(),
       child: ListView(
-        padding: V3Page.contentPadding(context),
+        padding: AppPage.contentPadding(context),
         children: children,
       ),
     );

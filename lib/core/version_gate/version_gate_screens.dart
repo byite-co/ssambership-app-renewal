@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
-import '../../design/widgets/primary_button.dart';
-import '../../design/widgets/secondary_button.dart';
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_primary_button.dart';
+import '../../design/widgets/app_secondary_button.dart';
+import '../../design/widgets/glass_card.dart';
 import 'store_url_policy.dart';
 import 'version_policy.dart';
+
+/// 안내 문장 스타일(보조색 캡션).
+final TextStyle _caption =
+    AppTypography.caption.copyWith(color: AppColors.textSecondary);
 
 /// 스토어 열기 함수(테스트 주입용 — 실제 url_launcher 를 쓰지 않는 fake 주입).
 typedef StoreLauncher = Future<bool> Function(Uri uri);
@@ -66,21 +71,22 @@ class ForceUpdateScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   const Icon(Icons.system_update_alt,
-                      size: 44, color: ColorTokens.muted),
+                      size: 44, color: AppColors.textSecondary),
                   const SizedBox(height: 14),
                   const Text('업데이트가 필요해요',
-                      style: AppType.title, textAlign: TextAlign.center),
+                      style: AppTypography.section,
+                      textAlign: TextAlign.center),
                   const SizedBox(height: 8),
                   Text(message,
-                      style: AppType.caption, textAlign: TextAlign.center),
+                      style: _caption, textAlign: TextAlign.center),
                   if (policy.minimumVersionName.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 4),
                     // 표기 전용 버전명 — 판정은 정수 빌드번호로 이미 끝났다.
-                    Text('최소 지원 버전: ${policy.minimumVersionName}',
-                        style: AppType.caption, textAlign: TextAlign.center),
+                    Text('${policy.minimumVersionName} 이상이 필요해요',
+                        style: _caption, textAlign: TextAlign.center),
                   ],
                   const SizedBox(height: 24),
-                  PrimaryButton(
+                  AppPrimaryButton(
                     label: '스토어에서 업데이트',
                     onPressed: () => _openStore(
                       context: context,
@@ -115,15 +121,16 @@ class VersionGateRetryScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 const Icon(Icons.wifi_off_outlined,
-                    size: 44, color: ColorTokens.muted),
+                    size: 44, color: AppColors.textSecondary),
                 const SizedBox(height: 14),
                 const Text('잠시 확인이 필요해요',
-                    style: AppType.title, textAlign: TextAlign.center),
+                    style: AppTypography.section,
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 8),
-                const Text('버전 정보를 확인하지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
-                    style: AppType.caption, textAlign: TextAlign.center),
+                Text('버전 정보를 확인하지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+                    style: _caption, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                SecondaryButton(label: '재시도', onPressed: onRetry),
+                AppSecondaryButton(label: '재시도', onPressed: onRetry),
               ],
             ),
           ),
@@ -153,24 +160,14 @@ class RecommendUpdateBanner extends StatelessWidget {
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: Container(
-          margin: const EdgeInsets.all(12),
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          decoration: BoxDecoration(
-            color: ColorTokens.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ColorTokens.border),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x1A0F172A),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: GlassCard(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            child: Row(
             children: <Widget>[
-              Expanded(child: Text(message, style: AppType.body)),
+              Expanded(child: Text(message, style: AppTypography.body)),
               TextButton(
                 onPressed: () => _openStore(
                   context: context,
@@ -186,6 +183,7 @@ class RecommendUpdateBanner extends StatelessWidget {
               ),
             ],
           ),
+          ),
         ),
       ),
     );
@@ -199,7 +197,7 @@ class VersionGateLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: CircularProgressIndicator(color: ColorTokens.accent)),
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

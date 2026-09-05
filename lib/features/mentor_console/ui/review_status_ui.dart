@@ -1,4 +1,4 @@
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/mentor_console_models.dart';
 
 /// 검토형 제출 상태(학력 인증·학적 변경) 표시 라벨 — 코드값 노출 금지.
@@ -19,17 +19,17 @@ String reviewStatusLabel(ReviewStatus s) {
   }
 }
 
-V3CalloutTone reviewStatusTone(ReviewStatus s) {
+AppCalloutTone reviewStatusTone(ReviewStatus s) {
   switch (s) {
     case ReviewStatus.approved:
-      return V3CalloutTone.success;
+      return AppCalloutTone.success;
     case ReviewStatus.rejected:
-      return V3CalloutTone.danger;
+      return AppCalloutTone.danger;
     case ReviewStatus.pending:
     case ReviewStatus.resubmitRequired:
     case ReviewStatus.unknown:
-      return V3CalloutTone.warning;
+      return AppCalloutTone.warning;
     case ReviewStatus.superseded:
-      return V3CalloutTone.neutral;
+      return AppCalloutTone.neutral;
   }
 }
