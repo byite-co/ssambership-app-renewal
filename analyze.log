@@ -1,0 +1,99 @@
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.0 (7.2.1 available)
+  app_links_platform_interface 2.0.3 (2.0.4 available)
+  archive 4.0.9 (4.2.0 available)
+  cli_util 0.4.2 (0.6.0 available)
+  clock 1.1.2 (1.1.3 available)
+  cross_file 0.3.5+4 (0.3.5+5 available)
+  dbus 0.7.13 (0.7.15 available)
+  extension 0.6.0 (1.0.0 available)
+  file_picker 11.0.2 (12.2.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  flutter_dotenv 5.2.1 (6.0.1 available)
+  flutter_lints 4.0.0 (6.0.0 available)
+  freezed_annotation 2.4.4 (3.1.0 available)
+  functions_client 2.6.4 (2.7.1 available)
+  go_router 14.8.1 (18.0.1 available)
+  gotrue 2.26.0 (2.27.2 available)
+  html 0.15.6 (0.15.7 available)
+  image 4.9.1 (4.9.2 available)
+  image_picker_android 0.8.13+19 (0.8.13+22 available)
+  image_picker_ios 0.8.13+6 (0.8.13+7 available)
+  intl 0.20.2 (0.20.3 available)
+  jni 0.14.2 (1.0.3 available)
+  lints 4.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  passkeys_platform_interface 2.8.0 (2.9.0 available)
+  pdfx 2.9.2 (2.11.0 available)
+  posix 6.5.0 (6.5.2 available)
+  postgrest 2.8.0 (2.9.1 available)
+  process 5.0.5 (5.0.6 available)
+  realtime_client 2.11.0 (2.13.0 available)
+  sentry 9.26.0 (9.29.0 available)
+  sentry_flutter 9.26.0 (9.29.0 available)
+  shared_preferences_android 2.4.26 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  storage_client 2.6.0 (2.8.0 available)
+  supabase 2.14.0 (2.16.1 available)
+  supabase_flutter 2.16.0 (2.17.2 available)
+  synchronized 3.4.1 (3.4.1+2 available)
+  test_api 0.7.11 (0.7.14 available)
+  url_launcher_android 6.3.32 (6.3.33 available)
+  url_launcher_ios 6.4.1 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  video_player 2.13.0 (2.14.0 available)
+  video_player_android 2.12.0 (2.12.2 available)
+  video_player_avfoundation 2.11.0 (2.11.1 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webview_flutter_android 4.13.0 (4.14.1 available)
+  webview_flutter_wkwebview 3.26.0 (3.26.1 available)
+  win32 5.15.0 (6.4.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+63 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing ssambership-app-renewal...                            
+
+   info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/widgets.dart'. Try removing the import directive • lib/app/routes/individual_question_routes.dart:1:8 • unnecessary_import
+   info • 'anonKey' is deprecated and shouldn't be used. Use publishableKey instead. anonKey will be removed in a future major version. Try replacing the use of the deprecated member with the replacement • lib/core/supabase/supabase_client.dart:16:7 • deprecated_member_use
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/community/ui/widgets/content_policy_gate.dart:65:16 • prefer_const_constructors
+   info • Use 'const' literals as arguments to constructors of '@immutable' classes. Try adding 'const' before the literal • lib/features/community/ui/widgets/content_policy_gate.dart:68:19 • prefer_const_literals_to_create_immutables
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/community/ui/widgets/content_policy_gate.dart:69:11 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/community/ui/widgets/content_policy_gate.dart:75:11 • prefer_const_constructors
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/features/community/ui/widgets/report_sheet.dart:65:15 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/features/community/ui/widgets/report_sheet.dart:67:15 • deprecated_member_use
+   info • Use 'const' for final variables initialized to a constant value. Try replacing 'final' with 'const' • lib/features/dev/dev_flags.dart:5:1 • prefer_const_declarations
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/dev/s3_data_inspector.dart:213:9 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/dev/s3_data_inspector.dart:217:9 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/dev/s3_data_inspector.dart:269:18 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/dev/s3_data_inspector.dart:342:18 • prefer_const_constructors
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/features/individual_question/ui/widgets/iq_widgets.dart:204:7 • curly_braces_in_flow_control_structures
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/mentors/ui/widgets/free_question_entry_section.dart:191:15 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • lib/features/mentors/ui/widgets/free_question_entry_section.dart:215:15 • prefer_const_constructors
+   info • Local variables should be final. Try making the variable final • lib/features/question_room/ui/mentor_room_home_screen.dart:54:5 • prefer_final_locals
+   info • The local variable '_host' starts with an underscore. Try renaming the variable to not start with an underscore • test/community/content_policy_gate_test.dart:18:10 • no_leading_underscores_for_local_identifiers
+   info • The imported package 'http' isn't a dependency of the importing package. Try adding a dependency for 'http' in the 'pubspec.yaml' file • test/data/message_paging_postgrest_wire_test.dart:4:8 • depend_on_referenced_packages
+   info • The imported package 'http' isn't a dependency of the importing package. Try adding a dependency for 'http' in the 'pubspec.yaml' file • test/data/message_paging_postgrest_wire_test.dart:5:8 • depend_on_referenced_packages
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • test/deeplink/notification_deep_link_controller_test.dart:227:37 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • test/deeplink/notification_deep_link_controller_test.dart:235:37 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • test/deeplink/notification_deep_link_controller_test.dart:243:37 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • test/goldens/student_new_question_golden_test.dart:15:25 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation • test/individual_question/iq_requirement_display_test.dart:68:9 • prefer_const_constructors
+   info • Use an initializing formal to assign a parameter to a field. Try using an initialing formal ('this.result') to initialize the field • test/mypage/profile_edit_repository_test.dart:18:57 • prefer_initializing_formals
+   info • The import of 'package:ssambership_app/core/scan/picked_image.dart' is unnecessary because all of the used elements are also provided by the import of 'package:ssambership_app/features/question_room/data/attachments/attachment_upload.dart'. Try removing the import directive • test/screens/pdf_multipage_sequential_test.dart:5:8 • unnecessary_import
+
+27 issues found. (ran in 18.5s)
