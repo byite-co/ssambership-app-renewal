@@ -9,7 +9,7 @@
 | 항목 | 기대 | 실측 |
 |---|---|---|
 | `flutter analyze` | error 0 · warning 0 · info 27 | error 0 · warning 0 · info 27 ✔ (Flutter 3.44.6 stable) |
-| `flutter test` | 1,647 통과 | §4 |
+| `flutter test` | 1,647 통과 | 1,647 통과 ✔ (All tests passed) |
 | 골든 | 38 + 갤러리 10 | `test/goldens/images` 38 · `test/goldens/design_system/images` 10 = 48 ✔ |
 
 ## 1-1. DB-4 §6 오너 결정 — 미결 6건
@@ -64,4 +64,4 @@
 ## 4. 기준선 실측
 
 - `flutter analyze`: 27 issues — error 0 · warning 0 · info 27 (기대와 일치).
-- `flutter test`: 실행 중 — 완료 시 이 줄을 결과로 갱신한다.
+- `flutter test`: 1,647 통과 — All tests passed (기대와 일치).
