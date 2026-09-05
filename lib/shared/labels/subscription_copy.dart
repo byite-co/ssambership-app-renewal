@@ -1,4 +1,3 @@
-import '../../core/entitlement/subscription_status.dart';
 import '../../core/entitlement/subscription_summary.dart';
 import '../../core/entitlement/weekly_question_usage.dart';
 import '../format/formatters.dart';
@@ -14,7 +13,7 @@ class SubscriptionCopy {
     if (sub == null) return null;
     if (!sub.isActive) return '구독이 끝났어요';
     final DateTime? when = sub.nextRenewal;
-    if (sub.status?.trim() == SubscriptionStatuses.cancelScheduled) {
+    if (sub.isCancelScheduled) {
       return when == null ? '해지 예정이에요' : '${Formatters.monthDay(when)}에 해지돼요';
     }
     return when == null ? '구독 중이에요' : '${Formatters.monthDay(when)}에 갱신돼요';

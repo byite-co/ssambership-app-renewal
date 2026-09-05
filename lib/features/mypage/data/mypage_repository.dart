@@ -105,6 +105,8 @@ class MyPageRepository {
         SubscriptionCardInfo(
           mentorName: names[s.mentorId]?.displayName ?? '멘토',
           isActive: s.isActive,
+          subscriptionId: s.id,
+          cancelAtPeriodEnd: s.cancelAtPeriodEnd,
           status: s.status,
           planTier: s.planTier,
           nextRenewal: s.nextRenewal,

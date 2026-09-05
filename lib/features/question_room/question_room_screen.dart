@@ -426,8 +426,8 @@ class _RoomTile extends StatelessWidget {
   static Widget? _statusBadge(SubscriptionSummary? sub) {
     if (sub == null) return null;
     final String status = sub.status?.trim().toLowerCase() ?? '';
-    if (status == 'active') return null;
-    if (status == 'cancel_scheduled') {
+    if (status == 'active' && !sub.isCancelScheduled) return null;
+    if (sub.isCancelScheduled) {
       final DateTime? until = sub.nextRenewal;
       return StatusPill(
         label:

@@ -299,6 +299,8 @@ class _MyPageScreenState extends State<MyPageScreen>
       StudentSubscriptionSection(
         subscriptions: data.subscriptions,
         onGoToQuestions: _goToQuestions,
+        // A-4b ②③: 해지 예약·취소·환불 신청 뒤 서버 정본 재조회.
+        onChanged: _reload,
       ),
       ..._cashSectionFor(data),
       // 학생: 리뷰 행 미노출(범용 '리뷰 작성' 메뉴는 폐기 — 역할 게이트).
