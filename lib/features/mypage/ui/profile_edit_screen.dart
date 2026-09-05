@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/web_bridge/web_bridge_actions.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/shape_tokens.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/typography_tokens.dart';
-import '../../../design/widgets/primary_button.dart';
-import '../../../design/widgets/secondary_button.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_input_field.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/app_secondary_button.dart';
 import '../data/mypage_models.dart';
 import '../data/profile_edit_repository.dart';
 import '../../../shared/errors/friendly_error.dart';
@@ -90,65 +91,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('프로필 수정')),
+    return AppPage(
+      title: '프로필 수정',
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: AppSpacing.s16),
         children: <Widget>[
-          Text('표시명', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          TextField(
-            controller: _name,
-            style: AppType.body,
-            decoration: _decoration('표시할 이름'),
+          AppField(
+            label: '표시명',
+            child: AppInputField(
+              controller: _name,
+              hintText: '표시할 이름',
+              textInputAction: TextInputAction.next,
+            ),
           ),
           // 학년은 학생만 편집(멘토는 학년 개념 없음 — 웹 프로필 관리로 연결).
           if (!_isMentor) ...<Widget>[
-            const SizedBox(height: AppSpacing.s16),
-            Text('학년 (선택)', style: AppType.caption),
-            const SizedBox(height: AppSpacing.titleBody),
-            TextField(
-              controller: _grade,
-              style: AppType.body,
-              decoration: _decoration('예: 고2, 재수생'),
+            const SizedBox(height: AppSpacing.s20),
+            AppField(
+              label: '학년 (선택)',
+              child: AppInputField(
+                controller: _grade,
+                hintText: '예: 고2, 재수생',
+              ),
             ),
           ],
           const SizedBox(height: AppSpacing.s12),
           // 역할·이메일은 편집 대상이 아님(안내만).
           if (widget.profile.email != null)
             Text('이메일 ${widget.profile.email} · 역할·이메일은 여기서 바꿀 수 없어요.',
-                style: AppType.caption),
-          const SizedBox(height: AppSpacing.s24),
-          PrimaryButton(
-            label: _busy ? '저장 중…' : '저장',
-            onPressed: _busy ? null : _save,
-          ),
+                style: AppTypography.captionSecondary),
           // 멘토: 상세 프로필(대학·학과·소개 등)은 웹에서 관리.
           if (_isMentor) ...<Widget>[
-            const SizedBox(height: AppSpacing.s12),
-            SecondaryButton(
+            const SizedBox(height: AppSpacing.s20),
+            AppSecondaryButton(
               label: '멘토 프로필 관리 (웹)',
               icon: Icons.open_in_new_rounded,
-              neutral: true,
               onPressed: () => openProfileEditWeb(context),
             ),
           ],
         ],
       ),
-    );
-  }
-
-  InputDecoration _decoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: ColorTokens.elevated,
-      border: OutlineInputBorder(
-        borderRadius: AppShape.inputRadius,
-        borderSide: BorderSide.none,
+      bottom: AppPrimaryButton(
+        label: _busy ? '저장 중…' : '저장',
+        onPressed: _busy ? null : _save,
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 }

@@ -63,7 +63,10 @@ class GlassCard extends StatelessWidget {
               color: AppColors.navy.withValues(alpha: AppGlass.ringAlpha),
             ),
           ),
-          child: child,
+          // ListTile·CheckboxListTile 등은 잉크를 가장 가까운 Material 에 그린다 —
+          // 채움이 있는 DecoratedBox 안쪽에 투명 Material 을 한 장 두어 잉크가
+          // 유리 뒤로 숨지 않게 한다(디버그 단언 'ink splashes may be invisible').
+          child: Material(type: MaterialType.transparency, child: child),
         ),
         if (showHighlight)
           Positioned(
