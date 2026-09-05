@@ -11,7 +11,9 @@ import '../support/fake_mentor_console.dart';
 import '../support/fake_scan_port.dart';
 import '../support/mentor_document_fixtures.dart';
 
-/// 멘토 프로필 편집(A-4a α1·α2·α3) — 9필드 전면 전송 · 과목 정본 코드 · 열림 토글 · 사진.
+/// 멘토 프로필 편집(A-4a α2·α3) — 웹 대조(2026-09-05) 결과대로 편집 가능한 것은
+/// 사진·고교·과목·한줄·상세 5개. 대학·학과(웹 readOnly)·답변 스타일·구독 열림(웹 UI 없음)은
+/// 현재 값 재전송. 9필드 전면 전송 · 과목 정본 코드 · 과목 0개면 열림 닫힘(웹 게이트).
 void main() {
   void tallSurface(WidgetTester tester) {
     tester.view.physicalSize = const Size(800, 3600);
@@ -58,7 +60,7 @@ void main() {
         matching: find.byType(TextField),
       );
 
-  testWidgets('현재 값이 채워지고, 저장은 9필드를 한 번에 · 과목은 정본 코드만', (
+  testWidgets('현재 값이 채워지고, 저장은 9필드를 한 번에 · 편집 없는 4필드는 현재 값 재전송', (
     WidgetTester tester,
   ) async {
     tallSurface(tester);
@@ -66,41 +68,77 @@ void main() {
     await tester.pumpWidget(app(port));
     await tester.pumpAndSettle();
 
+    // 대학·학과는 잠금 표시(입력 없음) + 학적 변경 요청 진입.
     expect(find.text('서울대학교'), findsOneWidget);
     expect(find.text('의예과'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
+    expect(find.text('학적 변경 요청하기'), findsOneWidget);
+    // 편집 칸은 고교·한줄·상세 3개뿐(사진은 버튼, 과목은 칩).
+    expect(find.byType(TextField), findsNWidgets(3));
+    expect(find.text('답변 스타일'), findsNothing);
+    expect(find.text('새 구독 받기'), findsNothing);
+    expect(find.byType(Switch), findsNothing);
     expect(find.text('수능 수학 1등급의 풀이 습관'), findsOneWidget);
     // '수학'(라벨)·'math_calculus'(코드) → 2개 선택, 자유 라벨 '코딩'은 제외.
-    expect(find.text('2개 선택'), findsNothing); // 문장 안에 포함되어 있음.
     expect(find.textContaining('2개 선택'), findsOneWidget);
     expect(find.textContaining('math'), findsNothing); // 코드 비노출.
 
-    // 과목 하나 추가(영어), 소개 수정, 열림 끄기.
     await tester.tap(find.text('영어'));
     await tester.enterText(fieldUnder('한줄 소개'), '영어도 함께');
-    await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(find.textContaining('3개 선택'), findsOneWidget);
-    expect(find.text('새 구독 신청을 받지 않아요. 이미 구독 중인 학생은 그대로예요.'),
-        findsOneWidget);
 
     await tester.tap(find.text('저장하기'));
     await tester.pumpAndSettle();
 
     final Map<String, Object?> call = port.calls.single;
     expect(call['name'], 'updateOwnProfile');
-    expect(call['p_university_name'], '서울대학교');
+    expect(call['p_university_name'], '서울대학교'); // 현재 값 재전송.
     expect(call['p_department_name'], '의예과');
     expect(call['p_high_school_name'], '한국고');
     expect(call['p_teaching_subjects'], <String>['english', 'math', 'math_calculus']);
     expect(call['p_intro_line'], '영어도 함께');
     expect(call['p_bio'], '개념부터 실전까지.');
-    expect(call['p_answer_style'], '단계별 풀이');
+    expect(call['p_answer_style'], '단계별 풀이'); // 웹과 같이 현재 값 유지.
     expect(call['p_profile_image_url'], isNull);
-    expect(call['p_is_open_for_subscriptions'], false);
+    expect(call['p_is_open_for_subscriptions'], true); // 현재 값(열림) 유지.
     expect(find.text('프로필을 저장했어요.'), findsOneWidget);
   });
 
-  testWidgets('대학교·학과를 비우면 저장 비활성 · 41자는 사유 문장', (
+  testWidgets('과목을 모두 해제하면 경고 + 저장 시 구독 열림을 닫아 보낸다(웹 게이트)', (
+    WidgetTester tester,
+  ) async {
+    tallSurface(tester);
+    final FakeMentorConsole port = FakeMentorConsole(
+      profile: profile(subjects: const <String>['math']),
+    );
+    await tester.pumpWidget(app(port));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1개 선택'), findsOneWidget);
+
+    await tester.tap(find.text('수학'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('0개 선택'), findsOneWidget);
+    expect(find.text('담당 과목이 없으면 저장할 때 새 구독 받기가 닫혀요(웹과 동일).'),
+        findsOneWidget);
+
+    await tester.tap(find.text('저장하기'));
+    await tester.pumpAndSettle();
+    expect(port.calls.single['p_teaching_subjects'], <String>[]);
+    expect(port.calls.single['p_is_open_for_subscriptions'], false);
+  });
+
+  testWidgets('학적 변경 요청하기 → 학적 변경 화면', (WidgetTester tester) async {
+    tallSurface(tester);
+    await tester.pumpWidget(app(FakeMentorConsole(profile: profile())));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('학적 변경 요청하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('학적 변경 요청'), findsOneWidget);
+    expect(find.text('변경 요청 제출하기'), findsOneWidget);
+  });
+
+  testWidgets('41자 고교·51자 한줄·501자 상세는 사유 문장 + 저장 잠금', (
     WidgetTester tester,
   ) async {
     tallSurface(tester);
@@ -108,24 +146,25 @@ void main() {
     await tester.pumpWidget(app(port));
     await tester.pumpAndSettle();
 
-    await tester.enterText(fieldUnder('학과 (필수)'), '   ');
+    await tester.enterText(fieldUnder('출신 고등학교'), '가' * 41);
     await tester.pumpAndSettle();
+    expect(find.text('고등학교은(는) 40자까지 입력할 수 있어요.'), findsOneWidget);
     await tester.tap(find.text('저장하기'));
     await tester.pumpAndSettle();
     expect(port.calls, isEmpty);
 
-    await tester.enterText(fieldUnder('학과 (필수)'), '의예과');
-    await tester.enterText(fieldUnder('대학교 (필수)'), '가' * 41);
-    await tester.pumpAndSettle();
-    expect(find.text('대학교은(는) 40자까지 입력할 수 있어요.'), findsOneWidget);
-    await tester.tap(find.text('저장하기'));
-    await tester.pumpAndSettle();
-    expect(port.calls, isEmpty);
-
-    await tester.enterText(fieldUnder('대학교 (필수)'), '연세대학교');
+    await tester.enterText(fieldUnder('출신 고등학교'), '한국고');
     await tester.enterText(fieldUnder('상세 소개'), '나' * 501);
     await tester.pumpAndSettle();
     expect(find.text('상세 소개은(는) 500자까지 입력할 수 있어요.'), findsOneWidget);
+    await tester.tap(find.text('저장하기'));
+    await tester.pumpAndSettle();
+    expect(port.calls, isEmpty);
+
+    await tester.enterText(fieldUnder('상세 소개'), '짧게');
+    await tester.enterText(fieldUnder('한줄 소개'), '다' * 51);
+    await tester.pumpAndSettle();
+    expect(find.text('한줄 소개은(는) 50자까지 입력할 수 있어요.'), findsOneWidget);
     await tester.tap(find.text('저장하기'));
     await tester.pumpAndSettle();
     expect(port.calls, isEmpty);

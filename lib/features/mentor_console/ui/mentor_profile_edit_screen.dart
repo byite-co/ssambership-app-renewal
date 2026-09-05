@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/scan/image_downscaler.dart';
 import '../../../core/scan/picked_image.dart';
@@ -19,21 +21,24 @@ import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/widgets/v3_page.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
+import 'academic_record_change_screen.dart';
 import 'mentor_document_field.dart';
 
-/// 입력 상한 — 웹 `MentorProfileEditForm` maxLength 미러(대학·학과·고교 40, 한줄 50,
-/// 상세 500). 답변 스타일은 웹 폼에 없어 상세 소개 절반(200)으로 둔다.
+/// 입력 상한 — 웹 `MentorProfileEditForm` maxLength 미러(고교 40, 한줄 50, 상세 500).
 const int kMentorNameFieldMax = 40;
 const int kMentorIntroLineMax = 50;
 const int kMentorBioMax = 500;
-const int kMentorAnswerStyleMax = 200;
 
-/// 멘토 프로필 편집(A-4a α2·α1·α3) — `/profile/edit`.
+/// 멘토 프로필 편집(A-4a α2·α3) — `/profile/edit`. 웹 `MentorProfileEditForm` 대조 결과
+/// (2026-09-05): 사용자가 고칠 수 있는 것은 사진·출신 고등학교·담당 과목·한줄 소개·상세
+/// 소개 5개뿐이다. 대학교·학과는 웹에서 readOnly(잠금 · 학적변경요청으로만), 답변
+/// 스타일·구독 열림은 웹에 편집 UI 가 없어 현재 값을 그대로 재전송한다(웹 동일).
 ///
 /// F7 `mentor_profile_update_self` 는 allowlist 9필드 **전면 교체**라 현재 값을
 /// 먼저 읽어 폼에 채우고 9개를 모두 다시 보낸다. 담당 과목은 정본 코드만 전송
-/// (서버도 `subjects.code` 실존 값만 남긴다). 사진은 `profile-avatars/{uid}/…` 에
-/// 먼저 올리고 공개 URL 을 `p_profile_image_url` 로 넘긴다.
+/// (서버도 `subjects.code` 실존 값만 남긴다). 과목이 0개면 웹과 같이 구독 열림을
+/// 닫아서 보낸다. 사진은 `profile-avatars/{uid}/…` 에 먼저 올리고 공개 URL 을
+/// `p_profile_image_url` 로 넘긴다.
 class MentorProfileEditScreen extends StatefulWidget {
   const MentorProfileEditScreen({
     super.key,
@@ -53,15 +58,15 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
   late final MentorConsolePort _port;
   late Future<MentorOwnProfile> _future;
 
-  final TextEditingController _university = TextEditingController();
-  final TextEditingController _department = TextEditingController();
   final TextEditingController _highSchool = TextEditingController();
   final TextEditingController _introLine = TextEditingController();
   final TextEditingController _bio = TextEditingController();
-  final TextEditingController _answerStyle = TextEditingController();
   final Set<String> _subjects = <String>{};
-  bool _open = true;
   String? _avatarUrl;
+
+  /// 마지막으로 읽은 현재 프로필 — 편집 UI 가 없는 필드(대학·학과·답변 스타일·
+  /// 구독 열림)는 여기 값을 그대로 재전송한다.
+  MentorOwnProfile? _current;
 
   bool _seeded = false;
   bool _saving = false;
@@ -80,12 +85,9 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
   }
 
   List<TextEditingController> get _controllers => <TextEditingController>[
-        _university,
-        _department,
         _highSchool,
         _introLine,
         _bio,
-        _answerStyle,
       ];
 
   @override
@@ -100,18 +102,15 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
 
   Future<MentorOwnProfile> _load() async {
     final MentorOwnProfile p = await _port.loadOwnProfile();
+    _current = p;
     if (!_seeded) {
       _seeded = true;
-      _university.text = p.universityName ?? '';
-      _department.text = p.departmentName ?? '';
       _highSchool.text = p.highSchoolName ?? '';
       _introLine.text = p.introLine ?? '';
       _bio.text = p.bio ?? '';
-      _answerStyle.text = p.answerStyle ?? '';
       _subjects
         ..clear()
         ..addAll(mentorSubjectCodesStrict(p.teachingSubjects));
-      _open = p.isOpenForSubscriptions;
       _avatarUrl = p.profileImageUrl;
     }
     return p;
@@ -129,29 +128,28 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
     return null;
   }
 
-  String? get _universityError =>
-      _lengthError(_university, kMentorNameFieldMax, '대학교');
-  String? get _departmentError =>
-      _lengthError(_department, kMentorNameFieldMax, '학과');
   String? get _highSchoolError =>
       _lengthError(_highSchool, kMentorNameFieldMax, '고등학교');
   String? get _introLineError =>
       _lengthError(_introLine, kMentorIntroLineMax, '한줄 소개');
   String? get _bioError => _lengthError(_bio, kMentorBioMax, '상세 소개');
-  String? get _answerStyleError =>
-      _lengthError(_answerStyle, kMentorAnswerStyleMax, '답변 스타일');
 
   bool get _canSave =>
       !_saving &&
       !_uploading &&
-      _university.text.trim().isNotEmpty &&
-      _department.text.trim().isNotEmpty &&
-      _universityError == null &&
-      _departmentError == null &&
+      _current != null &&
       _highSchoolError == null &&
       _introLineError == null &&
-      _bioError == null &&
-      _answerStyleError == null;
+      _bioError == null;
+
+  List<String> get _selectedSubjectCodes => <String>[
+        for (final SubjectCatalogEntry e in subjectCatalogEntries)
+          if (_subjects.contains(e.code)) e.code,
+      ];
+
+  /// 웹 과목 필수 게이트 미러: 과목 0개면 구독 열림을 켤 수 없다(현재 값이 열림이어도 닫아 보낸다).
+  bool get _subscriptionOpenToSend =>
+      (_current?.isOpenForSubscriptions ?? false) && _subjects.isNotEmpty;
 
   String? _nullIfEmpty(TextEditingController c) {
     final String v = c.text.trim();
@@ -195,25 +193,35 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
       });
 
   // ── 저장 ──
+  Future<void> _openAcademicRecordChange() async {
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.mentorAcademicRecordChange,
+      fallbackBuilder: (_) =>
+          AcademicRecordChangeScreen(portOverride: widget.portOverride),
+    );
+  }
+
   Future<void> _save() async {
+    final MentorOwnProfile? current = _current;
+    if (current == null) return;
     setState(() {
       _saving = true;
       _saveError = null;
     });
     try {
       await _port.updateOwnProfile(MentorProfileUpdate(
-        universityName: _university.text.trim(),
-        departmentName: _department.text.trim(),
+        // 대학·학과는 웹 readOnly(학적 변경 요청 경로) — 현재 값 재전송.
+        universityName: current.universityName ?? '',
+        departmentName: current.departmentName ?? '',
         highSchoolName: _nullIfEmpty(_highSchool),
-        teachingSubjects: <String>[
-          for (final SubjectCatalogEntry e in subjectCatalogEntries)
-            if (_subjects.contains(e.code)) e.code,
-        ],
+        teachingSubjects: _selectedSubjectCodes,
         introLine: _nullIfEmpty(_introLine),
         bio: _nullIfEmpty(_bio),
-        answerStyle: _nullIfEmpty(_answerStyle),
+        // 답변 스타일·구독 열림은 웹에 편집 UI 가 없다 — 현재 값 재전송(과목 게이트만 적용).
+        answerStyle: current.answerStyle,
         profileImageUrl: _avatarUrl,
-        isOpenForSubscriptions: _open,
+        isOpenForSubscriptions: _subscriptionOpenToSend,
       ));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,7 +260,6 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
   }
 
   Widget _form(BuildContext context, MentorOwnProfile profile) {
-    final RoleTheme roleTheme = RoleTheme.of(context);
     final bool busy = _saving || _uploading;
     return ListView(
       padding: V3Page.contentPadding(context),
@@ -306,41 +313,6 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
                 const SizedBox(height: 8),
                 V3Callout(tone: V3CalloutTone.danger, text: _avatarError!),
               ],
-              const Divider(height: 24),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const Text('새 구독 받기', style: AppTypography.body),
-                        const SizedBox(height: 2),
-                        Text(
-                          _open
-                              ? '멘토 목록에 노출되고 새 구독 신청을 받아요.'
-                              : '새 구독 신청을 받지 않아요. 이미 구독 중인 학생은 그대로예요.',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Semantics(
-                    label: '새 구독 받기',
-                    child: Switch.adaptive(
-                      value: _open,
-                      activeTrackColor: roleTheme.color,
-                      onChanged: busy
-                          ? null
-                          : (bool v) => setState(() {
-                                _open = v;
-                                _saveError = null;
-                              }),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -361,28 +333,17 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
-                label: '대학교 (필수)',
-                error: _universityError,
-                child: AppInputField(
-                  controller: _university,
-                  hintText: '예: 서울대학교',
-                  enabled: !busy,
-                  textInputAction: TextInputAction.next,
-                ),
-              ),
+              _LockedField(label: '대학교', value: profile.universityName),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
-                label: '학과 (필수)',
-                error: _departmentError,
-                child: AppInputField(
-                  controller: _department,
-                  hintText: '예: 의예과',
-                  enabled: !busy,
-                  textInputAction: TextInputAction.next,
-                ),
+              _LockedField(label: '학과', value: profile.departmentName),
+              const SizedBox(height: 6),
+              V3EntryRow(
+                icon: Icons.swap_horiz_rounded,
+                label: '학적 변경 요청하기',
+                caption: '대학교·학과는 웹과 같이 학적 변경 요청으로만 바꿔요',
+                onTap: _openAcademicRecordChange,
               ),
-              const SizedBox(height: AppSpacing.base),
+              const SizedBox(height: 6),
               V3Field(
                 label: '출신 고등학교',
                 error: _highSchoolError,
@@ -428,19 +389,6 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
                   maxLines: 8,
                 ),
               ),
-              const SizedBox(height: AppSpacing.base),
-              V3Field(
-                label: '답변 스타일',
-                help: '예: 풀이 과정을 단계별로, 개념부터 짚어서',
-                error: _answerStyleError,
-                child: AppInputField(
-                  controller: _answerStyle,
-                  hintText: '답변할 때 지키는 방식',
-                  enabled: !busy,
-                  minLines: 1,
-                  maxLines: 3,
-                ),
-              ),
             ],
           ),
         ),
@@ -458,6 +406,14 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
+              if (_subjects.isEmpty &&
+                  (profile.isOpenForSubscriptions)) ...<Widget>[
+                const SizedBox(height: 8),
+                const V3Callout(
+                  tone: V3CalloutTone.warning,
+                  text: '담당 과목이 없으면 저장할 때 새 구독 받기가 닫혀요(웹과 동일).',
+                ),
+              ],
               const SizedBox(height: AppSpacing.base),
               _SubjectPicker(
                 selected: _subjects,
@@ -481,7 +437,7 @@ class _MentorProfileEditScreenState extends State<MentorProfileEditScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          '대학교와 학과는 비울 수 없어요. 저장하면 9개 항목이 한 번에 반영돼요.',
+          '저장하면 프로필이 한 번에 반영돼요. 대학교·학과는 학적 변경 요청으로 바꿔요.',
           textAlign: TextAlign.center,
           style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
         ),
@@ -620,6 +576,42 @@ class _SubjectChip extends StatelessWidget {
               color: selected ? roleTheme.color : AppColors.textPrimary,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 웹 readOnly 필드(대학교·학과) — 값만 보여주고 잠금 표시.
+class _LockedField extends StatelessWidget {
+  const _LockedField({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool empty = value == null || value!.trim().isEmpty;
+    return V3Field(
+      label: label,
+      child: GlassInner(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                empty ? '미입력' : value!,
+                style: AppTypography.body.copyWith(
+                  color: empty ? AppColors.textSecondary : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ],
         ),
       ),
     );
