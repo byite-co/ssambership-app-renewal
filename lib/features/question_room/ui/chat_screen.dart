@@ -4,7 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
-import '../../../design/tokens/color_tokens.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_page.dart';
 import '../data/attachments/attachment_upload.dart';
 import '../data/attachments/attachment_url_resolver.dart';
 import '../data/attachments/device_image_picker.dart';
@@ -494,30 +495,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.thread.title?.trim().isNotEmpty == true
-              ? widget.thread.title!.trim()
-              : '질문',
+    return AppPage(
+      title: widget.thread.title?.trim().isNotEmpty == true
+          ? widget.thread.title!.trim()
+          : '질문',
+      actions: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Center(child: ThreadStatusPill(status: _status)),
         ),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '새로고침',
-            onPressed: _refresh,
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Center(child: ThreadStatusPill(status: _status)),
-          ),
-          RoomSafetyMenu(
-            counterparty: _counterparty,
-            blocked: _blocked,
-            onSelected: _onSafetyAction,
-          ),
-        ],
-      ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: '새로고침',
+          onPressed: _refresh,
+        ),
+        RoomSafetyMenu(
+          counterparty: _counterparty,
+          blocked: _blocked,
+          onSelected: _onSafetyAction,
+        ),
+      ],
       body: Column(
         children: <Widget>[
           Expanded(child: _list()),
@@ -540,16 +537,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _list() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView();
     }
     if (_loadError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('대화를 불러오지 못했어요.\n${friendlyError(_loadError!)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: ColorTokens.danger)),
-        ),
+      return AppErrorView(
+        title: '대화를 불러오지 못했어요',
+        message: friendlyError(_loadError!),
+        onRetry: () {
+          setState(() {
+            _loading = true;
+            _loadError = null;
+          });
+          _load();
+        },
       );
     }
     return LiveMessageList(

@@ -111,9 +111,7 @@ class ProfileEditRepository {
     } catch (e) {
       throw mapProfileUpdateError(e);
     }
-    if (data is! Map ||
-        data['ok'] != true ||
-        data['contract_version'] != 1) {
+    if (data is! Map || data['ok'] != true || data['contract_version'] != 1) {
       throw const AppError('프로필 저장 결과를 확인하지 못했어요. 다시 시도해 주세요.');
     }
   }

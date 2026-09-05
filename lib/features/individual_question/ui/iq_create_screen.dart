@@ -15,7 +15,8 @@ import '../../../design/widgets/app_input_field.dart';
 import '../../../design/widgets/app_primary_button.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../../question_room/data/attachments/attachment_upload.dart'
     show ImagePickerPort, validatePickedImage;
 import '../../question_room/data/attachments/device_image_picker.dart';
@@ -407,18 +408,16 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: widget.isDirect ? '개별질문 하기 (지정형)' : '새 개별질문 (공개형)',
-      // 첨부 버튼을 뷰포트 맨 위로 스크롤하는 기존 테스트 계약 — 앱바 뒤로 늘리지 않는다.
-      bodyBehindAppBar: false,
       body: FutureBuilder<IqCreatePrefill>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<IqCreatePrefill> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 3);
+            return const AppLoadingView(cards: 3);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '정보를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _retryPrefill,
@@ -446,7 +445,7 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
     //   없이(또는 아주 조금만) 닿아야 한다 — 기존 첨부·PDF·첨삭 테스트가 그 전제로
     //   `ensureVisible` 뒤 곧바로 탭한다. 카드·여백을 늘리지 않는다.
     return ListView(
-      padding: V3Page.contentPadding(context, behindAppBar: false),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         // ── 누구에게 · 내 캐시 ──
         GlassCard(
@@ -478,8 +477,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         ),
         if (directPriceMissing) ...<Widget>[
           const SizedBox(height: 10),
-          const V3Callout(
-            tone: V3CalloutTone.danger,
+          const AppCallout(
+            tone: AppCalloutTone.danger,
             text: '이 멘토는 아직 개별질문 가격을 설정하지 않아 질문할 수 없어요.',
           ),
         ],
@@ -525,8 +524,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         ),
         if (locked) ...<Widget>[
           const SizedBox(height: 10),
-          V3Callout(
-            tone: V3CalloutTone.warning,
+          AppCallout(
+            tone: AppCalloutTone.warning,
             text: '질문은 등록됐어요. 남은 첨부 ${_images.length}장을 다시 업로드하거나, '
                 '첨부 없이 완료할 수 있어요.',
           ),
@@ -561,7 +560,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
                       ? '-${formatIqCash(remainingCents)}'
                       : formatIqCash(remainingCents),
                   style: AppTypography.body.copyWith(
-                    color: insufficient ? AppColors.danger : AppColors.textPrimary,
+                    color:
+                        insufficient ? AppColors.danger : AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -570,8 +570,8 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
         if (insufficient) ...<Widget>[
           const SizedBox(height: 10),
           // ★ Commerce-Zero: 사실 안내만 — 충전 버튼·링크·인앱 브라우저 없음.
-          const V3Callout(
-            tone: V3CalloutTone.warning,
+          const AppCallout(
+            tone: AppCalloutTone.warning,
             title: '잔액이 부족해요',
             text: '지금 캐시로는 이 질문을 등록할 수 없어요.',
           ),

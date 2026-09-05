@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/auth/account_status.dart';
 import '../../../core/web_bridge/web_bridge_actions.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/typography_tokens.dart';
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/app_secondary_button.dart';
+import '../../../design/widgets/glass_card.dart';
 import '../../../design/widgets/money_display.dart';
-import '../../../design/widgets/primary_button.dart';
-import '../../../design/widgets/secondary_button.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/format/formatters.dart';
 import '../data/account_deletion_repository.dart';
@@ -272,7 +274,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: ColorTokens.danger),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: Text(action),
           ),
         ],
@@ -304,26 +306,33 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('회원 탈퇴')),
+    return AppPage(
+      title: '회원 탈퇴',
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: AppSpacing.s16),
         children: <Widget>[
-          if (_pending)
-            ..._pendingBody()
-          else if (_consentStage)
-            ..._forfeitConsentBody()
-          else
-            ..._requestBody(),
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                if (_pending)
+                  ..._pendingBody()
+                else if (_consentStage)
+                  ..._forfeitConsentBody()
+                else
+                  ..._requestBody(),
+              ],
+            ),
+          ),
           if (_unavailable) ...<Widget>[
             const SizedBox(height: AppSpacing.s16),
             Text(
               '앱에서 바로 탈퇴할 수 없어요.\n웹 페이지에서 탈퇴를 진행해 주세요.',
-              style: AppType.body.copyWith(color: ColorTokens.danger),
+              style: AppTypography.body.copyWith(color: AppColors.danger),
             ),
             const SizedBox(height: 8),
-            SecondaryButton(label: '웹에서 진행', onPressed: () => _openWeb()),
+            AppSecondaryButton(label: '웹에서 진행', onPressed: () => _openWeb()),
           ],
         ],
       ),
@@ -332,7 +341,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   List<Widget> _requestBody() {
     return <Widget>[
-      Text('탈퇴 전에 꼭 확인해 주세요', style: AppType.title),
+      const Text('탈퇴 전에 꼭 확인해 주세요', style: AppTypography.section),
       const SizedBox(height: AppSpacing.s16),
       const Text(
         // 접수 전에는 서버 마감 시각이 없다 — 구체 시각은 접수 후 안내·배너가 낸다.
@@ -342,7 +351,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
         '· 삭제 후에는 되돌릴 수 없어요.\n'
         '· 접수 후 취소 가능 시간 내에만 취소할 수 있어요.\n'
         '· 남은 캐시 잔액이 있으면 삭제 처리와 함께 소멸돼요.',
-        style: AppType.body,
+        style: AppTypography.body,
       ),
       const SizedBox(height: AppSpacing.s16),
       CheckboxListTile(
@@ -350,12 +359,12 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
         onChanged: _busy
             ? null
             : (bool? v) => setState(() => _acknowledged = v ?? false),
-        title: const Text('위 내용을 모두 확인했어요', style: AppType.body),
+        title: const Text('위 내용을 모두 확인했어요', style: AppTypography.body),
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: EdgeInsets.zero,
       ),
       const SizedBox(height: AppSpacing.s16),
-      PrimaryButton(
+      AppPrimaryButton(
         label: _busy ? '처리 중…' : '탈퇴 요청',
         onPressed: (_acknowledged && !_busy && !_unavailable) ? _request : null,
       ),
@@ -367,13 +376,13 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
   List<Widget> _forfeitConsentBody() {
     final int balance = _forfeitBalanceCents!;
     return <Widget>[
-      Text('남은 캐시 잔액이 있어요', style: AppType.title),
+      const Text('남은 캐시 잔액이 있어요', style: AppTypography.section),
       const SizedBox(height: AppSpacing.s16),
       // 금액은 서버 응답(balance_cents) 정본 — 앱에서 계산하지 않는다.
       MoneyDisplay(
         label: '삭제 처리 시 소멸되는 캐시 잔액',
         amount: CashFormat.won(balance),
-        emphasizeColor: ColorTokens.danger,
+        emphasizeColor: AppColors.danger,
       ),
       const SizedBox(height: AppSpacing.s16),
       Text(
@@ -384,7 +393,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
         '${CashFormat.won(balance)}이 소멸돼요.\n'
         '· 소멸 처리 후에는 환불·복구할 수 없어요.\n'
         '· 취소 가능 시간 내에 탈퇴 요청을 취소하면 캐시 잔액은 소멸되지 않아요.',
-        style: AppType.body,
+        style: AppTypography.body,
       ),
       const SizedBox(height: AppSpacing.s16),
       CheckboxListTile(
@@ -394,22 +403,21 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
             : (bool? v) => setState(() => _forfeitAcknowledged = v ?? false),
         title: Text(
           '삭제 처리 시 남은 캐시 잔액 ${CashFormat.won(balance)}이 소멸되는 데 동의해요',
-          style: AppType.body,
+          style: AppTypography.body,
         ),
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: EdgeInsets.zero,
       ),
       const SizedBox(height: AppSpacing.s16),
-      PrimaryButton(
+      AppPrimaryButton(
         label: _busy ? '처리 중…' : '동의하고 탈퇴 요청',
         onPressed: (_forfeitAcknowledged && !_busy && !_unavailable)
             ? _requestWithForfeitConsent
             : null,
       ),
       const SizedBox(height: AppSpacing.s8),
-      SecondaryButton(
+      AppSecondaryButton(
         label: '돌아가기',
-        neutral: true,
         onPressed: _busy
             ? null
             : () => setState(() {
@@ -422,24 +430,24 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
 
   List<Widget> _pendingBody() {
     return <Widget>[
-      Text('탈퇴 요청이 접수된 계정이에요', style: AppType.title),
+      const Text('탈퇴 요청이 접수된 계정이에요', style: AppTypography.section),
       const SizedBox(height: AppSpacing.s16),
       Text(
         // 서버 status_self 의 cancelable_until 정본을 그대로 표시한다.
         '${_cancelWindowLine(_cancelableUntil)}\n'
         '취소하면 보안을 위해 다시 로그인해야 해요.',
-        style: AppType.body,
+        style: AppTypography.body,
       ),
       const SizedBox(height: AppSpacing.s16),
       if (!_cancelClosed)
-        PrimaryButton(
+        AppPrimaryButton(
           label: _busy ? '처리 중…' : '탈퇴 취소',
           onPressed: _busy ? null : _cancel,
         )
       else
         const Text(
           '지금은 취소할 수 없어요. 탈퇴가 예정대로 진행돼요.',
-          style: AppType.body,
+          style: AppTypography.body,
         ),
     ];
   }

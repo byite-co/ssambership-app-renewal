@@ -4,10 +4,10 @@ import '../../app/app_navigation.dart';
 import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
 import '../../core/auth/deletion_notice_controller.dart';
-import '../../design/shape_tokens.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/glass_inner.dart';
 import '../../features/mypage/ui/account_delete_screen.dart';
 import '../format/formatters.dart';
 
@@ -106,56 +106,67 @@ class _WithdrawalPendingBannerState extends State<WithdrawalPendingBanner>
   Widget build(BuildContext context) {
     if (!_c.showsNotice) return const SizedBox.shrink();
     final DateTime? until = _c.cancelableUntil;
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, AppSpacing.s8, AppSpacing.screenH, 0),
-      padding: const EdgeInsets.all(AppSpacing.cardPad),
-      decoration: BoxDecoration(
-        color: ColorTokens.elevated,
-        borderRadius: AppShape.cardRadius,
-        border: Border.all(color: ColorTokens.warning),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenH,
+        8,
+        AppSpacing.screenH,
+        0,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Icon(Icons.info_rounded,
-                  size: 20, color: ColorTokens.warning),
-              const SizedBox(width: AppSpacing.s8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const Text('탈퇴 요청이 접수된 계정이에요', style: AppType.body),
-                    if (until != null) ...<Widget>[
-                      const SizedBox(height: 2),
-                      // 서버 cancelable_until 만 표시 — 로컬 추정 문구 금지.
+      child: GlassInner(
+        padding: const EdgeInsets.all(14),
+        ringColor: AppColors.warning.withValues(alpha: 0.6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
                       Text(
-                        '${_formatUntil(until)}까지 취소할 수 있어요',
-                        style: AppType.caption,
+                        '탈퇴 요청이 접수된 계정이에요',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      if (until != null) ...<Widget>[
+                        const SizedBox(height: 2),
+                        // 서버 cancelable_until 만 표시 — 로컬 추정 문구 금지.
+                        Text(
+                          '${_formatUntil(until)}까지 취소할 수 있어요',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
+                ),
+              ],
+            ),
+            // 서버 can_cancel 이 참일 때만 버튼을 만든다(값 부재·locked/purging → 비노출).
+            if (_c.canCancel) ...<Widget>[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const ValueKey<String>('withdrawal-banner-cancel'),
+                  onPressed: _openCancel,
+                  child: const Text('탈퇴 취소'),
                 ),
               ),
             ],
-          ),
-          // 서버 can_cancel 이 참일 때만 버튼을 만든다(값 부재·locked/purging → 비노출).
-          if (_c.canCancel) ...<Widget>[
-            const SizedBox(height: AppSpacing.s8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                key: const ValueKey<String>('withdrawal-banner-cancel'),
-                onPressed: _openCancel,
-                child: const Text('탈퇴 취소'),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }

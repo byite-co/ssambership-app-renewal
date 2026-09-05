@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../design/shape_tokens.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/typography_tokens.dart';
-import '../../../design/widgets/primary_button.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_input_field.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../data/free_question_entry.dart';
 
@@ -71,65 +72,42 @@ class _FreeQuestionComposeScreenState extends State<FreeQuestionComposeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  InputDecoration _decoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: ColorTokens.elevated,
-      border: const OutlineInputBorder(
-        borderRadius: AppShape.inputRadius,
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const _FreeQuestionAppBar(),
+    return AppPage(
+      title: '무료 질문하기',
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context),
         children: <Widget>[
           Text('${widget.mentorName} 멘토에게 보내는 무료 질문이에요.',
-              style: AppType.caption),
+              style: AppTypography.captionSecondary),
           const SizedBox(height: AppSpacing.s16),
-          const Text('제목 (선택)', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          TextField(
-            controller: _title,
-            style: AppType.body,
-            decoration: _decoration('한 줄 제목'),
+          AppField(
+            label: '제목 (선택)',
+            child: AppInputField(
+              controller: _title,
+              hintText: '한 줄 제목',
+              textInputAction: TextInputAction.next,
+            ),
           ),
-          const SizedBox(height: AppSpacing.s16),
-          const Text('질문 내용', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          TextField(
-            controller: _body,
-            style: AppType.body,
-            minLines: 5,
-            maxLines: 10,
-            decoration: _decoration('궁금한 점을 적어주세요.'),
-          ),
-          const SizedBox(height: AppSpacing.s24),
-          PrimaryButton(
-            label: _busy ? '등록 중…' : '무료 질문 보내기',
-            onPressed: _busy ? null : _submit,
+          const SizedBox(height: AppSpacing.s20),
+          AppField(
+            label: '무엇이 궁금한가요?',
+            child: AppInputField(
+              controller: _body,
+              hintText: '어디까지 풀었는지 함께 적으면 답변이 훨씬 정확해져요',
+              minLines: 6,
+              maxLines: 12,
+              keyboardType: TextInputType.multiline,
+            ),
           ),
         ],
       ),
+      bottom: AppPrimaryButton(
+        label: _busy ? '등록 중…' : '무료 질문 보내기',
+        onPressed: _busy ? null : _submit,
+      ),
     );
   }
-}
-
-class _FreeQuestionAppBar extends StatelessWidget
-    implements PreferredSizeWidget {
-  const _FreeQuestionAppBar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  @override
-  Widget build(BuildContext context) => AppBar(title: const Text('무료 질문하기'));
 }

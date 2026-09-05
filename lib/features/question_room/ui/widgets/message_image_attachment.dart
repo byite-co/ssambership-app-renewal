@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
 import '../../data/models/question_attachment.dart';
 
 /// 채팅 말풍선 안/옆의 이미지 첨부 썸네일. 탭 시 [onOpen](전체화면 뷰어).
 ///
 /// 서명 URL 을 [resolver] 로 발급(만료 전 캐시 재사용)해 표시하고, 로딩·실패는
-/// 플레이스홀더로 대체한다(깨진 이미지·크래시 방지).
+/// 플레이스홀더로 대체한다(깨진 이미지·크래시 방지). 말풍선 안에 인라인으로
+/// 들어가므로 모서리 10(design-v3 §3-2 '문제 사진').
 class MessageImageAttachment extends StatefulWidget {
   const MessageImageAttachment({
     super.key,
@@ -15,12 +17,17 @@ class MessageImageAttachment extends StatefulWidget {
     required this.resolver,
     required this.onOpen,
     this.size = 180,
+    this.captionColor,
   });
 
   final QuestionAttachment attachment;
   final AttachmentUrlResolver resolver;
   final VoidCallback onOpen;
   final double size;
+
+  /// 썸네일 아래 '탭하면 전체화면' 한 줄의 글자색(design-v3 §3-2). 말풍선 톤에
+  /// 따라 호출부가 정한다(역할색 말풍선=흰색 계열, 그 외=보조색). null 이면 생략.
+  final Color? captionColor;
 
   @override
   State<MessageImageAttachment> createState() => _MessageImageAttachmentState();
@@ -45,38 +52,56 @@ class _MessageImageAttachmentState extends State<MessageImageAttachment> {
 
   @override
   Widget build(BuildContext context) {
+    final Color? captionColor = widget.captionColor;
     return GestureDetector(
       onTap: widget.onOpen,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: FutureBuilder<String>(
-            future: _url,
-            builder: (BuildContext context, AsyncSnapshot<String> snap) {
-              if (snap.connectionState != ConnectionState.done) {
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _thumbnail(),
+          if (captionColor != null) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              '사진 · 탭하면 전체화면',
+              style: AppTypography.meta.copyWith(color: captionColor),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _thumbnail() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: FutureBuilder<String>(
+          future: _url,
+          builder: (BuildContext context, AsyncSnapshot<String> snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const _ThumbBox(child: _Spinner());
+            }
+            final String? url = snap.data;
+            if (snap.hasError || url == null) {
+              return const _ThumbBox(child: _BrokenIcon());
+            }
+            return Image.network(
+              url,
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.cover,
+              loadingBuilder:
+                  (BuildContext c, Widget child, ImageChunkEvent? progress) {
+                if (progress == null) return child;
                 return const _ThumbBox(child: _Spinner());
-              }
-              final String? url = snap.data;
-              if (snap.hasError || url == null) {
-                return const _ThumbBox(child: _BrokenIcon());
-              }
-              return Image.network(
-                url,
-                width: widget.size,
-                height: widget.size,
-                fit: BoxFit.cover,
-                loadingBuilder: (BuildContext c, Widget child,
-                    ImageChunkEvent? progress) {
-                  if (progress == null) return child;
-                  return const _ThumbBox(child: _Spinner());
-                },
-                errorBuilder: (BuildContext c, Object e, StackTrace? s) =>
-                    const _ThumbBox(child: _BrokenIcon()),
-              );
-            },
-          ),
+              },
+              errorBuilder: (BuildContext c, Object e, StackTrace? s) =>
+                  const _ThumbBox(child: _BrokenIcon()),
+            );
+          },
         ),
       ),
     );
@@ -90,7 +115,7 @@ class _ThumbBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: ColorTokens.elevated,
+      color: AppColors.navy.withValues(alpha: 0.07),
       alignment: Alignment.center,
       child: child,
     );
@@ -112,7 +137,7 @@ class _BrokenIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Icon(
         Icons.broken_image_outlined,
-        color: ColorTokens.muted,
+        color: AppColors.textSecondary,
         size: 28,
       );
 }

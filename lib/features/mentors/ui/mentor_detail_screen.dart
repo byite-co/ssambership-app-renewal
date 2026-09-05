@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_navigation.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/typography_tokens.dart';
+import '../../../design/role_theme.dart' show RoleTheme;
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_badge.dart';
-import '../../../design/widgets/app_card.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/glass_card.dart';
 import '../../../design/widgets/initial_avatar.dart';
-import '../../../design/widgets/primary_button.dart';
 import '../data/free_question_entry.dart';
 import '../data/mentor_directory_repository.dart';
 import '../data/mentor_favorites_repository.dart';
@@ -21,7 +23,7 @@ import '../../../app/app_scope.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
-import '../../../design/widgets/secondary_button.dart';
+import '../../../design/widgets/app_secondary_button.dart';
 import '../../../shared/widgets/commerce_notice_card.dart';
 import '../../../app/app_route_paths.dart';
 import '../../individual_question/data/models/individual_question_models.dart';
@@ -69,7 +71,6 @@ class MentorDetailScreen extends StatefulWidget {
 
 class _MentorDetailScreenState extends State<MentorDetailScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
   late final MentorDirectoryRepository _repo;
   late final MentorFavoritesRepository _favRepo;
   late bool _favorited = widget.initialFavorited;
@@ -180,17 +181,15 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
   @override
   Widget build(BuildContext context) {
     final MentorListItem m = widget.item;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(m.displayName),
-        actions: <Widget>[
-          MentorFavoriteButton(favorited: _favorited, onTap: _toggleFavorite),
-          const SizedBox(width: 4),
-        ],
-      ),
+    return AppPage(
+      title: m.displayName,
+      actions: <Widget>[
+        MentorFavoriteButton(favorited: _favorited, onTap: _toggleFavorite),
+        const SizedBox(width: 4),
+      ],
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH, 16, AppSpacing.screenH, 24),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: 16),
         children: <Widget>[
           _Header(item: m),
           if (m.subjectViews.isNotEmpty) ...<Widget>[
@@ -204,7 +203,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
                 children: <Widget>[
                   // canonical 한글 라벨만 노출(raw 코드 노출 금지).
                   for (final MentorSubject s in m.subjectViews)
-                    AppBadge(label: s.label),
+                    AppBadge(label: s.label, tone: AppBadgeTone.neutral),
                 ],
               ),
             ),
@@ -216,7 +215,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
               (m.profile?.introLine?.trim().isNotEmpty ?? false)
                   ? m.profile!.introLine!.trim()
                   : '아직 소개가 등록되지 않은 신규 멘토예요.',
-              style: AppType.body,
+              style: AppTypography.body,
             ),
           ),
           const SizedBox(height: AppSpacing.cardGap),
@@ -230,13 +229,16 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
           ),
           // 컴플라이언스: 요금제 섹션(가격 숫자·안내문) 제거 — 결제 유도 방지.
           // 구독 CTA는 가격 없이 이동만 유지.
+          // ★ A-4b 네이티브 '구독하기' 버튼 자리: 아래 Builder 의 비구독 분기
+          //   (CommerceNoticeCard 자리)에 AppPrimaryButton('스탠다드로 구독하기')
+          //   를 두면 된다(design-v3 §5-3). 그때까지는 웹 브릿지 안내만.
           const SizedBox(height: AppSpacing.s24),
           Builder(
             builder: (BuildContext context) {
               // null = 구독 여부 미확정(첫 로딩·조회 실패) — 무료 CTA 활성화 금지.
               final bool? subscribed = _extras?.alreadySubscribed;
               if (subscribed == true) {
-                return PrimaryButton(
+                return AppPrimaryButton(
                   label: '질문방으로',
                   icon: Icons.forum_rounded,
                   onPressed: () => _goToQuestionRoom(context),
@@ -273,7 +275,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
                   AppScope.of(context).auth.currentRole ==
                       AppRole.student)) ...<Widget>[
             const SizedBox(height: 10),
-            SecondaryButton(
+            AppSecondaryButton(
               label: '개별질문 하기',
               icon: Icons.help_outline,
               onPressed: () => _openIndividualQuestion(context),
@@ -323,7 +325,7 @@ class _Header extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        InitialAvatar(name: item.displayName, size: 64),
+        InitialAvatar(name: item.displayName, size: 64, tinted: false),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -334,7 +336,7 @@ class _Header extends StatelessWidget {
                   Flexible(
                     child: Text(
                       item.displayName,
-                      style: AppType.title,
+                      style: AppTypography.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -368,10 +370,10 @@ class _StatsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Text('불러오는 중…', style: AppType.caption);
+      return const Text('불러오는 중…', style: AppTypography.captionSecondary);
     }
     if (extras.hasNoActivity) {
-      return const Text('아직 활동 정보가 없어요.', style: AppType.body);
+      return const Text('아직 활동 정보가 없어요.', style: AppTypography.body);
     }
 
     final List<Widget> lines = <Widget>[];
@@ -380,9 +382,9 @@ class _StatsView extends StatelessWidget {
     if (rating != null) {
       lines.add(MentorMetaItem(
         icon: Icons.star_rounded,
-        iconColor: ColorTokens.warning,
+        iconColor: AppColors.warning,
         text: rating,
-        style: AppType.body,
+        style: AppTypography.body,
       ));
     }
     // 평균 응답시간 — 값이 있을 때만(schedule 아이콘).
@@ -391,7 +393,7 @@ class _StatsView extends StatelessWidget {
       lines.add(MentorMetaItem(
         icon: Icons.schedule_rounded,
         text: response,
-        style: AppType.body,
+        style: AppTypography.body,
       ));
     }
 
@@ -419,17 +421,17 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
               if (icon != null) ...<Widget>[
-                Icon(icon, size: 18, color: ColorTokens.secondary),
+                Icon(icon, size: 18, color: RoleTheme.of(context).color),
                 const SizedBox(width: 6),
               ],
-              Text(title, style: AppType.title),
+              Text(title, style: AppTypography.section),
             ],
           ),
           const SizedBox(height: AppSpacing.titleBody),

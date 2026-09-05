@@ -11,7 +11,7 @@ import 'package:ssambership_app/design/widgets/app_input_field.dart';
 import 'package:ssambership_app/design/widgets/app_primary_button.dart';
 import 'package:ssambership_app/design/widgets/app_secondary_button.dart';
 import 'package:ssambership_app/design/widgets/app_skeleton.dart';
-import 'package:ssambership_app/design/widgets/glass_badge.dart';
+import 'package:ssambership_app/design/widgets/app_badge.dart';
 import 'package:ssambership_app/design/widgets/glass_bars.dart';
 import 'package:ssambership_app/design/widgets/glass_card.dart';
 import 'package:ssambership_app/design/widgets/glass_surface.dart';

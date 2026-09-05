@@ -5,10 +5,11 @@ import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../core/web_bridge/shortform_compose_bridge.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/widgets/empty_state.dart';
-import '../../../../design/widgets/primary_button.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
+import '../../../../design/widgets/app_primary_button.dart';
 import '../../data/community_models.dart';
 import '../../data/community_paginator.dart';
 import '../../data/community_read_repository.dart';
@@ -94,30 +95,27 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_pager.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('숏폼을 불러오지 못했어요.\n${friendlyError(_pager.error!)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: ColorTokens.danger)),
-        ),
+      return AppErrorView(
+        title: '숏폼을 불러오지 못했어요',
+        message: friendlyError(_pager.error!),
+        onRetry: () => _pager.refresh(),
       );
     }
     final List<ShortformPost> posts = _pager.items;
     if (posts.isEmpty) {
       // 멘토: 작성 유도 빈 화면. 학생·게스트: 기존 열람 안내 그대로.
       return canCompose
-          ? EmptyState(
+          ? AppEmptyState(
               icon: Icons.play_circle_outline,
               title: '아직 숏폼이 없어요',
-              message: '앱 안에서 영상을 선택해 작성할 수 있어요.',
+              description: '앱 안에서 영상을 선택해 작성할 수 있어요.',
               actionLabel: '숏폼 작성',
               onAction: _openCompose,
             )
-          : const EmptyState(
+          : const AppEmptyState(
               icon: Icons.play_circle_outline,
               title: '아직 숏폼이 없어요',
-              message: '멘토들의 숏폼이 올라오면 여기에 표시돼요.',
+              description: '멘토들의 숏폼이 올라오면 여기에 표시돼요.',
             );
     }
     // §4: 외부(웹·관리자 숨김·복구) 변경 반영용 pull-to-refresh — 세대 토큰이 있는
@@ -126,9 +124,9 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
       onRefresh: () => _pager.refresh(),
       child: ListView.builder(
         controller: _scroll,
+        clipBehavior: Clip.none,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH, 8, AppSpacing.screenH, 88),
+        padding: AppPage.contentPadding(context, top: 4, bottom: 24),
         itemCount: posts.length + (_pager.hasMore ? 1 : 0),
         itemBuilder: (BuildContext context, int i) {
           if (i >= posts.length) {
@@ -149,8 +147,9 @@ class ShortformFeedViewState extends State<ShortformFeedView> {
               AppSpacing.screenH, 8, AppSpacing.screenH, 0),
           child: Align(
             alignment: Alignment.centerRight,
-            child: PrimaryButton(
+            child: AppPrimaryButton(
               label: '숏폼 작성',
+              icon: Icons.videocam_rounded,
               onPressed: _openCompose,
               expand: false,
             ),

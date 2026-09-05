@@ -7,8 +7,8 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../../../../core/web_bridge/shortform_compose_bridge.dart';
 import '../../../../core/web_bridge/web_bridge_config.dart';
 import '../../../../core/web_bridge/web_session_hygiene.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
 
 /// 멘토 숏폼 작성 — 비결제 전용 인앱 WebView(`shortform_create` 단일 목적).
 ///
@@ -168,14 +168,12 @@ class _ShortformComposeScreenState extends State<ShortformComposeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('숏폼 작성'),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          tooltip: '취소',
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+    return AppPage(
+      title: '숏폼 작성',
+      leading: IconButton(
+        icon: const Icon(Icons.close_rounded),
+        tooltip: '취소',
+        onPressed: () => Navigator.of(context).maybePop(),
       ),
       body: _body(),
     );
@@ -233,22 +231,12 @@ class _Notice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, size: 46, color: ColorTokens.muted),
-            const SizedBox(height: 12),
-            Text(title, style: AppType.title, textAlign: TextAlign.center),
-            const SizedBox(height: 6),
-            Text(message, style: AppType.caption, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: onAction, child: Text(actionLabel)),
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: icon,
+      title: title,
+      description: message,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 }

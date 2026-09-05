@@ -2,8 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../../design/role_accent.dart';
-import '../../../design/tokens/color_tokens.dart';
+import '../../../design/tokens/app_typography.dart';
 import '../../scan_annotation/scan_annotation_screen.dart';
 import '../data/attachments/attachment_url_resolver.dart';
 import '../data/models/question_attachment.dart';
@@ -73,21 +72,27 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 전체화면 이미지 뷰어 — 사진이 주인공이라 유리 배경 대신 검정 바탕.
+    // 앱바도 같은 검정 위 흰 글자(v3 §0 예외: 미디어 뷰어).
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: ColorTokens.page,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        titleTextStyle: AppTypography.section.copyWith(color: Colors.white),
         title: const Text('이미지'),
         actions: <Widget>[
           TextButton.icon(
             onPressed: _preparing ? null : _annotate,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
             icon: _preparing
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
-                : Icon(Icons.draw_rounded, color: AppAccent.of(context).accent),
+                : const Icon(Icons.draw_rounded, color: Colors.white),
             label: const Text('주석 달기'),
           ),
         ],
@@ -132,7 +137,7 @@ class _ViewerError extends StatelessWidget {
         padding: EdgeInsets.all(24),
         child: Text(
           '이미지를 불러오지 못했어요.',
-          style: TextStyle(color: ColorTokens.secondary),
+          style: TextStyle(color: Colors.white70),
         ),
       );
 }

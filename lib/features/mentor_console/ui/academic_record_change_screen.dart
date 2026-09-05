@@ -9,11 +9,12 @@ import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_input_field.dart';
 import '../../../design/widgets/app_primary_button.dart';
-import '../../../design/widgets/glass_badge.dart';
+import '../../../design/widgets/app_badge.dart';
 import '../../../design/widgets/glass_card.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/format/formatters.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/document_validation.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
@@ -168,7 +169,7 @@ class _AcademicRecordChangeScreenState
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '학적 변경 요청',
       body: FutureBuilder<List<AcademicRecordChangeRecord>>(
         future: _future,
@@ -177,10 +178,10 @@ class _AcademicRecordChangeScreenState
           AsyncSnapshot<List<AcademicRecordChangeRecord>> snap,
         ) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 2);
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '요청 상태를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _reload,
@@ -202,13 +203,13 @@ class _AcademicRecordChangeScreenState
         latest != null && latest.status == ReviewStatus.pending;
 
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         _StatusHero(latest: latest),
         const SizedBox(height: 12),
         if (locked)
-          const V3Callout(
-            tone: V3CalloutTone.neutral,
+          const AppCallout(
+            tone: AppCalloutTone.neutral,
             text: '검토가 끝나면 새 요청을 보낼 수 있어요. 결과는 알림으로 알려드릴게요.',
           )
         else
@@ -225,7 +226,7 @@ class _AcademicRecordChangeScreenState
                   ),
                 ),
                 const SizedBox(height: AppSpacing.base),
-                V3Field(
+                AppField(
                   label: '변경할 학교명',
                   help: '최대 $kAcademicUniversityNameMax자',
                   error: _universityError,
@@ -237,7 +238,7 @@ class _AcademicRecordChangeScreenState
                   ),
                 ),
                 const SizedBox(height: AppSpacing.base),
-                V3Field(
+                AppField(
                   label: '변경 사유 (선택)',
                   help: '최대 $kAcademicChangeReasonMax자',
                   error: _reasonError,
@@ -259,7 +260,7 @@ class _AcademicRecordChangeScreenState
                 ),
                 if (_submitError != null) ...<Widget>[
                   const SizedBox(height: 10),
-                  V3Callout(tone: V3CalloutTone.danger, text: _submitError!),
+                  AppCallout(tone: AppCalloutTone.danger, text: _submitError!),
                 ],
                 const SizedBox(height: AppSpacing.base),
                 AppPrimaryButton(
@@ -272,7 +273,7 @@ class _AcademicRecordChangeScreenState
           ),
         if (records.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.section),
-          const V3SectionTitle('요청 기록'),
+          const AppSectionTitle('요청 기록'),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             child: Column(

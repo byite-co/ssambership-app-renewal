@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../../design/tokens/color_tokens.dart';
+import '../../../design/role_theme.dart';
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_page.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../pdf_rasterizer.dart';
 import '../picked_image.dart';
@@ -94,24 +97,23 @@ class _PdfPageSelectScreenState extends State<PdfPageSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('질문할 페이지 선택 (${_selected.length}/${widget.maxSelect})'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: _selected.isEmpty || _importing ? null : _import,
-            child: _importing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text('가져오기 (${_selected.length})'),
-          ),
-        ],
-      ),
+    return AppPage(
+      title: '질문할 페이지 선택 (${_selected.length}/${widget.maxSelect})',
+      actions: <Widget>[
+        TextButton(
+          onPressed: _selected.isEmpty || _importing ? null : _import,
+          child: _importing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text('가져오기 (${_selected.length})'),
+        ),
+      ],
       body: GridView.builder(
-        padding: const EdgeInsets.all(12),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 140,
           mainAxisSpacing: 10,
@@ -152,6 +154,7 @@ class _PageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool selected = selectedOrder != null;
+    final Color role = RoleTheme.of(context).color;
     return Semantics(
       button: true,
       label: '$pageNumber페이지${selected ? ' 선택됨' : ''}',
@@ -165,12 +168,10 @@ class _PageTile extends StatelessWidget {
                 children: <Widget>[
                   Container(
                     decoration: BoxDecoration(
-                      color: ColorTokens.elevated,
+                      color: AppColors.glass,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: selected
-                            ? ColorTokens.primary
-                            : ColorTokens.border,
+                        color: selected ? role : AppColors.ring,
                         width: selected ? 2.5 : 1,
                       ),
                     ),
@@ -192,7 +193,7 @@ class _PageTile extends StatelessWidget {
                         if (snap.hasError || snap.data == null) {
                           return const Center(
                             child: Icon(Icons.broken_image_rounded,
-                                color: ColorTokens.muted),
+                                color: AppColors.textSecondary),
                           );
                         }
                         return Image.memory(
@@ -201,7 +202,7 @@ class _PageTile extends StatelessWidget {
                           gaplessPlayback: true,
                           errorBuilder: (_, __, ___) => const Center(
                             child: Icon(Icons.broken_image_rounded,
-                                color: ColorTokens.muted),
+                                color: AppColors.textSecondary),
                           ),
                         );
                       },
@@ -215,8 +216,8 @@ class _PageTile extends StatelessWidget {
                         width: 22,
                         height: 22,
                         alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          color: ColorTokens.primary,
+                        decoration: BoxDecoration(
+                          color: role,
                           shape: BoxShape.circle,
                         ),
                         child: Text(
@@ -233,7 +234,7 @@ class _PageTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text('$pageNumber', style: const TextStyle(fontSize: 12)),
+            Text('$pageNumber', style: AppTypography.meta),
           ],
         ),
       ),

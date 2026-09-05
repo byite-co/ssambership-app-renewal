@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/glass_inner.dart';
 import '../../data/models/question_attachment.dart';
 
 /// 말풍선 안/독립 행의 파일(비이미지) 첨부 칩. 탭 시 [onOpen](서명 URL 열기).
@@ -25,32 +27,38 @@ class MessageFileAttachment extends StatelessWidget {
     final String name = raw.isEmpty ? '첨부 파일' : raw;
     return GestureDetector(
       onTap: onOpen,
-      child: Container(
+      child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: ColorTokens.elevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: ColorTokens.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.insert_drive_file_outlined,
-                size: 18, color: ColorTokens.secondary),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 12.5, color: ColorTokens.primary),
+        child: GlassInner(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(
+                Icons.insert_drive_file_outlined,
+                size: 18,
+                color: AppColors.textSecondary,
               ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.open_in_new, size: 14, color: ColorTokens.muted),
-          ],
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.open_in_new,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
         ),
       ),
     );

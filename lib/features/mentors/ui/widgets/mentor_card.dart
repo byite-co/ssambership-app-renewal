@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/widgets/glass_card.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../data/mentor_models.dart';
 import '../../data/mentor_subject.dart';
@@ -36,7 +36,7 @@ class MentorCard extends StatelessWidget {
     final String? school = profile?.schoolLine;
     final String? intro = profile?.introLine?.trim();
 
-    return AppCard(
+    return GlassCard(
       onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,7 +44,7 @@ class MentorCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              InitialAvatar(name: item.displayName, size: 48),
+              InitialAvatar(name: item.displayName, size: 48, tinted: false),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -55,7 +55,10 @@ class MentorCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             item.displayName,
-                            style: AppType.title,
+                            style: AppTypography.bodyStrong.copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -91,7 +94,7 @@ class MentorCard extends StatelessWidget {
                 const Padding(
                   padding: EdgeInsets.only(top: 3),
                   child: Icon(Icons.menu_book_rounded,
-                      size: 16, color: ColorTokens.secondary),
+                      size: 16, color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 5),
                 Expanded(child: _SubjectChips(subjects: subjects)),
@@ -102,7 +105,7 @@ class MentorCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               intro,
-              style: AppType.caption,
+              style: AppTypography.captionSecondary,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -130,8 +133,9 @@ class _SubjectChips extends StatelessWidget {
       spacing: 6,
       runSpacing: 6,
       children: <Widget>[
-        for (final MentorSubject s in shown) AppBadge(label: s.label),
-        if (extra > 0) AppBadge(label: '+$extra'),
+        for (final MentorSubject s in shown)
+          AppBadge(label: s.label, tone: AppBadgeTone.neutral),
+        if (extra > 0) AppBadge(label: '+$extra', tone: AppBadgeTone.neutral),
       ],
     );
   }

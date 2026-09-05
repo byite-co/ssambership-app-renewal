@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
 import '../../data/models/question_attachment.dart';
 import '../../data/models/question_message.dart';
@@ -162,27 +163,41 @@ class _LiveMessageListState extends State<LiveMessageList> {
     final List<_Row> rows = _buildRows();
     if (rows.isEmpty) {
       return Center(
-        child: Text(widget.emptyHint, style: AppType.caption),
+        child: Text(widget.emptyHint, style: AppTypography.captionSecondary),
       );
     }
     // N21: 상단 '이전 대화 불러오기'(이전 페이지가 있을 수 있을 때만).
     final bool showEarlier = widget.hasEarlier && widget.onLoadEarlier != null;
-    return ListView.builder(
+    // ★ 버튼 행은 메시지 슬리버와 **분리**한다. 한 SliverList 에 섞으면 미배치
+    //   구간 extent 추정(배치된 자식 평균)에 버튼 높이가 섞여 prepend 보정
+    //   (extent 델타)이 말풍선 높이만큼 어긋난다 — v3 말풍선(gap 14)에서 실측
+    //   35px. 슬리버를 나누면 균일 말풍선의 추정이 정확해진다.
+    return CustomScrollView(
       controller: _scroll,
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
-      itemCount: rows.length + (showEarlier ? 1 : 0),
-      itemBuilder: (BuildContext context, int i) {
-        if (showEarlier && i == 0) {
-          return Center(
-            child: TextButton(
-              onPressed: _loadingEarlier ? null : _loadEarlier,
-              child: Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+      clipBehavior: Clip.none,
+      slivers: <Widget>[
+        if (showEarlier)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s16),
+              child: Center(
+                child: TextButton(
+                  onPressed: _loadingEarlier ? null : _loadEarlier,
+                  child:
+                      Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+                ),
+              ),
             ),
-          );
-        }
-        return rows[i - (showEarlier ? 1 : 0)].child;
-      },
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+          sliver: SliverList.builder(
+            itemCount: rows.length,
+            itemBuilder: (BuildContext context, int i) => rows[i].child,
+          ),
+        ),
+      ],
     );
   }
 
@@ -217,7 +232,7 @@ class _LiveMessageListState extends State<LiveMessageList> {
       final List<Widget> chips = <Widget>[
         for (final QuestionAttachment a
             in linked[m.id] ?? const <QuestionAttachment>[])
-          _attachmentWidget(a, resolver!),
+          _attachmentWidget(a, resolver!, onAccent: mine),
       ];
       rows.add(_Row(
         m.createdAt,
@@ -232,14 +247,18 @@ class _LiveMessageListState extends State<LiveMessageList> {
   }
 
   /// 첨부 1건 위젯(계약 §2-6): image/* → 썸네일+뷰어, 그 외 → 파일 칩(탭=열기).
+  /// [onAccent] = 역할색(불투명) 말풍선 안 — 캡션을 흰색 계열로.
   Widget _attachmentWidget(QuestionAttachment a, AttachmentUrlResolver resolver,
-      {double imageSize = 180}) {
+      {double imageSize = 180, bool onAccent = false}) {
     if (isImageAttachment(a.mimeType)) {
       return MessageImageAttachment(
         attachment: a,
         resolver: resolver,
         onOpen: () => widget.onOpenImage?.call(a),
         size: imageSize,
+        captionColor: onAccent
+            ? Colors.white.withValues(alpha: 0.82)
+            : AppColors.textSecondary,
       );
     }
     return MessageFileAttachment(

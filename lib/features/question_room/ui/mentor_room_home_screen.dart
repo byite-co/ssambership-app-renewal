@@ -4,10 +4,12 @@ import '../../../app/app_navigation.dart';
 import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/entitlement/subscription_summary.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/typography_tokens.dart';
-import '../../../shared/format/formatters.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../shared/errors/friendly_error.dart';
+import '../../../shared/labels/subscription_copy.dart';
 import '../data/models/connection_note.dart';
 import '../data/models/question_thread.dart';
 import '../data/models/room.dart';
@@ -16,7 +18,6 @@ import 'connection_notes_screen.dart';
 import 'question_list_screen.dart';
 import 'widgets/entrance_card.dart';
 import 'widgets/thread_status_pill.dart';
-import '../../../shared/errors/friendly_error.dart';
 
 /// 멘토방 홈(2뎁스). 얇은 헤더 + 동등한 두 입구(질문/답변·연결노트) 미리보기.
 class MentorRoomHomeScreen extends StatefulWidget {
@@ -69,42 +70,47 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.mentorName)),
+    return AppPage(
+      title: widget.mentorName,
       body: FutureBuilder<_RoomHomeData>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<_RoomHomeData> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
+            return AppErrorView(
+              message: friendlyError(snap.error!),
+              onRetry: _refresh,
             );
           }
           final _RoomHomeData d = snap.data!;
+          final String? header =
+              SubscriptionCopy.subscriptionSentence(widget.sub);
           return ListView(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+            clipBehavior: Clip.none,
+            padding: AppPage.contentPadding(context),
             children: <Widget>[
-              _header(),
-              const SizedBox(height: AppSpacing.section),
+              // 멘토 이름은 앱바 제목에 있으므로 본문에는 구독 문장만 둔다.
+              if (header != null) ...<Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                  child: Text(header, style: AppTypography.captionSecondary),
+                ),
+                const SizedBox(height: AppSpacing.s12),
+              ],
               EntranceCard(
                 icon: Icons.forum_rounded,
                 title: '질문 / 답변',
                 child: d.latestThread == null
-                    ? Text('아직 질문이 없어요. 첫 질문을 남겨보세요.', style: AppType.caption)
+                    ? const Text('아직 질문이 없어요. 첫 질문을 남겨보세요.',
+                        style: AppTypography.captionSecondary)
                     : Row(
                         children: <Widget>[
                           Expanded(
                             child: Text(
                               _threadTitle(d.latestThread!),
-                              style: AppType.body,
+                              style: AppTypography.body,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -115,41 +121,25 @@ class _MentorRoomHomeScreenState extends State<MentorRoomHomeScreen> {
                       ),
                 onTap: () => _openQuestions(),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.listGap),
               EntranceCard(
                 icon: Icons.sticky_note_2_outlined,
                 title: '연결노트',
                 child: d.latestMentorNote?.body?.trim().isNotEmpty == true
                     ? Text(
                         d.latestMentorNote!.body!.trim(),
-                        style: AppType.caption,
+                        style: AppTypography.body,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       )
-                    : Text('멘토가 남긴 노트가 아직 없어요.', style: AppType.caption),
+                    : const Text('멘토가 남긴 노트가 아직 없어요.',
+                        style: AppTypography.captionSecondary),
                 onTap: () => _openNotes(),
               ),
             ],
           );
         },
       ),
-    );
-  }
-
-  Widget _header() {
-    final SubscriptionSummary? sub = widget.sub;
-    final List<String> bits = <String>[
-      if (sub != null) (sub.isActive ? '구독 중' : '구독 만료'),
-      if (sub?.nextRenewal != null)
-        '다음 갱신 ${Formatters.shortDate(sub!.nextRenewal!)}',
-    ];
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Text(widget.mentorName, style: AppType.title),
-        ),
-        if (bits.isNotEmpty) Text(bits.join(' · '), style: AppType.caption),
-      ],
     );
   }
 

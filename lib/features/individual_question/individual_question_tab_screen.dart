@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/auth/auth_service.dart' show AppRole;
-import '../../design/widgets/empty_state.dart';
+import '../../design/widgets/app_empty_state.dart';
 import 'iq_flags.dart';
 import 'ui/mentor_iq_list_screen.dart';
 import 'ui/student_iq_list_screen.dart';
@@ -22,10 +22,10 @@ class IndividualQuestionTabScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // 기능 스위치가 꺼져 있으면 빈 안내(탭 자체는 유지 — 라벨/인덱스 불변).
     if (!kIndividualQuestionEnabled) {
-      return const EmptyState(
+      return const AppEmptyState(
         icon: Icons.question_answer_rounded,
         title: '개별질문 준비 중이에요',
-        message: '곧 이곳에서 1건씩 질문할 수 있어요.',
+        description: '곧 이곳에서 1건씩 질문할 수 있어요.',
       );
     }
     final bool isMentor = isMentorOverride ??

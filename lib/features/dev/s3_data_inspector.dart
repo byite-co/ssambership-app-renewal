@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../data/mappings/subject_labels.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_typography.dart';
 import '../../design/widgets/app_badge.dart';
-import '../../design/widgets/app_card.dart';
-import '../../design/widgets/empty_state.dart';
+import '../../design/widgets/app_empty_state.dart';
+import '../../design/widgets/app_page.dart';
+import '../../design/widgets/glass_card.dart';
 import '../../design/widgets/status_pill.dart';
 import '../../shared/format/formatters.dart';
 import '../../shared/labels/question_room_labels.dart';
@@ -46,16 +47,14 @@ class _S3DataInspectorState extends State<S3DataInspector> {
             ? '점검 · 방 #${_roomIndex + 1}'
             : 'S3 데이터 점검 (개발용)';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        leading: _room != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _goBack,
-              )
-            : null,
-      ),
+    return AppPage(
+      title: title,
+      leading: _room != null
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _goBack,
+            )
+          : null,
       body: _thread != null
           ? _MessagesView(repo: widget.repository, thread: _thread!)
           : _room != null
@@ -113,10 +112,10 @@ class _AsyncList<T> extends StatelessWidget {
         }
         final List<T> items = snap.data ?? <T>[];
         if (items.isEmpty) {
-          return EmptyState(
+          return AppEmptyState(
             icon: Icons.inbox_outlined,
             title: emptyTitle,
-            message: '표시할 데이터가 없어요.',
+            description: '표시할 데이터가 없어요.',
           );
         }
         return builder(context, items);
@@ -137,7 +136,7 @@ class _ErrorBox extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: ColorTokens.danger),
+          style: AppTypography.body.copyWith(color: AppColors.danger),
         ),
       ),
     );
@@ -163,7 +162,7 @@ class _RoomsView extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (BuildContext context, int i) {
             final Room r = rooms[i];
-            return AppCard(
+            return GlassCard(
               onTap: () => onOpenRoom(r, i),
               child: Row(
                 children: <Widget>[
@@ -171,16 +170,17 @@ class _RoomsView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('방 #${i + 1}', style: AppType.body),
+                        Text('방 #${i + 1}', style: AppTypography.body),
                         const SizedBox(height: 4),
                         Text(
                           '개설 ${Formatters.koreanDate(r.createdAt)}',
-                          style: AppType.caption,
+                          style: AppTypography.captionSecondary,
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: ColorTokens.muted),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.textSecondary),
                 ],
               ),
             );
@@ -210,11 +210,11 @@ class _RoomDetailView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        Text('질문 스레드', style: AppType.caption),
+        Text('질문 스레드', style: AppTypography.captionSecondary),
         const SizedBox(height: 10),
         _ThreadList(repo: repo, roomId: room.id, onOpenThread: onOpenThread),
         const SizedBox(height: 24),
-        Text('연결노트', style: AppType.caption),
+        Text('연결노트', style: AppTypography.captionSecondary),
         const SizedBox(height: 10),
         _NoteList(repo: repo, roomId: room.id),
       ],
@@ -253,8 +253,8 @@ class _ThreadList extends StatelessWidget {
   Widget build(BuildContext context) {
     return FutureBuilder<List<QuestionThread>>(
       future: repo.threads(roomId),
-      builder: (BuildContext context,
-          AsyncSnapshot<List<QuestionThread>> snap) {
+      builder:
+          (BuildContext context, AsyncSnapshot<List<QuestionThread>> snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.all(8),
@@ -266,12 +266,12 @@ class _ThreadList extends StatelessWidget {
         }
         final List<QuestionThread> threads = snap.data ?? <QuestionThread>[];
         if (threads.isEmpty) {
-          return Text('스레드가 없어요.', style: AppType.caption);
+          return Text('스레드가 없어요.', style: AppTypography.captionSecondary);
         }
         return Column(
           children: <Widget>[
             for (final QuestionThread t in threads) ...<Widget>[
-              AppCard(
+              GlassCard(
                 onTap: () => onOpenThread(t),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +283,7 @@ class _ThreadList extends StatelessWidget {
                             t.title?.trim().isNotEmpty == true
                                 ? t.title!
                                 : '(제목 없음)',
-                            style: AppType.body,
+                            style: AppTypography.body,
                           ),
                         ),
                         StatusPill(
@@ -326,8 +326,8 @@ class _NoteList extends StatelessWidget {
   Widget build(BuildContext context) {
     return FutureBuilder<List<ConnectionNote>>(
       future: repo.notes(roomId),
-      builder: (BuildContext context,
-          AsyncSnapshot<List<ConnectionNote>> snap) {
+      builder:
+          (BuildContext context, AsyncSnapshot<List<ConnectionNote>> snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.all(8),
@@ -339,12 +339,12 @@ class _NoteList extends StatelessWidget {
         }
         final List<ConnectionNote> notes = snap.data ?? <ConnectionNote>[];
         if (notes.isEmpty) {
-          return Text('연결노트가 없어요.', style: AppType.caption);
+          return Text('연결노트가 없어요.', style: AppTypography.captionSecondary);
         }
         return Column(
           children: <Widget>[
             for (final ConnectionNote n in notes) ...<Widget>[
-              AppCard(
+              GlassCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
@@ -355,7 +355,7 @@ class _NoteList extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       n.body?.trim().isNotEmpty == true ? n.body! : '(내용 없음)',
-                      style: AppType.body,
+                      style: AppTypography.body,
                     ),
                   ],
                 ),
@@ -388,16 +388,16 @@ class _MessagesView extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (BuildContext context, int i) {
             final QuestionMessage m = messages[i];
-            return AppCard(
+            return GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     Formatters.koreanDate(m.createdAt),
-                    style: AppType.caption,
+                    style: AppTypography.captionSecondary,
                   ),
                   const SizedBox(height: 6),
-                  Text(m.body, style: AppType.body),
+                  Text(m.body, style: AppTypography.body),
                 ],
               ),
             );

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/role_accent.dart';
-import 'package:ssambership_app/design/theme.dart';
-import 'package:ssambership_app/design/tokens/color_tokens.dart';
+import 'package:ssambership_app/design/app_theme.dart';
+import 'package:ssambership_app/design/role_theme.dart';
+import 'package:ssambership_app/design/tokens/app_colors.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
 
-/// ★ 반드시 AppTheme.build(role) 로 테마를 구성한다.
-///   theme 를 안 넘기면 AppAccent.of 가 조용히 student 폴백을 주기 때문에
+/// ★ 반드시 RoleTheme(role) 로 역할을 구성한다.
+///   RoleTheme 을 안 두르면 RoleTheme.of 가 조용히 student 폴백을 주기 때문에
 ///   멘토 강조색 단언이 '엉뚱한 이유로' 통과한다.
-Widget _themed(AppRole role, Widget child) => MaterialApp(
-      theme: AppTheme.build(role),
-      home: Scaffold(body: child),
+Widget _themed(AppRole role, Widget child) => RoleTheme(
+      role: role,
+      child: MaterialApp(
+        theme: AppTheme.build(role: role),
+        home: Scaffold(body: child),
+      ),
     );
 
 Container _bubbleBox(WidgetTester tester) => tester.widget<Container>(
@@ -57,33 +59,33 @@ void main() {
     expect(_bubbleRow(tester).mainAxisAlignment, MainAxisAlignment.center);
   });
 
-  testWidgets('tone=neutral → elevated 채움', (WidgetTester tester) async {
+  testWidgets('tone=neutral → 유리 실효색(불투명) 채움', (WidgetTester tester) async {
     await tester.pumpWidget(_themed(
       AppRole.student,
       const ConversationBubble(body: '안녕'),
     ));
     final BoxDecoration d = _bubbleBox(tester).decoration! as BoxDecoration;
-    expect(d.color, ColorTokens.elevated);
+    expect(d.color, AppColors.glass);
   });
 
-  testWidgets('tone=accent → 학생 테마의 accentSoft', (WidgetTester tester) async {
+  testWidgets('tone=accent → 학생 역할색(불투명) 채움', (WidgetTester tester) async {
     await tester.pumpWidget(_themed(
       AppRole.student,
       const ConversationBubble(body: '안녕', tone: ConversationTone.accent),
     ));
     final BoxDecoration d = _bubbleBox(tester).decoration! as BoxDecoration;
-    expect(d.color, RoleAccent.student.accentSoft);
+    expect(d.color, RoleColors.student);
   });
 
-  testWidgets('tone=accent → 멘토 테마에서는 멘토 accentSoft(거울상 색)',
+  testWidgets('tone=accent → 멘토 역할에서는 멘토 초록(거울상 색)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_themed(
       AppRole.mentor,
       const ConversationBubble(body: '안녕', tone: ConversationTone.accent),
     ));
     final BoxDecoration d = _bubbleBox(tester).decoration! as BoxDecoration;
-    expect(d.color, RoleAccent.mentor.accentSoft);
-    expect(d.color, isNot(RoleAccent.student.accentSoft));
+    expect(d.color, RoleColors.mentor);
+    expect(d.color, isNot(RoleColors.student));
   });
 
   testWidgets('꼬리 모서리 거울상(end=우하단 각짐 / start=좌하단 각짐)',

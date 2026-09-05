@@ -70,7 +70,7 @@ void main() {
     expect(find.text('박멘토'), findsOneWidget);
     expect(find.text('구독 중'), findsOneWidget);
     expect(find.text('구독 만료'), findsOneWidget);
-    expect(find.textContaining('다음 갱신 7/27'), findsOneWidget);
+    expect(find.textContaining('7월 27일에 갱신돼요'), findsOneWidget);
     // remaining null → "남은 질문 N개" 같은 날조 숫자 없이 상태 문구.
     expect(find.textContaining('구독 상태로 질문 가능'), findsOneWidget);
     expect(find.textContaining('남은 질문'), findsNothing);

@@ -14,6 +14,7 @@ class GlassInner extends StatelessWidget {
       Radius.circular(AppRadius.input),
     ),
     this.ringColor,
+    this.fillColor,
   });
 
   final Widget child;
@@ -21,12 +22,15 @@ class GlassInner extends StatelessWidget {
   final BorderRadius borderRadius;
   final Color? ringColor;
 
+  /// 채움색. null 이면 기본 안쪽 유리(흰색 α0.58). 입력 필드는 [AppColors.inputFill].
+  final Color? fillColor;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: AppGlass.innerFill),
+        color: fillColor ?? Colors.white.withValues(alpha: AppGlass.innerFill),
         borderRadius: borderRadius,
       ),
       foregroundDecoration: BoxDecoration(

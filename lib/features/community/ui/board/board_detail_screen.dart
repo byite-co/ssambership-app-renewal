@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
-import '../../../../design/role_accent.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/shape_tokens.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/role_theme.dart' show RoleTheme;
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
+import '../../../../design/widgets/app_input_field.dart';
+import '../../../../design/widgets/app_page.dart';
+import '../../../../design/widgets/glass_surface.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
@@ -142,13 +144,13 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Text('더 이상 볼 수 없는 글이에요.', style: AppType.cardTitle),
+            const Text('더 이상 볼 수 없는 글이에요.', style: AppTypography.section),
             const SizedBox(height: 8),
             const Text(
               // 삭제와 모더레이션 비공개를 구분해 말할 근거가 조회 결과에 없다
               // (둘 다 목록 뷰에서 함께 빠진다) — 지어내지 않고 둘 다 적는다.
               '삭제되었거나 비공개로 바뀌었어요.',
-              style: AppType.caption,
+              style: AppTypography.captionSecondary,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -428,29 +430,27 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
   }
 
   Widget _buildScaffold(BoardPost p) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('게시글'),
-        actions: <Widget>[
-          PopupMenuButton<String>(
-            tooltip: '더보기',
-            onSelected: (String v) {
-              if (v == 'edit') _editMyPost();
-              if (v == 'delete') _deleteMyPost();
-              if (v == 'block') _blockPostAuthor();
-            },
-            itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
-              // 수정·삭제는 내 글에만 노출(타인 글 UI 미노출 — 서버도 거부).
-              if (_isMyPost)
-                const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
-              if (_isMyPost)
-                const PopupMenuItem<String>(value: 'delete', child: Text('삭제')),
-              const PopupMenuItem<String>(
-                  value: 'block', child: Text('이 사용자 차단')),
-            ],
-          ),
-        ],
-      ),
+    return AppPage(
+      title: '게시글',
+      actions: <Widget>[
+        PopupMenuButton<String>(
+          tooltip: '더보기',
+          onSelected: (String v) {
+            if (v == 'edit') _editMyPost();
+            if (v == 'delete') _deleteMyPost();
+            if (v == 'block') _blockPostAuthor();
+          },
+          itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
+            // 수정·삭제는 내 글에만 노출(타인 글 UI 미노출 — 서버도 거부).
+            if (_isMyPost)
+              const PopupMenuItem<String>(value: 'edit', child: Text('수정')),
+            if (_isMyPost)
+              const PopupMenuItem<String>(value: 'delete', child: Text('삭제')),
+            const PopupMenuItem<String>(
+                value: 'block', child: Text('이 사용자 차단')),
+          ],
+        ),
+      ],
       // [QA-C6] 서버에서 사라진 글이면 스냅샷을 계속 그리지 않는다.
       body: _gone
           ? _goneBody()
@@ -458,6 +458,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
               children: <Widget>[
                 Expanded(
                   child: ListView(
+                    clipBehavior: Clip.none,
                     padding: const EdgeInsets.fromLTRB(
                         AppSpacing.screenH, 16, AppSpacing.screenH, 16),
                     children: <Widget>[
@@ -468,21 +469,22 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
                               tinted: true),
                           const Spacer(),
                           Text(Formatters.relativeKorean(p.createdAt),
-                              style: AppType.caption),
+                              style: AppTypography.meta),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.titleBody),
-                      Text(p.title, style: AppType.title),
+                      Text(p.title, style: AppTypography.title),
                       const SizedBox(height: AppSpacing.titleBody),
                       Row(
                         children: <Widget>[
                           InitialAvatar(
                               name: p.authorName, size: 28, tinted: false),
                           const SizedBox(width: 8),
-                          Text(p.authorName, style: AppType.caption),
+                          Text(p.authorName,
+                              style: AppTypography.captionSecondary),
                           const SizedBox(width: 10),
                           Text('조회 ${p.viewCount + _viewCountBump}',
-                              style: AppType.caption),
+                              style: AppTypography.meta),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.s16),
@@ -490,7 +492,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
                         p.body?.trim().isNotEmpty == true
                             ? p.body!.trim()
                             : '(내용 없음)',
-                        style: AppType.body,
+                        style: AppTypography.body.copyWith(height: 1.6),
                       ),
                       // 첨부 이미지 — imageRefs 순서대로. 한 장의 실패가 본문·다른
                       // 이미지 표시를 막지 않는다(장별 독립 해석·플레이스홀더).
@@ -512,7 +514,10 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
                         onToggleScrap: _toggleScrap,
                         onReport: _report,
                       ),
-                      const Divider(height: 28, color: ColorTokens.border),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: _HairlineRule(),
+                      ),
                       _commentList(),
                     ],
                   ),
@@ -535,7 +540,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
           );
         }
         if (snap.hasError) {
-          return Text('댓글을 불러오지 못했어요.', style: AppType.caption);
+          return const Text('댓글을 불러오지 못했어요.',
+              style: AppTypography.captionSecondary);
         }
         final List<CommunityComment> comments =
             snap.data ?? <CommunityComment>[];
@@ -548,16 +554,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             // 헤더: "댓글 {개수}". 스타일 title.
-            Text('댓글 $headerCount', style: AppType.title),
+            Text('댓글 $headerCount', style: AppTypography.section),
             const SizedBox(height: AppSpacing.titleBody),
             if (comments.isEmpty)
-              Text('첫 댓글을 남겨보세요.', style: AppType.caption)
+              const Text('첫 댓글을 남겨보세요.', style: AppTypography.captionSecondary)
             else
               // 댓글 항목 '사이에만' 옅은 구분선(첫 위·마지막 아래 없음).
               for (int i = 0; i < comments.length; i++) ...<Widget>[
-                if (i > 0)
-                  const Divider(
-                      height: 1, thickness: 0.5, color: ColorTokens.border),
+                if (i > 0) const _HairlineRule(),
                 CommentTile(
                   comment: comments[i],
                   onReport: () => _reportComment(comments[i].id),
@@ -579,44 +583,34 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
   }
 
   Widget _inputBar() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        decoration: const BoxDecoration(
-          color: ColorTokens.surface,
-          border: Border(top: BorderSide(color: ColorTokens.border)),
-        ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: _input,
-                style: AppType.body,
-                minLines: 1,
-                maxLines: 3,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: '댓글 입력',
-                  filled: true,
-                  fillColor: ColorTokens.elevated,
-                  border: OutlineInputBorder(
-                    borderRadius: AppShape.inputRadius,
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    // 하단 유리 바(채팅 입력 바와 같은 언어) — 본문이 그 뒤로 지나간다.
+    return GlassSurface.bar(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: AppInputField(
+                  controller: _input,
+                  hintText: '댓글을 남겨 보세요',
+                  minLines: 1,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
                 ),
               ),
-            ),
-            IconButton(
-              icon: Icon(Icons.send_rounded,
-                  color:
-                      _busy ? ColorTokens.muted : AppAccent.of(context).accent),
-              onPressed: _busy ? null : _send,
-            ),
-          ],
+              IconButton(
+                icon: Icon(Icons.send_rounded,
+                    color: _busy
+                        ? AppColors.textSecondary.withValues(alpha: 0.5)
+                        : RoleTheme.of(context).color),
+                onPressed: _busy ? null : _send,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -665,9 +659,9 @@ class _PostImageState extends State<_PostImage> {
     return Container(
       height: 160,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: ColorTokens.elevated,
-        borderRadius: AppShape.inputRadius,
+      decoration: BoxDecoration(
+        color: AppColors.navy.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(AppRadius.input),
       ),
       child: child,
     );
@@ -690,18 +684,20 @@ class _PostImageState extends State<_PostImage> {
         if (uri == null) {
           // 해석 실패 — 원문 ref·경로 없이 중립 안내만.
           return _placeholder(
-            child: const Text('이미지를 불러오지 못했어요.', style: AppType.caption),
+            child: const Text('이미지를 불러오지 못했어요.',
+                style: AppTypography.captionSecondary),
           );
         }
         return ClipRRect(
-          borderRadius: AppShape.inputRadius,
+          borderRadius: BorderRadius.circular(AppRadius.input),
           child: Image.network(
             uri.toString(),
             fit: BoxFit.fitWidth,
             width: double.infinity,
             errorBuilder: (BuildContext c, Object e, StackTrace? s) =>
                 _placeholder(
-              child: const Text('이미지를 불러오지 못했어요.', style: AppType.caption),
+              child: const Text('이미지를 불러오지 못했어요.',
+                  style: AppTypography.captionSecondary),
             ),
             loadingBuilder:
                 (BuildContext c, Widget child, ImageChunkEvent? progress) {
@@ -718,4 +714,13 @@ class _PostImageState extends State<_PostImage> {
       },
     );
   }
+}
+
+/// 댓글 사이 옅은 구분선(1px 링색) — Divider 위젯 대신 v3 링 토큰.
+class _HairlineRule extends StatelessWidget {
+  const _HairlineRule();
+
+  @override
+  Widget build(BuildContext context) =>
+      const SizedBox(height: 1, child: ColoredBox(color: AppColors.ring));
 }

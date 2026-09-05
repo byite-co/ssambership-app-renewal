@@ -10,22 +10,28 @@ import '../../core/entitlement/subscription_status_display.dart';
 import '../../core/refresh/data_refresh_bus.dart';
 import '../../core/entitlement/subscription_summary.dart';
 import '../../core/entitlement/weekly_question_usage.dart';
-import '../../design/shape_tokens.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
-import '../../design/widgets/app_card.dart';
-import '../../design/widgets/empty_state.dart';
+import '../../design/role_theme.dart' show RoleTheme;
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_empty_state.dart';
+import '../../design/widgets/app_input_field.dart';
+import '../../design/widgets/app_page.dart';
+import '../../design/widgets/glass_card.dart';
 import '../../design/widgets/initial_avatar.dart';
-import '../../design/widgets/quota_bar.dart';
 import '../../design/widgets/status_pill.dart';
 import '../../shared/format/formatters.dart';
+import '../../shared/labels/subscription_copy.dart';
 import '../../shared/widgets/commerce_notice_card.dart';
+import '../mentors/format/mentor_price_format.dart';
 import 'data/mentor_lookup_repository.dart';
+import 'data/mentor_note_format.dart';
+import 'data/models/connection_note.dart';
+import 'data/models/question_thread.dart';
 import 'data/models/room.dart';
 import 'data/question_room_read_repository.dart';
 import 'ui/mentor/mentor_inbox_screen.dart';
 import 'ui/mentor_room_home_screen.dart';
+import 'ui/widgets/note_preview_line.dart';
 import '../../shared/errors/friendly_error.dart';
 import '../../shared/widgets/screen_visibility.dart';
 
@@ -47,16 +53,16 @@ class QuestionRoomScreen extends StatelessWidget {
         return const _StudentRoomList();
       case AppRole.admin:
       case AppRole.guest:
-        return const EmptyState(
+        return const AppEmptyState(
           icon: Icons.forum_rounded,
           title: '질문방은 학생·멘토 전용이에요',
-          message: '학생 또는 멘토 계정으로 이용해 주세요.',
+          description: '학생 또는 멘토 계정으로 이용해 주세요.',
         );
     }
   }
 }
 
-/// 학생용 1뎁스 = 내 멘토방 목록(카카오톡식). (S4)
+/// 학생용 1뎁스 = 내 멘토방 목록(design-v3 §3-1). (S4)
 class _StudentRoomList extends StatefulWidget {
   const _StudentRoomList();
 
@@ -64,14 +70,17 @@ class _StudentRoomList extends StatefulWidget {
   State<_StudentRoomList> createState() => _StudentRoomListState();
 }
 
-/// 목록 한 행에 필요한 묶음(방 + 멘토 표시명 + 구독 요약 + 주간 사용량).
+/// 목록 한 행에 필요한 묶음(방 + 멘토 표시명 + 구독 요약 + 주간 사용량 + 최근 노트).
 class _RoomItem {
-  const _RoomItem(
-      {required this.room,
-      this.mentor,
-      this.sub,
-      this.usage,
-      required this.lastActivity});
+  const _RoomItem({
+    required this.room,
+    this.mentor,
+    this.sub,
+    this.usage,
+    required this.lastActivity,
+    this.answeredCount = 0,
+    this.latestNote,
+  });
   final Room room;
   final MentorPublic? mentor;
   final SubscriptionSummary? sub;
@@ -83,6 +92,12 @@ class _RoomItem {
   /// Q&A 활동 시 방 행을 갱신하지 않으므로(트리거·RPC 실측) 방 값만으로는
   /// 동결된다. 멘토 인박스와 동일 기준으로 통일.
   final DateTime lastActivity;
+
+  /// 답변이 와서 확인을 기다리는 질문 수(스레드 상태 answered) — '답변 N' 배지.
+  final int answeredCount;
+
+  /// 멘토가 남긴 최근 노트(§3-1 "노트가 목록에서 먼저 보입니다"). 없으면 null.
+  final ConnectionNote? latestNote;
 
   String get mentorName => mentor?.displayName ?? '멘토';
 }
@@ -142,7 +157,9 @@ class _StudentRoomListState extends State<_StudentRoomList>
         ? <String, WeeklyQuestionUsage?>{}
         : await _repo.weeklyUsageBatch(rooms.map((Room r) => r.mentorId));
     // N37: 방별 실제 활동시각 — 스레드 슬림 조회 1회(방·상태·활동시각만).
+    // 같은 조회에서 '답변 도착(answered)' 건수도 센다(§3-1 '답변 N' 배지).
     final Map<String, DateTime> lastByRoom = <String, DateTime>{};
+    final Map<String, int> answeredByRoom = <String, int>{};
     try {
       final List<ThreadStatusRow> statusRows = await _repo
           .threadStatusRowsForRooms(rooms.map((Room r) => r.id).toList());
@@ -151,10 +168,29 @@ class _StudentRoomListState extends State<_StudentRoomList>
         if (cur == null || t.updatedAt.isAfter(cur)) {
           lastByRoom[t.roomId] = t.updatedAt;
         }
+        if (t.status == ThreadStatus.answered) {
+          answeredByRoom[t.roomId] = (answeredByRoom[t.roomId] ?? 0) + 1;
+        }
       }
     } catch (_) {
       // 실패 시 방 updated_at 폴백(표시 저하일 뿐 흐름은 막지 않는다).
     }
+    // §3-1: 멘토가 남긴 최근 노트 한 줄 — 방별 best-effort(실패·없음 = 미표시).
+    final Map<String, ConnectionNote> noteByRoom = <String, ConnectionNote>{};
+    await Future.wait(rooms.map((Room r) async {
+      try {
+        final List<ConnectionNote> notes = await _repo.notes(r.id);
+        for (final ConnectionNote n in notes) {
+          if (n.authorRole == NoteAuthorRole.mentor &&
+              (n.body ?? '').trim().isNotEmpty) {
+            noteByRoom[r.id] = n; // notes 는 최신순
+            break;
+          }
+        }
+      } catch (_) {
+        // 노트는 보조 맥락 — 못 읽어도 목록은 그대로.
+      }
+    }));
     DateTime activityOf(Room r) {
       final DateTime? t = lastByRoom[r.id];
       return (t != null && t.isAfter(r.updatedAt)) ? t : r.updatedAt;
@@ -167,6 +203,8 @@ class _StudentRoomListState extends State<_StudentRoomList>
               mentor: names[r.mentorId],
               sub: subs[r.mentorId],
               usage: usageByMentor[r.mentorId],
+              answeredCount: answeredByRoom[r.id] ?? 0,
+              latestNote: noteByRoom[r.id],
             ))
         .toList();
     // N37: 표시·정렬 기준 통일 — 실제 활동시각 내림차순(인박스와 동일).
@@ -189,25 +227,14 @@ class _StudentRoomListState extends State<_StudentRoomList>
         Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenH,
-            12,
-            AppSpacing.screenH,
             8,
+            AppSpacing.screenH,
+            12,
           ),
-          child: TextField(
-            style: AppType.body,
+          child: AppInputField(
+            hintText: '멘토 검색',
+            prefixIcon: const Icon(Icons.search_rounded, size: 20),
             onChanged: (String v) => setState(() => _query = v.trim()),
-            decoration: InputDecoration(
-              hintText: '멘토 검색',
-              prefixIcon:
-                  const Icon(Icons.search_rounded, color: ColorTokens.muted),
-              filled: true,
-              fillColor: ColorTokens.elevated,
-              border: OutlineInputBorder(
-                borderRadius: AppShape.inputRadius,
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-            ),
           ),
         ),
         Expanded(child: _list()),
@@ -228,31 +255,29 @@ class _StudentRoomListState extends State<_StudentRoomList>
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return _ErrorView(
-              message: '목록을 불러오지 못했어요.\n${friendlyError(snap.error!)}');
+          return AppEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: '목록을 불러오지 못했어요',
+            description: friendlyError(snap.error!),
+          );
         }
         final List<_RoomItem> all = snap.data ?? <_RoomItem>[];
         if (all.isEmpty) {
           return Column(
             children: <Widget>[
               Expanded(
-                child: EmptyState(
+                child: AppEmptyState(
                   icon: Icons.forum_rounded,
                   title: '아직 질문방이 없어요',
-                  message: '멘토를 구독하면 1:1 질문방이 열려요',
+                  description: '멘토를 구독하면 1:1 질문방이 열려요',
                   // CTA는 기존 탭 전환 경로만 재사용(멘토 찾기 탭). 결제 유도 아님.
                   actionLabel: '멘토 찾기',
                   onAction: () => TabNavigator.go(AppTab.mentors),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.screenH,
-                  0,
-                  AppSpacing.screenH,
-                  16,
-                ),
-                child: CommerceNoticeCard(text: kSubscribeNoticeText),
+              Padding(
+                padding: AppPage.contentPadding(context, top: 0, bottom: 16),
+                child: const CommerceNoticeCard(text: kSubscribeNoticeText),
               ),
             ],
           );
@@ -263,21 +288,18 @@ class _StudentRoomListState extends State<_StudentRoomList>
                 .where((_RoomItem it) => it.mentorName.contains(_query))
                 .toList();
         if (items.isEmpty) {
-          return const EmptyState(
+          return const AppEmptyState(
             icon: Icons.search_off,
             title: '검색 결과가 없어요',
-            message: '다른 이름으로 검색해 보세요.',
+            description: '다른 이름으로 검색해 보세요.',
           );
         }
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH,
-            8,
-            AppSpacing.screenH,
-            16,
-          ),
+          clipBehavior: Clip.none,
+          padding: AppPage.contentPadding(context, top: 0),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, __) =>
+              const SizedBox(height: AppSpacing.listGap),
           itemBuilder: (BuildContext context, int i) =>
               _RoomTile(item: items[i], onOpen: () => _open(items[i])),
         );
@@ -299,51 +321,50 @@ class _StudentRoomListState extends State<_StudentRoomList>
   }
 }
 
+/// 방 한 행(design-v3 §3-1): 아바타 · 이름 · 시각 / 요금제 · 이번 주 남은 질문 /
+/// 📌 최근 노트 / 답변 N · 구독 상태 배지. 카드 하나가 방 하나.
 class _RoomTile extends StatelessWidget {
   const _RoomTile({required this.item, required this.onOpen});
   final _RoomItem item;
   final VoidCallback onOpen;
 
+  /// '프리미엄 · 질문 무제한' / '스탠다드 · 이번 주 9개 중 9개 남았어요'.
+  /// 요금제·한도 정보가 하나도 없으면 null(줄 생략 — 날조 금지).
+  static String? planLine(
+      SubscriptionSummary? sub, WeeklyQuestionUsage? usage) {
+    final List<String> bits = <String>[];
+    final String? tier = sub?.planTier?.trim();
+    if (tier != null && tier.isNotEmpty) bits.add(planTierLabel(tier));
+    final String? quota = SubscriptionCopy.quotaSentence(usage);
+    if (quota != null) bits.add(quota);
+    return bits.isEmpty ? null : bits.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final SubscriptionSummary? sub = item.sub;
-    // 구독 상태칩·갱신일은 넘칠 수 있어 Wrap 으로 자연스럽게 줄바꿈(정보 유지, 배치만 정돈).
-    final WeeklyQuestionUsage? usage = item.usage;
-    final bool hasQuotaBar = usage != null && usage.hasQuota;
-    final SubscriptionStatusDisplay? statusDisp = sub == null
-        ? null
-        : subscriptionStatusDisplay(sub.status, isActive: sub.isActive);
-    // 상태칩 + 잔여를 한 줄로(정보 순서 유지). 넘치면 Wrap 이 자연 줄바꿈.
-    final List<Widget> meta = <Widget>[
-      // D1-B: 상태 도트 + 기존 상태칩.
-      if (statusDisp != null)
-        StatusPill(
-          label: statusDisp.label,
-          tone: statusDisp.tone,
-          showDot: true,
-        ),
-      // A2: 잔여 바로 못 보여줄 때(한도 정보 없음)만 텍스트 폴백.
-      if (!hasQuotaBar && usage?.planQuotaLabel != null)
-        Text(usage!.planQuotaLabel!, style: AppType.caption),
-      if (sub?.nextRenewal != null)
-        Text(
-          '다음 갱신 ${Formatters.shortDate(sub!.nextRenewal!)}',
-          style: AppType.caption,
-        ),
-    ];
-    return AppCard(
+    final String? plan = planLine(sub, item.usage);
+    final ConnectionNote? note = item.latestNote;
+    final String? noteSummary =
+        note == null ? null : MentorNoteParts.parse(note.body).summary;
+
+    // 상태 배지: 정상 이용(active)은 요금제 줄로 충분하다 — 해지 예정·만료·미결제
+    // 처럼 학생이 알아야 할 상태만 배지로(§3-5 덧붙인 판단 ②).
+    final Widget? statusBadge = _statusBadge(sub);
+    final bool hasBadges = item.answeredCount > 0 || statusBadge != null;
+
+    return GlassCard(
       onTap: onOpen,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // 아바타: 역할색 옅은 틴트 배경 + 이니셜(이 카드의 시그니처 요소).
-          InitialAvatar(name: item.mentorName, size: 48),
-          const SizedBox(width: AppSpacing.s12),
+          InitialAvatar(name: item.mentorName, size: 44, tinted: false),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // 이름(title) + 우측 상단 활동시각(caption): 한 줄 정렬.
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
@@ -351,32 +372,47 @@ class _RoomTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item.mentorName,
-                        style: AppType.title,
+                        style: AppTypography.bodyStrong.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.s8),
+                    const SizedBox(width: 8),
                     // 마지막 활동시각 — N37: 방·스레드 max(인박스와 동일 기준).
                     Text(
-                      '${Formatters.relativeKorean(item.lastActivity)} 활동',
-                      style: AppType.caption,
+                      Formatters.relativeKorean(item.lastActivity),
+                      style: AppTypography.meta,
                     ),
                   ],
                 ),
-                if (meta.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: AppSpacing.s8),
-                  Wrap(
-                    spacing: AppSpacing.s8,
-                    runSpacing: AppSpacing.s4 + 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: meta,
+                if (plan != null) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    plan,
+                    style: AppTypography.captionSecondary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                // D1-A: 주간 잔여 질문권 프로그레스 바(있는 값만 — RPC used/limit).
-                if (hasQuotaBar) ...<Widget>[
-                  const SizedBox(height: AppSpacing.s8),
-                  QuotaBar(used: usage.used, limit: usage.limit),
+                if (noteSummary != null && noteSummary.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 8),
+                  NotePreviewLine(summary: noteSummary),
+                ],
+                if (hasBadges) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: <Widget>[
+                      if (item.answeredCount > 0)
+                        _SolidBadge(label: '답변 ${item.answeredCount}'),
+                      if (statusBadge != null) statusBadge,
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -385,20 +421,46 @@ class _RoomTile extends StatelessWidget {
       ),
     );
   }
+
+  /// 구독 상태 배지 — active 는 미표시. 해지 예정은 '해지 예정 · 9월 5일까지'.
+  static Widget? _statusBadge(SubscriptionSummary? sub) {
+    if (sub == null) return null;
+    final String status = sub.status?.trim().toLowerCase() ?? '';
+    if (status == 'active') return null;
+    if (status == 'cancel_scheduled') {
+      final DateTime? until = sub.nextRenewal;
+      return StatusPill(
+        label:
+            until == null ? '해지 예정' : '해지 예정 · ${Formatters.monthDay(until)}까지',
+        tone: StatusTone.danger,
+      );
+    }
+    if (status.isEmpty && sub.isActive) return null; // 미상 + 활성 → 정상 취급.
+    final SubscriptionStatusDisplay disp =
+        subscriptionStatusDisplay(sub.status, isActive: sub.isActive);
+    return StatusPill(label: disp.label, tone: disp.tone);
+  }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.message});
-  final String message;
+/// 역할색 채움 배지('답변 1' — design-v3 §3-1).
+class _SolidBadge extends StatelessWidget {
+  const _SolidBadge({required this.label});
+  final String label;
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: ColorTokens.danger),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: RoleTheme.of(context).color,
+        borderRadius: BorderRadius.circular(AppRadius.badge),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.meta.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
         ),
       ),
     );

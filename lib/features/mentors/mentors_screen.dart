@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 import '../../app/app_navigation.dart';
 import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
-import '../../design/role_accent.dart';
-import '../../design/shape_tokens.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/role_theme.dart' show RoleTheme;
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_empty_state.dart';
+import '../../design/widgets/app_input_field.dart';
+import '../../design/widgets/app_page.dart';
+import '../../design/widgets/app_secondary_button.dart';
 import '../../design/widgets/chip_scroll.dart';
-import '../../design/widgets/empty_state.dart';
 import 'data/mentor_directory_repository.dart';
 import 'data/mentor_directory_view.dart';
 import 'data/mentor_favorites_repository.dart';
@@ -142,22 +144,12 @@ class _MentorsScreenState extends State<MentorsScreen> {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenH, 12, AppSpacing.screenH, 8),
-          child: TextField(
-            style: AppType.body,
+              AppSpacing.screenH, 8, AppSpacing.screenH, 8),
+          child: AppInputField(
+            hintText: '과목 · 학교 · 이름',
+            prefixIcon: const Icon(Icons.search_rounded,
+                color: AppColors.textSecondary),
             onChanged: (String v) => setState(() => _query = v.trim()),
-            decoration: InputDecoration(
-              hintText: '과목·이름·학교 검색',
-              prefixIcon:
-                  const Icon(Icons.search_rounded, color: ColorTokens.muted),
-              filled: true,
-              fillColor: ColorTokens.elevated,
-              border: OutlineInputBorder(
-                borderRadius: AppShape.inputRadius,
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-            ),
           ),
         ),
         // 전체 / 찜한 멘토 scope 세그먼트(로그인 시). 기존 '찜한 멘토 N' 카운트는
@@ -178,7 +170,7 @@ class _MentorsScreenState extends State<MentorsScreen> {
                       ButtonSegment<MentorListScope>(
                         value: MentorListScope.favorite,
                         icon: Icon(Icons.favorite_rounded,
-                            size: 14, color: AppAccent.of(context).accent),
+                            size: 14, color: RoleTheme.of(context).color),
                         label: Text(_favoriteSegmentLabel()),
                       ),
                     ],
@@ -225,10 +217,10 @@ class _MentorsScreenState extends State<MentorsScreen> {
                 items: <MentorListItem>[], incomplete: false);
         final List<MentorListItem> all = result.items;
         if (all.isEmpty) {
-          return const EmptyState(
+          return const AppEmptyState(
             icon: Icons.school_outlined,
             title: '아직 공개된 멘토가 없어요',
-            message: '곧 멘토들이 등록될 거예요.',
+            description: '곧 멘토들이 등록될 거예요.',
           );
         }
 
@@ -273,7 +265,7 @@ class _MentorsScreenState extends State<MentorsScreen> {
                 padding: EdgeInsets.fromLTRB(
                     AppSpacing.screenH, 0, AppSpacing.screenH, 6),
                 child: Text('멘토가 많아 목록 일부만 불러왔어요. 검색으로 원하는 멘토를 찾아보세요.',
-                    style: AppType.caption),
+                    style: AppTypography.captionSecondary),
               ),
             if (subjects.isNotEmpty)
               Padding(
@@ -302,26 +294,26 @@ class _MentorsScreenState extends State<MentorsScreen> {
             Expanded(
               child: items.isEmpty
                   ? (favEmptyNoFilter
-                      ? const EmptyState(
+                      ? const AppEmptyState(
                           icon: Icons.favorite_border_rounded,
                           title: '아직 찜한 멘토가 없어요',
-                          message: '멘토 카드의 하트를 눌러 찜해 보세요.',
+                          description: '멘토 카드의 하트를 눌러 찜해 보세요.',
                         )
-                      : const EmptyState(
+                      : const AppEmptyState(
                           icon: Icons.search_off,
                           title: '검색 결과가 없어요',
-                          message: '다른 과목·이름·학교로 찾아보세요.',
+                          description: '다른 과목·이름·학교로 찾아보세요.',
                         ))
                   : Center(
                       // 태블릿 과폭 방지: 리스트 폭 600 제한·중앙정렬(모바일 390<600 영향 없음, 2열 아님).
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 600),
                         child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.screenH, 4, AppSpacing.screenH, 16),
+                          clipBehavior: Clip.none,
+                          padding: AppPage.contentPadding(context, top: 4),
                           itemCount: items.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.cardGap),
+                              const SizedBox(height: AppSpacing.listGap),
                           itemBuilder: (BuildContext context, int i) {
                             return MentorCard(
                               item: items[i],
@@ -388,7 +380,7 @@ class _SortBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          Text('멘토 $count명', style: AppType.caption),
+          Text('멘토 $count명', style: AppTypography.captionSecondary),
           PopupMenuButton<MentorSort>(
             initialValue: sort,
             onSelected: onChanged,
@@ -400,8 +392,9 @@ class _SortBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text(_label, style: AppType.caption),
-                const Icon(Icons.arrow_drop_down, color: ColorTokens.secondary),
+                Text(_label, style: AppTypography.captionSecondary),
+                const Icon(Icons.arrow_drop_down,
+                    color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -423,7 +416,7 @@ class _ErrorView extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: ColorTokens.danger),
+          style: AppTypography.body.copyWith(color: AppColors.danger),
         ),
       ),
     );
@@ -447,10 +440,14 @@ class _RetryView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: ColorTokens.danger),
+              style: AppTypography.body.copyWith(color: AppColors.danger),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(onPressed: onRetry, child: const Text('다시 시도')),
+            AppSecondaryButton(
+              label: '다시 시도',
+              expand: false,
+              onPressed: onRetry,
+            ),
           ],
         ),
       ),

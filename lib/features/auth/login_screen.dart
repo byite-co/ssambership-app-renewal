@@ -4,17 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/app_scope.dart';
 import '../../app/entry_guard.dart';
-import '../../design/shape_tokens.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
-import '../../design/widgets/primary_button.dart';
-import '../../design/widgets/secondary_button.dart';
+import '../../design/role_theme.dart' show RoleTheme;
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_background.dart';
+import '../../design/widgets/app_input_field.dart';
+import '../../design/widgets/app_primary_button.dart';
+import '../../design/widgets/app_secondary_button.dart';
+import '../../design/widgets/glass_card.dart';
+import '../../design/widgets/glass_inner.dart';
 import '../../shared/constants/app_constants.dart';
 import '../dev/dev_flags.dart';
 import '../../shared/errors/friendly_error.dart';
 
-/// 로그인 화면. 이메일+비밀번호 로그인 / 둘러보기(게스트) / 웹 가입 안내(자리).
+/// 로그인 화면(design-v3 §5-1) — 이메일+비밀번호 로그인 / 둘러보기(게스트) / 웹 가입 안내.
+/// 주색은 로그인 역할(RoleTheme)이 정한다 — 학생 파랑 · 멘토 초록.
 ///
 /// ★ 컴패니언 앱: 회원가입 폼 없음(가입은 웹). 결제·가격 UI 없음(Commerce-Zero).
 class LoginScreen extends StatefulWidget {
@@ -45,9 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await AppScope.of(context).auth.signInWithPassword(
-        email: _email.text,
-        password: _password.text,
-      );
+            email: _email.text,
+            password: _password.text,
+          );
       // 성공 시 router redirect 가 /home 또는 /blocked 로 이동시킨다.
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = friendlyAuthError(e));
@@ -71,94 +75,94 @@ class _LoginScreenState extends State<LoginScreen> {
         GoRouterState.of(context).uri.queryParameters['notice'];
     final bool loginRequired = notice == 'login_required';
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const Center(child: _BrandSymbol()),
-                  const SizedBox(height: AppSpacing.s16),
-                  const Text(
-                    AppConstants.appDisplayName,
-                    style: AppType.display,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  const Text(
-                    '질문 멘토링, 모바일에서',
-                    style: AppType.caption,
-                    textAlign: TextAlign.center,
-                  ),
-                  if (loginRequired) ...<Widget>[
+    return AppBackground(
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenH, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    const Center(child: _BrandSymbol()),
+                    const SizedBox(height: AppSpacing.s16),
+                    const Text(
+                      AppConstants.appDisplayName,
+                      style: AppTypography.title,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
+                    const Text(
+                      '질문 멘토링, 모바일에서',
+                      style: AppTypography.captionSecondary,
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: AppSpacing.s24),
-                    const _NoticeBanner(),
-                  ],
-                  const SizedBox(height: AppSpacing.s32),
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const <String>[
-                      AutofillHints.email,
-                      AutofillHints.username,
-                    ],
-                    textInputAction: TextInputAction.next,
-                    style: AppType.body,
-                    decoration: _decoration('이메일'),
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  TextField(
-                    controller: _password,
-                    obscureText: true,
-                    autofillHints: const <String>[AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _signIn(),
-                    style: AppType.body,
-                    decoration: _decoration('비밀번호'),
-                  ),
-                  if (_error != null) ...<Widget>[
-                    const SizedBox(height: AppSpacing.s12),
-                    Text(
-                      _error!,
-                      style: AppType.caption.copyWith(
-                        color: ColorTokens.danger,
-                        fontWeight: FontWeight.w600,
+                    GlassCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          if (loginRequired) ...<Widget>[
+                            const _NoticeBanner(),
+                            const SizedBox(height: AppSpacing.s16),
+                          ],
+                          AppInputField(
+                            controller: _email,
+                            labelText: '이메일',
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const <String>[
+                              AutofillHints.email,
+                              AutofillHints.username,
+                            ],
+                            textInputAction: TextInputAction.next,
+                          ),
+                          const SizedBox(height: AppSpacing.s12),
+                          AppInputField(
+                            controller: _password,
+                            labelText: '비밀번호',
+                            obscureText: true,
+                            autofillHints: const <String>[
+                              AutofillHints.password
+                            ],
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _signIn(),
+                            errorText: _error,
+                          ),
+                          const SizedBox(height: AppSpacing.s20),
+                          AppPrimaryButton(
+                            label: _loading ? '로그인 중…' : '로그인',
+                            onPressed: _loading ? null : _signIn,
+                          ),
+                          const SizedBox(height: AppSpacing.s8),
+                          AppSecondaryButton(
+                            label: '둘러보기',
+                            onPressed: _loading ? null : _browse,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: AppSpacing.s24),
-                  PrimaryButton(
-                    label: _loading ? '로그인 중…' : '로그인',
-                    onPressed: _loading ? null : _signIn,
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  SecondaryButton(
-                    label: '둘러보기',
-                    neutral: true,
-                    onPressed: _loading ? null : _browse,
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  // 가입은 웹에서만 — 확정된 가입 경로가 없어 링크(어포던스)
-                  // 없이 순수 안내만 둔다(죽은 버튼 금지, P0-4).
-                  // 웹 가입 라우트 확정 시 web_bridge 에 signupPath 를 추가해
-                  // 버튼으로 승격한다.
-                  const Text(
-                    '아직 회원이 아니신가요? 회원가입은 웹에서 진행돼요.',
-                    style: TextStyle(color: ColorTokens.secondary),
-                    textAlign: TextAlign.center,
-                  ),
-                  // ★ 개발 전용 — 출시 빌드에서는 노출되지 않는다.
-                  if (kDevToolsEnabled)
-                    TextButton(
-                      onPressed: () => context.go(EntryGuard.devGallery),
-                      child: const Text('위젯 갤러리 (개발용)'),
+                    const SizedBox(height: AppSpacing.s16),
+                    // 가입은 웹에서만 — 확정된 가입 경로가 없어 링크(어포던스)
+                    // 없이 순수 안내만 둔다(죽은 버튼 금지, P0-4).
+                    // 웹 가입 라우트 확정 시 web_bridge 에 signupPath 를 추가해
+                    // 버튼으로 승격한다.
+                    const Text(
+                      '아직 회원이 아니신가요? 회원가입은 웹에서 진행돼요.',
+                      style: AppTypography.captionSecondary,
+                      textAlign: TextAlign.center,
                     ),
-                ],
+                    // ★ 개발 전용 — 출시 빌드에서는 노출되지 않는다.
+                    if (kDevToolsEnabled)
+                      TextButton(
+                        onPressed: () => context.go(EntryGuard.devGallery),
+                        child: const Text('위젯 갤러리 (개발용)'),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -166,17 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  InputDecoration _decoration(String label) => InputDecoration(
-        labelText: label,
-        labelStyle: AppType.caption,
-        filled: true,
-        fillColor: ColorTokens.elevated,
-        border: OutlineInputBorder(
-          borderRadius: AppShape.inputRadius,
-          borderSide: BorderSide.none,
-        ),
-      );
 }
 
 /// 브랜드 심볼(단 하나) — 확정 앱 로고(졸업모자 + 말풍선). 과한 장식 금지.
@@ -201,19 +194,16 @@ class _NoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final Color role = RoleTheme.of(context).color;
+    return GlassInner(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: ColorTokens.elevated,
-        borderRadius: AppShape.inputRadius,
-        border: Border.all(color: ColorTokens.border),
-      ),
-      child: const Row(
+      ringColor: role.withValues(alpha: 0.35),
+      child: Row(
         children: <Widget>[
-          Icon(Icons.info_rounded, size: 18, color: ColorTokens.muted),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text('로그인이 필요해요', style: AppType.body),
+          Icon(Icons.info_rounded, size: 18, color: role),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('로그인이 필요해요', style: AppTypography.body),
           ),
         ],
       ),

@@ -8,9 +8,11 @@ import '../../app/app_tabs.dart';
 import '../../app/entry_guard.dart';
 import '../../core/auth/app_auth.dart';
 import '../../core/refresh/data_refresh_bus.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_blocks.dart';
+import '../../design/widgets/app_page.dart';
 import '../dev/dev_flags.dart';
 import 'data/mypage_models.dart';
 import 'data/mypage_repository.dart';
@@ -55,7 +57,6 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
   // A-2: 레포지토리·인증 상태는 AppScope 에서 받는다(직접 생성·싱글턴 참조 0).
   late final AppDependencies _deps;
   MyPageRepository get _repo => _deps.myPage;
@@ -217,15 +218,10 @@ class _MyPageScreenState extends State<MyPageScreen>
         child = const Center(child: CircularProgressIndicator());
       } else {
         // 초기 진입부터 실패 — 정상 스냅샷이 전혀 없을 때만 전체 오류 화면.
-        final String detail =
-            _lastError == null ? '' : '\n${friendlyError(_lastError!)}';
-        child = Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('내 정보를 불러오지 못했어요.$detail',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: ColorTokens.danger)),
-          ),
+        child = AppErrorView(
+          title: '내 정보를 불러오지 못했어요',
+          message: _lastError == null ? '' : friendlyError(_lastError!),
+          onRetry: _retryManual,
         );
       }
     } else {
@@ -251,13 +247,13 @@ class _MyPageScreenState extends State<MyPageScreen>
   Widget _sections(MyPageData data) {
     final bool signedIn = _auth.isSignedIn;
     return ListView(
-      padding:
-          const EdgeInsets.fromLTRB(20, AppSpacing.s16, 20, AppSpacing.s24),
+      clipBehavior: Clip.none,
+      padding: AppPage.contentPadding(context, top: AppSpacing.s16),
       children: <Widget>[
         // v19 보정1: 일반 재조회 실패 — 마지막 정상 화면 위 비단정 안내만.
         if (_loadFailed) ...<Widget>[
           Text('최신 정보를 불러오지 못했습니다.',
-              style: AppType.caption.copyWith(color: ColorTokens.danger)),
+              style: AppTypography.caption.copyWith(color: AppColors.danger)),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
@@ -272,9 +268,8 @@ class _MyPageScreenState extends State<MyPageScreen>
         ProfileSection(
           profile: data.profile,
           // 게스트(비로그인)는 수정 불가 — 세션 있을 때만 수정 진입 노출.
-          onEdit: _auth.isSignedIn
-              ? () => _openProfileEdit(data.profile)
-              : null,
+          onEdit:
+              _auth.isSignedIn ? () => _openProfileEdit(data.profile) : null,
         ),
         const SizedBox(height: AppSpacing.section),
         if (data.isMentor)
@@ -290,7 +285,8 @@ class _MyPageScreenState extends State<MyPageScreen>
           Center(
             child: TextButton(
               onPressed: () => context.go(EntryGuard.devS3),
-              child: Text('S3 데이터 점검 (개발용)', style: AppType.caption),
+              child: const Text('S3 데이터 점검 (개발용)',
+                  style: AppTypography.captionSecondary),
             ),
           ),
         ],

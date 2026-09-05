@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/role_accent.dart';
-import 'package:ssambership_app/design/theme.dart';
+import 'package:ssambership_app/design/tokens/app_colors.dart';
+import 'package:ssambership_app/design/app_theme.dart';
+import 'package:ssambership_app/design/role_theme.dart' as design;
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
@@ -50,8 +51,10 @@ Future<void> _pump(
   IndividualQuestionStatus status = IndividualQuestionStatus.answered,
   String? claimedMentorId = kMentorId,
 }) async {
-  await tester.pumpScopedWidget(MaterialApp(
-    theme: AppTheme.build(role),
+  await tester.pumpScopedWidget(design.RoleTheme(
+    role: _designRole(role),
+    child: MaterialApp(
+    theme: AppTheme.build(role: _designRole(role)),
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,
@@ -63,6 +66,7 @@ Future<void> _pump(
         mentorName: '수학멘토',
       ),
     ),
+  ),
   ));
   await tester.pumpAndSettle();
 }
@@ -81,6 +85,10 @@ ConversationBubble _bubbleWithBody(WidgetTester tester, String body) {
   expect(f, findsOneWidget, reason: '본문 "$body" 말풍선을 찾지 못했다');
   return tester.widget<ConversationBubble>(f);
 }
+
+/// 인증 역할 → 테마 역할(멘토만 초록). 화면이 RoleTheme 을 읽으므로 감싼다.
+design.AppRole _designRole(AppRole role) =>
+    role == AppRole.mentor ? design.AppRole.mentor : design.AppRole.student;
 
 void main() {
   testWidgets('학생 작성 메시지 → 학생 라벨(질문 말풍선과 별개로)', (WidgetTester tester) async {
@@ -254,6 +262,6 @@ void main() {
         .first;
     final BoxDecoration d =
         tester.widget<Container>(box).decoration! as BoxDecoration;
-    expect(d.color, RoleAccent.mentor.accentSoft);
+    expect(d.color, RoleColors.mentor);
   });
 }

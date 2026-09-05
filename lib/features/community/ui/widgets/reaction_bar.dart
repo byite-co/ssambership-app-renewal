@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/role_accent.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/role_theme.dart' show RoleTheme;
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_typography.dart';
 
 /// 반응 바 — 좋아요·스크랩·댓글수·신고. 상세 화면 하단/상단에 쓴다.
 /// 좋아요/스크랩은 토글(내 반응), 댓글수는 표시, 신고는 시트를 연다.
@@ -53,7 +53,7 @@ class ReactionBar extends StatelessWidget {
         const Spacer(),
         IconButton(
           tooltip: '신고',
-          icon: const Icon(Icons.flag_outlined, color: ColorTokens.muted),
+          icon: const Icon(Icons.flag_outlined, color: AppColors.textSecondary),
           onPressed: onReport,
         ),
       ],
@@ -76,7 +76,8 @@ class _Action extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = active ? AppAccent.of(context).accent : ColorTokens.secondary;
+    final Color color =
+        active ? RoleTheme.of(context).color : AppColors.textSecondary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -87,8 +88,7 @@ class _Action extends StatelessWidget {
           children: <Widget>[
             Icon(icon, size: 18, color: color),
             const SizedBox(width: 4),
-            Text(label,
-                style: AppType.caption.copyWith(color: color)),
+            Text(label, style: AppTypography.caption.copyWith(color: color)),
           ],
         ),
       ),

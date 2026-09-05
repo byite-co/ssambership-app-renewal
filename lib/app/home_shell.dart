@@ -3,7 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_service.dart' show AppRole;
 import '../core/refresh/data_refresh_bus.dart';
-import '../design/spacing_tokens.dart';
+import '../design/role_theme.dart' as design;
+import '../design/tokens/app_spacing.dart';
+import '../design/widgets/app_background.dart';
+import '../design/widgets/app_blocks.dart';
+import '../design/widgets/app_empty_state.dart';
+import '../design/widgets/app_page.dart';
+import '../design/widgets/glass_bars.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentor_console/ui/mentor_settlement_screen.dart';
@@ -15,6 +21,7 @@ import '../features/notifications/data/notification_badge_controller.dart'
 import '../features/notifications/notifications_screen.dart';
 import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
+import '../shared/errors/friendly_error.dart';
 import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
 import 'app_navigation.dart';
@@ -30,6 +37,9 @@ import 'routes/mypage_routes.dart';
 /// 운영 라우터에서는 [StatefulNavigationShell.currentIndex]가 선택 상태의 정본이고
 /// 각 branch Navigator가 탭별 상태를 보존한다. [navigationShell]이 없는 경우는
 /// 기존 직접-pump 테스트를 위한 작은 IndexedStack 폴백이다.
+///
+/// 껍데기(배경·유리 앱바·유리 탭바)는 [HomeShellChrome] 이 그린다 — 탭 골든이
+/// 같은 껍데기로 그려지도록 분리했다(A-6b).
 class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
@@ -47,6 +57,32 @@ class HomeShell extends StatefulWidget {
   /// 직접-pump 테스트용 마이페이지 데이터 주입. 운영에서는 null이다.
   final Future<MyPageData> Function()? myPageLoaderOverride;
 
+  /// 역할별 하단 탭(아이콘은 v3 아웃라인 세트, 라벨은 [AppConstants] 정본).
+  static List<GlassTabItem> tabItemsFor(AppRole role) {
+    final List<String> labels = role == AppRole.mentor
+        ? AppConstants.mentorBottomTabLabels
+        : AppConstants.studentBottomTabLabels;
+    final List<IconData> icons = role == AppRole.mentor
+        ? const <IconData>[
+            Icons.forum_outlined,
+            Icons.chat_bubble_outline,
+            Icons.account_balance_wallet_outlined,
+            Icons.groups_outlined,
+            Icons.notifications_none,
+          ]
+        : const <IconData>[
+            Icons.forum_outlined,
+            Icons.chat_bubble_outline,
+            Icons.person_search_outlined,
+            Icons.groups_outlined,
+            Icons.notifications_none,
+          ];
+    return <GlassTabItem>[
+      for (int i = 0; i < labels.length; i++)
+        GlassTabItem(icon: icons[i], label: labels[i]),
+    ];
+  }
+
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
@@ -59,32 +95,22 @@ class _HomeShellState extends State<HomeShell> {
   static const List<_HomeTabDestination> _studentTabs = <_HomeTabDestination>[
     _HomeTabDestination(
       location: AppTab.questionRoom,
-      label: '질문방',
-      icon: Icons.forum_rounded,
       fallbackPage: QuestionRoomScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.individualQuestion,
-      label: '개별질문',
-      icon: Icons.question_answer_rounded,
       fallbackPage: IndividualQuestionTabScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.mentors,
-      label: '멘토 찾기',
-      icon: Icons.search_rounded,
       fallbackPage: MentorsScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.community,
-      label: '커뮤니티',
-      icon: Icons.groups_rounded,
       fallbackPage: CommunityScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.notifications,
-      label: '알림',
-      icon: Icons.notifications_rounded,
       fallbackPage: NotificationsScreen(),
       hasNotificationBadge: true,
     ),
@@ -93,39 +119,31 @@ class _HomeShellState extends State<HomeShell> {
   static const List<_HomeTabDestination> _mentorTabs = <_HomeTabDestination>[
     _HomeTabDestination(
       location: AppTab.questionRoom,
-      label: '질문방',
-      icon: Icons.forum_rounded,
       fallbackPage: QuestionRoomScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.individualQuestion,
-      label: '개별질문',
-      icon: Icons.question_answer_rounded,
       fallbackPage: IndividualQuestionTabScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.settlements,
-      label: '정산',
-      icon: Icons.account_balance_wallet_rounded,
       fallbackPage: MentorSettlementsTabBody(),
     ),
     _HomeTabDestination(
       location: AppTab.community,
-      label: '커뮤니티',
-      icon: Icons.groups_rounded,
       fallbackPage: CommunityScreen(),
     ),
     _HomeTabDestination(
       location: AppTab.notifications,
-      label: '알림',
-      icon: Icons.notifications_rounded,
       fallbackPage: NotificationsScreen(),
       hasNotificationBadge: true,
     ),
   ];
 
+  AppRole get _role => _deps.auth.currentRole;
+
   List<_HomeTabDestination> get _tabs =>
-      _deps.auth.currentRole == AppRole.mentor ? _mentorTabs : _studentTabs;
+      _role == AppRole.mentor ? _mentorTabs : _studentTabs;
 
   @override
   void initState() {
@@ -232,28 +250,42 @@ class _HomeShellState extends State<HomeShell> {
     final bool shellRouteVisible = ModalRoute.of(context)?.isCurrent ?? true;
 
     final bool showSettlementHub =
-        _deps.auth.currentRole == AppRole.mentor &&
-            activeLocation == AppTab.settlements;
+        _role == AppRole.mentor && activeLocation == AppTab.settlements;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_titleFor(activeLocation, tabs[selectedIndex].label)),
-        actions: <Widget>[
-          // A-4a: 정산 탭(멘토)에서만 정산 허브(/settlements/history) 진입.
-          // 탭 본문(MentorSettlementsTabBody)은 골든 고정이라 손대지 않는다.
-          if (showSettlementHub)
-            IconButton(
-              tooltip: MentorSettlementScreen.entryTooltip,
-              icon: const Icon(Icons.receipt_long_rounded),
-              onPressed: _openSettlementHub,
+    return ValueListenableBuilder<int?>(
+      valueListenable: _deps.notificationBadge.count,
+      builder: (BuildContext context, int? count, Widget? body) {
+        final String? badge = notificationBadgeLabel(count);
+        final List<GlassTabItem> base = HomeShell.tabItemsFor(_role);
+        return HomeShellChrome(
+          title: _titleFor(activeLocation, base[selectedIndex].label),
+          actions: <Widget>[
+            // A-4a: 정산 탭(멘토)에서만 정산 허브(/settlements/history) 진입.
+            if (showSettlementHub)
+              IconButton(
+                tooltip: MentorSettlementScreen.entryTooltip,
+                icon: const Icon(Icons.receipt_long_rounded),
+                onPressed: _openSettlementHub,
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: _ProfileCircleButton(onTap: _openMyPage),
             ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _ProfileCircleButton(onTap: _openMyPage),
-          ),
-        ],
-      ),
-      body: Column(
+          ],
+          tabs: <GlassTabItem>[
+            for (int i = 0; i < base.length; i++)
+              GlassTabItem(
+                icon: base[i].icon,
+                label: base[i].label,
+                badgeLabel: tabs[i].hasNotificationBadge ? badge : null,
+              ),
+          ],
+          selectedIndex: selectedIndex,
+          onSelected: (int index) => _selectLocation(tabs[index].location),
+          body: body!,
+        );
+      },
+      child: Column(
         children: <Widget>[
           const WithdrawalPendingBanner(),
           Expanded(
@@ -276,20 +308,6 @@ class _HomeShellState extends State<HomeShell> {
                     child: shell,
                   ),
           ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (int index) =>
-            _selectLocation(tabs[index].location),
-        destinations: <NavigationDestination>[
-          for (final _HomeTabDestination tab in tabs)
-            NavigationDestination(
-              icon: tab.hasNotificationBadge
-                  ? _NotificationsTabIcon(icon: tab.icon)
-                  : Icon(tab.icon),
-              label: tab.label,
-            ),
         ],
       ),
     );
@@ -328,6 +346,51 @@ class _HomeShellState extends State<HomeShell> {
         return '알림';
     }
     return fallback;
+  }
+}
+
+/// 홈 셸 껍데기 — 배경 그라디언트 + 유리 앱바 + 유리 탭바.
+///
+/// 탭 본문은 [AppPageBody] 규칙(앱바 아래에서 뷰포트 시작, 넘친 스크롤은 앱바 뒤로)을
+/// 그대로 따르고, 탭바 뒤까지 본문이 늘어나므로 스크롤 본문은
+/// [AppPage.contentPadding] 으로 하단 여백을 잡는다. 탭 골든도 이 위젯으로 그린다.
+class HomeShellChrome extends StatelessWidget {
+  const HomeShellChrome({
+    super.key,
+    required this.title,
+    required this.body,
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onSelected,
+    this.actions = const <Widget>[],
+  });
+
+  final String title;
+  final Widget body;
+  final List<GlassTabItem> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBackground(
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        extendBody: true,
+        appBar: GlassAppBar(
+          title: Text(title),
+          automaticallyImplyLeading: false,
+          actions: actions,
+        ),
+        body: AppPageBody(child: body),
+        bottomNavigationBar: GlassTabBar(
+          items: tabs,
+          selectedIndex: selectedIndex,
+          onSelected: onSelected,
+        ),
+      ),
+    );
   }
 }
 
@@ -379,15 +442,11 @@ class _HomeTabVisibilityScope extends InheritedWidget {
 class _HomeTabDestination {
   const _HomeTabDestination({
     required this.location,
-    required this.label,
-    required this.icon,
     required this.fallbackPage,
     this.hasNotificationBadge = false,
   });
 
   final String location;
-  final String label;
-  final IconData icon;
   final Widget fallbackPage;
   final bool hasNotificationBadge;
 }
@@ -401,71 +460,37 @@ class MentorSettlementsTabBody extends StatelessWidget {
     return AsyncRouteLoader<MentorDashboard>(
       load: (AppDependencies dependencies) async =>
           (await dependencies.myPage.load()).mentor,
-      loadingBuilder: (_) => const Center(child: CircularProgressIndicator()),
-      notFoundBuilder: (_) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('정산 요약을 불러올 수 없어요.'),
-        ),
+      loadingBuilder: (_) => const AppLoadingView(cards: 1),
+      notFoundBuilder: (_) => const AppEmptyState(
+        icon: Icons.receipt_long_rounded,
+        title: '정산 요약을 불러올 수 없어요.',
+        description: '잠시 후 다시 확인해 주세요.',
       ),
       errorBuilder: (BuildContext context, Object error, VoidCallback retry) =>
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  const Text('정산 요약을 불러오지 못했어요.'),
-                  const SizedBox(height: AppSpacing.s12),
-                  TextButton(onPressed: retry, child: const Text('다시 시도')),
-                ],
-              ),
-            ),
+          AppErrorView(
+        title: '정산 요약을 불러오지 못했어요.',
+        message: friendlyError(error),
+        onRetry: retry,
+      ),
+      builder: (
+        BuildContext context,
+        MentorDashboard dashboard,
+        AppDependencies dependencies,
+      ) =>
+          ListView(
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context, top: AppSpacing.s16),
+        children: <Widget>[
+          MentorDashboardSection(
+            data: dashboard,
+            onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
+            // 정산 화면 자체 — 정산 안내 카드는 띄우지 않는다(정산 허브 아이콘이 위에 있다).
+            showPayoutNotice: false,
           ),
-      builder:
-          (
-            BuildContext context,
-            MentorDashboard dashboard,
-            AppDependencies dependencies,
-          ) => ListView(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              AppSpacing.s16,
-              20,
-              AppSpacing.s24,
-            ),
-            children: <Widget>[
-              MentorDashboardSection(
-                data: dashboard,
-                onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
-                // 정산 화면 자체 — 정산 안내 카드는 띄우지 않는다(정산 허브 아이콘이 위에 있다).
-                showPayoutNotice: false,
-              ),
-            ],
-          ),
+        ],
+      ),
       notFoundMessage: '정산 요약을 불러올 수 없어요.',
       errorMessage: '정산 요약을 불러오지 못했어요.',
-    );
-  }
-}
-
-class _NotificationsTabIcon extends StatelessWidget {
-  const _NotificationsTabIcon({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int?>(
-      valueListenable: AppScope.of(context).notificationBadge.count,
-      builder: (BuildContext context, int? count, Widget? _) {
-        final String? label = notificationBadgeLabel(count);
-        return Badge(
-          isLabelVisible: label != null,
-          label: label == null ? null : Text(label),
-          child: Icon(icon),
-        );
-      },
     );
   }
 }
@@ -477,7 +502,7 @@ class _ProfileCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final design.RoleTheme roleTheme = design.RoleTheme.of(context);
     return Semantics(
       button: true,
       label: AppConstants.myPageTitle,
@@ -489,10 +514,10 @@ class _ProfileCircleButton extends StatelessWidget {
           height: 36,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: scheme.primary.withValues(alpha: 0.12),
+            color: roleTheme.tint,
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.person_rounded, size: 22, color: scheme.primary),
+          child: Icon(Icons.person_rounded, size: 22, color: roleTheme.color),
         ),
       ),
     );

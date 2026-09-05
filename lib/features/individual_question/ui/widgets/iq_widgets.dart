@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../data/mappings/subject_labels.dart';
-import '../../../../design/tokens/typography.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/widgets/glass_card.dart';
 import '../../../../design/widgets/status_pill.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/models/individual_question_models.dart';
@@ -61,51 +61,48 @@ class IqQuestionCard extends StatelessWidget {
     final String? remaining =
         formatIqExpiryRemaining(question.expiresAt, question.status);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // 컴플라이언스: 카드에서 금액 표시 제거(유형·상태만).
-              Row(
-                children: <Widget>[
-                  AppBadge(label: iqTypeLabel(question.type), tinted: true),
-                  const SizedBox(width: 6),
-                  IqStatusPill(status: question.status),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // 컴플라이언스: 카드에서 금액 표시 제거(유형·상태만).
+            Row(
+              children: <Widget>[
+                AppBadge(label: iqTypeLabel(question.type), tinted: true),
+                const SizedBox(width: 6),
+                IqStatusPill(status: question.status),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              question.title.isEmpty ? '(제목 없음)' : question.title,
+              style: AppTypography.bodyStrong,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            // [QA-B6] 학생 본인 목록에서도 자신이 건 조건을 확인할 수 있어야 한다.
+            IqRequirementChips(
+              subject: question.subject,
+              requiredSchoolTier: question.requiredSchoolTier,
+              requiredMajorCategory: question.requiredMajorCategory,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: <Widget>[
+                if (question.createdAt != null)
+                  Text(
+                    Formatters.relativeKorean(question.createdAt!),
+                    style: AppTypography.meta,
+                  ),
+                if (remaining != null) ...<Widget>[
+                  const SizedBox(width: 8),
+                  Text(remaining, style: AppTypography.meta),
                 ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                question.title.isEmpty ? '(제목 없음)' : question.title,
-                style: AppTypography.body,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              // [QA-B6] 학생 본인 목록에서도 자신이 건 조건을 확인할 수 있어야 한다.
-              IqRequirementChips(
-                subject: question.subject,
-                requiredSchoolTier: question.requiredSchoolTier,
-                requiredMajorCategory: question.requiredMajorCategory,
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: <Widget>[
-                  if (question.createdAt != null)
-                    Text(
-                      Formatters.relativeKorean(question.createdAt!),
-                      style: AppTypography.caption,
-                    ),
-                  if (remaining != null) ...<Widget>[
-                    const SizedBox(width: 8),
-                    Text(remaining, style: AppTypography.caption),
-                  ],
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -130,8 +127,8 @@ class IqOpenQuestionCard extends StatelessWidget {
       IndividualQuestionStatus.open,
     );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -144,7 +141,7 @@ class IqOpenQuestionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               question.title.isEmpty ? '(제목 없음)' : question.title,
-              style: AppTypography.body,
+              style: AppTypography.bodyStrong,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -156,7 +153,7 @@ class IqOpenQuestionCard extends StatelessWidget {
             ),
             if (remaining != null) ...<Widget>[
               const SizedBox(height: 6),
-              Text(remaining, style: AppTypography.caption),
+              Text(remaining, style: AppTypography.meta),
             ],
             const SizedBox(height: 10),
             Align(
@@ -203,18 +200,21 @@ class IqRequirementChips extends StatelessWidget {
     final String? s = rawSubject == null ? null : subjectLabel(rawSubject);
     final String? tier = _clean(requiredSchoolTier);
     final String? major = _clean(requiredMajorCategory);
-    if (s == null && tier == null && major == null) return const SizedBox.shrink();
+    if (s == null && tier == null && major == null)
+      return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
         children: <Widget>[
-          if (s != null) AppBadge(label: s),
+          if (s != null) AppBadge(label: s, tone: AppBadgeTone.neutral),
           // 문구는 웹 작성 폼의 어휘를 그대로 쓴다('학교군'·'전공계열') —
           // 앱이 '이상'·'계열' 같은 순서·의미를 지어내면 학생이 건 조건과 어긋난다.
-          if (tier != null) AppBadge(label: '학교군 · $tier'),
-          if (major != null) AppBadge(label: '전공계열 · $major'),
+          if (tier != null)
+            AppBadge(label: '학교군 · $tier', tone: AppBadgeTone.neutral),
+          if (major != null)
+            AppBadge(label: '전공계열 · $major', tone: AppBadgeTone.neutral),
         ],
       ),
     );

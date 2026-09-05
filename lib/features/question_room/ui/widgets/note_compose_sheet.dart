@@ -5,7 +5,7 @@ import '../../../../design/tokens/app_spacing.dart';
 import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_input_field.dart';
 import '../../../../design/widgets/app_primary_button.dart';
-import '../../../../shared/widgets/v3_page.dart';
+import '../../../../design/widgets/app_blocks.dart';
 import '../../data/mentor_note_format.dart';
 
 /// 멘토 노트 작성 시트(A-5 §2-2) — 답변 전송 직후 화면 이동 없이 올라온다.
@@ -16,7 +16,7 @@ Future<String?> showNoteComposeSheet(
   required String studentName,
   String title = '답변을 보냈어요',
 }) {
-  return showV3BottomSheet<String>(
+  return showAppBottomSheet<String>(
     context,
     builder: (BuildContext sheet) =>
         _NoteComposeSheet(studentName: studentName, title: title),
@@ -63,7 +63,7 @@ class _NoteComposeSheetState extends State<_NoteComposeSheet> {
             style: AppTypography.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: AppSpacing.base),
-          V3Field(
+          AppField(
             label: '오늘 무엇이 약했나요?',
             child: AppInputField(
               controller: _weakness,
@@ -74,7 +74,7 @@ class _NoteComposeSheetState extends State<_NoteComposeSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          V3Field(
+          AppField(
             label: '다음에 어떤 유형을 풀면 좋을까요?',
             child: AppInputField(
               controller: _next,

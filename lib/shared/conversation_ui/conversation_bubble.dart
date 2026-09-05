@@ -8,10 +8,11 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../design/role_accent.dart';
-import '../../design/shape_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/role_theme.dart';
+import '../../design/tokens/app_colors.dart';
+import '../../design/tokens/app_glass.dart';
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
 
 /// 말풍선이 붙는 레이아웃 모서리.
 ///
@@ -20,30 +21,31 @@ import '../../design/typography_tokens.dart';
 /// 판정 책임을 호출부에 남겨둔다. [center] 는 작성자를 확정할 수 없을 때 쓴다.
 enum ConversationAlign { start, center, end }
 
-/// 말풍선 채움 톤. [accent] 는 현재 테마의 역할 강조색 옅은 틴트를 쓴다
-/// (학생 테마=파랑 계열, 멘토 테마=초록 계열 — 테마가 결정하며 이 계층은 모른다).
+/// 말풍선 채움 톤(design-v3 §3-2). [accent] 는 현재 역할색 불투명 채움 + 흰 글자
+/// (학생 화면=파랑, 멘토 화면=초록 — 테마가 결정하며 이 계층은 모른다),
+/// [neutral] 은 유리 패널 실효색(불투명) + 링 + 본문색.
 enum ConversationTone { neutral, accent }
 
 /// 대화 표면의 고정 기하값. 화면마다 매직 넘버가 흩어지지 않도록 한 곳에 모은다.
 abstract final class ConversationMetrics {
-  /// 말풍선 최대 폭 = 화면 폭 × 이 비율.
-  static const double maxWidthFactor = 0.72;
+  /// 말풍선 최대 폭 = 화면 폭 × 이 비율(수식·사진이 섞이므로 넓게 — §3-2).
+  static const double maxWidthFactor = 0.8;
 
   /// 보낸 쪽 아래 모서리만 각지게 만드는 '꼬리' 반경.
   static const double tailRadius = 4;
 
   /// 말풍선 내부 여백.
   static const EdgeInsets padding =
-      EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+      EdgeInsets.symmetric(horizontal: 14, vertical: 12);
 
   /// 말풍선 사이 세로 간격.
-  static const double gap = 10;
+  static const double gap = 14;
 
   /// 본문과 첨부 사이 간격.
-  static const double attachmentGap = 8;
+  static const double attachmentGap = 10;
 
   /// 본문 줄 높이.
-  static const double bodyHeight = 1.35;
+  static const double bodyHeight = 1.5;
 }
 
 class ConversationBubble extends StatelessWidget {
@@ -94,13 +96,16 @@ class ConversationBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = tone == ConversationTone.accent
-        ? AppAccent.of(context).accentSoft
-        : ColorTokens.elevated;
+    final bool accent = tone == ConversationTone.accent;
+    // ★ 둘 다 불투명 — 뒤 배경·첨부가 비쳐 글자 대비가 흔들리지 않게(A-6b 3번).
+    final Color bg = accent ? RoleTheme.of(context).color : AppColors.glass;
+    final Color fg = accent ? Colors.white : AppColors.textPrimary;
+    final Color fgSoft =
+        accent ? Colors.white.withValues(alpha: 0.82) : AppColors.textSecondary;
     final double maxBubbleWidth =
         MediaQuery.sizeOf(context).width * ConversationMetrics.maxWidthFactor;
 
-    const Radius r = Radius.circular(AppShape.card);
+    const Radius r = Radius.circular(AppRadius.card);
     const Radius tail = Radius.circular(ConversationMetrics.tailRadius);
     final BorderRadius bubbleRadius = BorderRadius.only(
       topLeft: r,
@@ -109,8 +114,12 @@ class ConversationBubble extends StatelessWidget {
       bottomRight: _isEnd ? tail : r,
     );
 
-    final Widget? time =
-        timeLabel == null ? null : Text(timeLabel!, style: AppType.caption);
+    final Widget? time = timeLabel == null
+        ? null
+        : Text(
+            timeLabel!,
+            style: AppTypography.meta.copyWith(fontSize: 11),
+          );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ConversationMetrics.gap),
@@ -127,20 +136,31 @@ class ConversationBubble extends StatelessWidget {
             child: Container(
               constraints: BoxConstraints(maxWidth: maxBubbleWidth),
               padding: ConversationMetrics.padding,
-              decoration: BoxDecoration(color: bg, borderRadius: bubbleRadius),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: bubbleRadius,
+                border: accent ? null : Border.all(color: AppColors.ring),
+                boxShadow: accent
+                    ? null
+                    : const <BoxShadow>[AppGlass.panelShadow],
+              ),
               child: Column(
                 crossAxisAlignment:
                     _isEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (authorLabel != null) ...<Widget>[
-                    Text(authorLabel!, style: AppType.caption),
+                    Text(
+                      authorLabel!,
+                      style: AppTypography.meta.copyWith(color: fgSoft),
+                    ),
                     const SizedBox(height: 4),
                   ],
                   if (titleLabel != null) ...<Widget>[
                     Text(
                       titleLabel!,
-                      style: AppType.cardTitle.copyWith(
+                      style: AppTypography.bodyStrong.copyWith(
+                        color: fg,
                         height: ConversationMetrics.bodyHeight,
                       ),
                     ),
@@ -149,8 +169,8 @@ class ConversationBubble extends StatelessWidget {
                   if (body.isNotEmpty)
                     Text(
                       body,
-                      style: AppType.body.copyWith(
-                        color: ColorTokens.primary,
+                      style: AppTypography.body.copyWith(
+                        color: fg,
                         height: ConversationMetrics.bodyHeight,
                       ),
                     ),

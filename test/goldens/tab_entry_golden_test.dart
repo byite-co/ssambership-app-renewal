@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/app/home_shell.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
@@ -8,7 +8,6 @@ import 'package:ssambership_app/features/individual_question/ui/student_iq_list_
 import 'package:ssambership_app/features/mentors/mentors_screen.dart';
 import 'package:ssambership_app/features/notifications/data/notification_badge_controller.dart';
 import 'package:ssambership_app/features/notifications/notifications_screen.dart';
-import 'package:ssambership_app/shared/constants/app_constants.dart';
 
 import 'golden_app_fakes.dart';
 import 'golden_fixtures.dart';
@@ -18,16 +17,14 @@ import 'tab_entry_golden_fakes.dart';
 /// A-2의 student_room_list·mentor_inbox 두 장이 각 역할의 질문방 진입 화면을
 /// 이미 고정한다. 이 파일은 나머지 8개(역할별 4개)를 채워 5×2 표면을 완성한다.
 void main() {
-  Widget frame(String title, Widget child) => Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: child,
-      );
+  // 탭 본문은 홈 셸과 같은 껍데기(배경·유리 앱바·유리 탭바)로 그린다.
+  Widget frame(AppRole role, int index, Widget child) =>
+      goldenTabFrame(role: role, selectedIndex: index, child: child);
 
   testWidgets('golden: student_iq_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.studentBottomTabLabels[1],
+      frame(AppRole.student, 1,
         StudentIqListScreen(
           embedded: true,
           loaderOverride: () async => goldenStudentIndividualQuestions(),
@@ -47,8 +44,7 @@ void main() {
   testWidgets('golden: student_mentors_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.studentBottomTabLabels[2],
+      frame(AppRole.student, 2,
         MentorsScreen(
           directory: GoldenMentorDirectory(goldenMentorDirectoryItems()),
           favorites: const GoldenMentorFavorites(
@@ -70,8 +66,7 @@ void main() {
   testWidgets('golden: student_community_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.studentBottomTabLabels[3],
+      frame(AppRole.student, 3,
         CommunityScreen(
           read: GoldenCommunityRead(
             boardsList: goldenBoards(),
@@ -97,8 +92,7 @@ void main() {
     );
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.studentBottomTabLabels[4],
+      frame(AppRole.student, 4,
         NotificationsScreen(
           repository: notifications,
           badge: NotificationBadgeController(repository: notifications),
@@ -119,8 +113,7 @@ void main() {
   testWidgets('golden: mentor_iq_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.mentorBottomTabLabels[1],
+      frame(AppRole.mentor, 1,
         MentorIqListScreen(
           embedded: true,
           loaderOverride: () async => MentorIqListData(
@@ -144,8 +137,7 @@ void main() {
   testWidgets('golden: mentor_settlements_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.mentorBottomTabLabels[2],
+      frame(AppRole.mentor, 2,
         const MentorSettlementsTabBody(),
       ),
       role: AppRole.mentor,
@@ -163,8 +155,7 @@ void main() {
   testWidgets('golden: mentor_community_tab', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.mentorBottomTabLabels[3],
+      frame(AppRole.mentor, 3,
         CommunityScreen(
           read: GoldenCommunityRead(
             boardsList: goldenBoards(),
@@ -190,8 +181,7 @@ void main() {
     );
     await pumpGoldenScreen(
       tester,
-      frame(
-        AppConstants.mentorBottomTabLabels[4],
+      frame(AppRole.mentor, 4,
         NotificationsScreen(
           repository: notifications,
           badge: NotificationBadgeController(repository: notifications),

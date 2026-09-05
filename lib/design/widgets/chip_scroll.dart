@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import '../role_accent.dart';
-import '../shape_tokens.dart';
-import '../tokens/color_tokens.dart';
 
-/// 가로 스크롤 칩 행(멘토 전환 칩 등). 활성 칩은 accent-tint, 비활성은 중립.
+import '../role_theme.dart';
+import '../tokens/app_colors.dart';
+import '../tokens/app_glass.dart';
+import '../tokens/app_spacing.dart';
+import '../tokens/app_typography.dart';
+
+/// 가로 스크롤 칩 행(필터·탭 전환). 활성 칩은 역할 틴트 + 역할색 글자, 비활성은
+/// 유리 안쪽 채움 + 링(design-v3 §5-2 '수학 · 고등 · 10만원 이하').
 /// 라벨은 한글만(영문 코드 노출 금지).
 class ChipScroll extends StatelessWidget {
   const ChipScroll({
@@ -27,6 +31,7 @@ class ChipScroll extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: padding,
+      clipBehavior: Clip.none,
       child: Row(
         children: <Widget>[
           for (int i = 0; i < labels.length; i++)
@@ -53,25 +58,33 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final RoleAccent ra = AppAccent.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppShape.pillRadius,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? ra.accentSoft : ColorTokens.surface,
-          borderRadius: AppShape.pillRadius,
-          border: Border.all(
-            color: active ? ra.accent : ColorTokens.border,
-          ),
+    final RoleTheme roleTheme = RoleTheme.of(context);
+    final BorderRadius radius = BorderRadius.circular(AppRadius.input);
+    return Material(
+      color: active
+          ? roleTheme.tint
+          : Colors.white.withValues(alpha: AppGlass.innerFill),
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: active
+              ? roleTheme.color.withValues(alpha: 0.35)
+              : AppColors.ring,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? ra.accent : ColorTokens.secondary,
-            fontSize: 13,
-            fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            label,
+            // 스타일 계약: 활성 w800 · 비활성 w600(board_filter_chip_test 가 읽는다).
+            style: AppTypography.caption.copyWith(
+              color: active ? roleTheme.color : AppColors.textSecondary,
+              fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              height: 1.2,
+            ),
           ),
         ),
       ),

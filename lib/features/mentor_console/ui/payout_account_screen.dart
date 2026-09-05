@@ -10,7 +10,8 @@ import '../../../design/widgets/glass_card.dart';
 import '../../../design/widgets/glass_inner.dart';
 import '../../../design/role_theme.dart';
 import '../../../shared/errors/friendly_error.dart';
-import '../../../shared/widgets/v3_page.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_blocks.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
 import '../data/payout_bank_allowlist.dart';
@@ -92,7 +93,7 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
   bool get _canSubmit => !_saving && _bank != null && _accountValid;
 
   Future<void> _pickBank() async {
-    final String? picked = await showV3BottomSheet<String>(
+    final String? picked = await showAppBottomSheet<String>(
       context,
       builder: (BuildContext ctx) => _BankPickerSheet(selected: _bank),
     );
@@ -128,16 +129,16 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return V3Page(
+    return AppPage(
       title: '정산 계좌',
       body: FutureBuilder<_PayoutAccountLoad>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<_PayoutAccountLoad> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const V3LoadingView(cards: 2);
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError || snap.data == null) {
-            return V3ErrorView(
+            return AppErrorView(
               title: '계좌 정보를 불러오지 못했어요',
               message: friendlyError(snap.error ?? ''),
               onRetry: _retry,
@@ -155,17 +156,17 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
         ? null
         : '계좌번호는 숫자 8~24자리로 입력해 주세요.';
     return ListView(
-      padding: V3Page.contentPadding(context),
+      padding: AppPage.contentPadding(context),
       children: <Widget>[
         if (current.registered)
-          V3Callout(
-            tone: V3CalloutTone.success,
+          AppCallout(
+            tone: AppCalloutTone.success,
             title: '등록된 계좌',
             text: '${current.bankName} ${current.accountMasked}',
           )
         else
-          const V3Callout(
-            tone: V3CalloutTone.warning,
+          const AppCallout(
+            tone: AppCalloutTone.warning,
             title: '아직 계좌가 없어요',
             text: '계좌를 등록하지 않으면 매달 23일 지급이 다음 달로 미뤄져요.',
           ),
@@ -174,12 +175,12 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              V3Field(
+              AppField(
                 label: '은행',
                 child: _BankSelectRow(bank: _bank, onTap: _saving ? null : _pickBank),
               ),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
+              AppField(
                 label: '계좌번호',
                 help: '숫자만 8~24자리 · 하이픈 없이 입력해요',
                 error: accountError,
@@ -191,7 +192,7 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.base),
-              V3Field(
+              AppField(
                 label: '예금주',
                 help: '본인 실명으로 고정돼요. 다른 사람 계좌는 등록할 수 없어요.',
                 child: GlassInner(
@@ -225,7 +226,7 @@ class _PayoutAccountScreenState extends State<PayoutAccountScreen> {
         ),
         if (_saveError != null) ...<Widget>[
           const SizedBox(height: 12),
-          V3Callout(tone: V3CalloutTone.danger, text: _saveError!),
+          AppCallout(tone: AppCalloutTone.danger, text: _saveError!),
         ],
         const SizedBox(height: AppSpacing.section),
         AppPrimaryButton(

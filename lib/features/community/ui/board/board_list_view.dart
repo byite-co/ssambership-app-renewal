@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
 import '../../../../design/widgets/chip_scroll.dart';
-import '../../../../design/widgets/empty_state.dart';
 import '../../data/community_labels.dart';
 import '../../data/community_models.dart';
 import '../../data/community_paginator.dart';
@@ -90,8 +91,10 @@ class BoardListViewState extends State<BoardListView> {
       builder: (BuildContext context, _) => Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenH, 10, AppSpacing.screenH, 8),
             child: ChipScroll(
+              padding: EdgeInsets.zero,
               labels: labels,
               selectedIndex: selected < 0 ? 0 : selected,
               onSelected: (int i) => _selectCategory(
@@ -109,21 +112,18 @@ class BoardListViewState extends State<BoardListView> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_pager.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('글을 불러오지 못했어요.\n${friendlyError(_pager.error!)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: ColorTokens.danger)),
-        ),
+      return AppErrorView(
+        title: '글을 불러오지 못했어요',
+        message: friendlyError(_pager.error!),
+        onRetry: () => _pager.refresh(),
       );
     }
     final List<BoardPost> posts = _pager.items;
     if (posts.isEmpty) {
-      return const EmptyState(
+      return const AppEmptyState(
         icon: Icons.forum_rounded,
         title: '아직 글이 없어요',
-        message: '이 분류에는 글이 없어요.',
+        description: '이 분류에는 글이 없어요.',
       );
     }
     // §4: 외부(웹·관리자) 변경 반영용 pull-to-refresh — 세대 토큰이 있는
@@ -132,11 +132,12 @@ class BoardListViewState extends State<BoardListView> {
       onRefresh: () => _pager.refresh(),
       child: ListView.separated(
         controller: _scroll,
+        clipBehavior: Clip.none,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH, 4, AppSpacing.screenH, 88),
+        // 하단 88 = 글쓰기 FAB 자리.
+        padding: AppPage.contentPadding(context, top: 4, bottom: 88),
         itemCount: posts.length + (_pager.hasMore ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.listGap),
         itemBuilder: (BuildContext context, int i) {
           if (i >= posts.length) {
             // 다음 페이지 로딩 인디케이터(끝에 도달 시 자동 로드).

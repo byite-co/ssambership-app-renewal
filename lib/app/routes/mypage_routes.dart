@@ -15,6 +15,7 @@ import '../app_route_paths.dart';
 import '../app_scope.dart';
 import '../app_tabs.dart';
 import '../async_route_loader.dart';
+import '../../design/widgets/app_page.dart';
 
 /// My-page routes are added one destination at a time during A-3.
 List<RouteBase> buildMyPageRoutes() => <RouteBase>[
@@ -81,24 +82,22 @@ class MyPageRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isMentor =
         AppScope.of(context).auth.currentRole == AppRole.mentor;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppConstants.myPageTitle),
-        actions: <Widget>[
-          // A-4a: 멘토는 마이페이지에서도 정산 허브로 들어간다. 본문(MyPageScreen)은
-          // 골든 고정이라 AppBar 액션으로만 진입점을 더한다.
-          if (isMentor)
-            IconButton(
-              tooltip: MentorSettlementScreen.entryTooltip,
-              icon: const Icon(Icons.receipt_long_rounded),
-              onPressed: () => AppNavigation.push<void>(
-                context,
-                AppRoutePaths.settlementHistory,
-                fallbackBuilder: (_) => const MentorSettlementScreen(),
-              ),
+    return AppPage(
+      title: AppConstants.myPageTitle,
+      actions: <Widget>[
+        // A-4a: 멘토는 마이페이지에서도 정산 허브로 들어간다. 본문(MyPageScreen)은
+        // 골든 고정이라 AppBar 액션으로만 진입점을 더한다.
+        if (isMentor)
+          IconButton(
+            tooltip: MentorSettlementScreen.entryTooltip,
+            icon: const Icon(Icons.receipt_long_rounded),
+            onPressed: () => AppNavigation.push<void>(
+              context,
+              AppRoutePaths.settlementHistory,
+              fallbackBuilder: (_) => const MentorSettlementScreen(),
             ),
-        ],
-      ),
+          ),
+      ],
       body: MyPageScreen(
         loaderOverride: loaderOverride,
         onOpenQuestionsTab: () => AppNavigation.complete<String>(

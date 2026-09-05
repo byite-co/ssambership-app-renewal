@@ -80,7 +80,8 @@ class IndividualQuestionRepository {
 
   /// 멘토: 수락 대기 중인 공개형 질문(위생 RPC — 본문·학생 정보 없음).
   /// 승인 멘토가 아니면 빈 목록이 온다(RPC 내부 게이트).
-  Future<List<OpenIndividualQuestion>> listOpenForMentor({int limit = 50}) async {
+  Future<List<OpenIndividualQuestion>> listOpenForMentor(
+      {int limit = 50}) async {
     final dynamic res = await _client.rpc(
       'list_open_individual_questions_for_mentor',
       params: <String, dynamic>{'p_limit': limit},

@@ -8,12 +8,16 @@ import '../../../core/ink/ink_document.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../core/scan/image_downscaler.dart';
 import '../../../shared/conversation_ui/conversation_bubble.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/tokens/typography.dart';
+import '../../../design/tokens/app_colors.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_badge.dart';
-import '../../../design/widgets/primary_button.dart';
-import '../../../design/widgets/secondary_button.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_input_field.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/app_secondary_button.dart';
+import '../../../design/widgets/glass_surface.dart';
 import '../../../shared/format/formatters.dart';
 import '../../../core/scan/picked_image.dart';
 import '../../../core/scan/scan_source_picker.dart';
@@ -220,6 +224,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       widget.urlResolverOverride ?? IqAttachmentUrlResolver.supabase();
 
   late Future<IqDetailData> _future;
+
   /// 마지막으로 관측한 타임라인 항목 수 — 증가할 때만 끝으로 수렴한다(QA-C8).
   int _lastTimelineCount = 0;
   bool _busy = false;
@@ -612,9 +617,8 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (result == null || !mounted) return;
 
     final int dot = background.fileName.lastIndexOf('.');
-    final String base = dot <= 0
-        ? background.fileName
-        : background.fileName.substring(0, dot);
+    final String base =
+        dot <= 0 ? background.fileName : background.fileName.substring(0, dot);
     final PickedImage flattened = await downscaleIfOversized(PickedImage(
       bytes: result.flattenedPng,
       fileName: '$base-ink.png',
@@ -806,23 +810,19 @@ class _IqDetailScreenState extends State<IqDetailScreen>
         }
         _confirmLeaveWithPending();
       },
-      child: Scaffold(
-        appBar: AppBar(title: const Text('개별질문')),
+      child: AppPage(
+        title: '개별질문',
         body: FutureBuilder<IqDetailData>(
           future: _future,
           builder: (BuildContext context, AsyncSnapshot<IqDetailData> snap) {
             if (snap.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const AppLoadingView();
             }
             if (snap.hasError || snap.data == null) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                      '질문을 불러오지 못했어요.\n${friendlyError(snap.error ?? '')}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: ColorTokens.danger)),
-                ),
+              return AppErrorView(
+                title: '질문을 불러오지 못했어요',
+                message: friendlyError(snap.error ?? ''),
+                onRetry: () => _refresh(),
               );
             }
             final IqDetailData data = snap.data!;
@@ -920,6 +920,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
               final IqAttachmentGroups groups = data.groups;
               return ListView(
                 controller: _timelineScroll,
+                clipBehavior: Clip.none,
                 padding: const EdgeInsets.fromLTRB(
                     AppSpacing.screenH, 12, AppSpacing.screenH, 12),
                 children: <Widget>[
@@ -964,8 +965,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.screenH, 10, AppSpacing.screenH, 10),
       decoration: const BoxDecoration(
-        color: ColorTokens.page,
-        border: Border(bottom: BorderSide(color: ColorTokens.border)),
+        border: Border(bottom: BorderSide(color: AppColors.ring)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -978,20 +978,20 @@ class _IqDetailScreenState extends State<IqDetailScreen>
               IqStatusPill(status: q.status),
               if (remaining != null) ...<Widget>[
                 const Spacer(),
-                Text(remaining, style: AppTypography.caption),
+                Text(remaining, style: AppTypography.captionSecondary),
               ],
             ],
           ),
           const SizedBox(height: 8),
           Text(
             q.title.isEmpty ? '(제목 없음)' : q.title,
-            style: AppTypography.cardTitle,
+            style: AppTypography.bodyStrong,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           if (meta.isNotEmpty) ...<Widget>[
             const SizedBox(height: 2),
-            Text(meta.join(' · '), style: AppTypography.caption),
+            Text(meta.join(' · '), style: AppTypography.captionSecondary),
           ],
           // [QA-B6] 과목·요구 학교군·요구 계열 — 목록·상세 어디에도 없던 값이다.
           IqRequirementChips(
@@ -1051,10 +1051,9 @@ class _IqDetailScreenState extends State<IqDetailScreen>
                 urlResolver: _urlResolver,
                 // 첨삭 진입은 멘토만(§3) — 학생 작성 첨부 + 활성 상태
                 // (assigned/claimed/**answered** — 해결 완료 전까지, §4-1).
-                onAnnotate:
-                    _canAnnotateGroup(q, IqMessageAuthor.student)
-                        ? _annotateAttachment
-                        : null,
+                onAnnotate: _canAnnotateGroup(q, IqMessageAuthor.student)
+                    ? _annotateAttachment
+                    : null,
                 // §6: 당사자 저장(다운로드) — RLS 가 당사자 외 접근을 차단한다.
                 onSave: _saveAttachment,
               ),
@@ -1093,9 +1092,8 @@ class _IqDetailScreenState extends State<IqDetailScreen>
                 attachments: attachments,
                 urlResolver: _urlResolver,
                 // 학생 메시지의 이미지에만 멘토 첨삭 진입(§4-1).
-                onAnnotate: _canAnnotateGroup(q, author)
-                    ? _annotateAttachment
-                    : null,
+                onAnnotate:
+                    _canAnnotateGroup(q, author) ? _annotateAttachment : null,
                 onSave: _saveAttachment,
               ),
             ],
@@ -1164,12 +1162,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
   /// 하단 고정 영역 — 타임라인과 시각적으로 분리된 흰 띠 + 시스템 제스처
   /// 안전영역. 키보드는 Scaffold(resizeToAvoidBottomInset 기본값)가 밀어올린다.
   Widget _bottomArea(List<Widget> children) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: ColorTokens.page,
-        border: Border(top: BorderSide(color: ColorTokens.border)),
-      ),
+    return GlassSurface.bar(
       child: SafeArea(
         top: false,
         child: Padding(
@@ -1190,18 +1183,18 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (iqAwaitingAnswer(q.status)) {
       out.add(const Text(
         '질문이 전달됐어요. 안전 보관 중인 캐시는 해결 완료를 누르기 전까지 보관돼요.',
-        style: AppTypography.caption,
+        style: AppTypography.captionSecondary,
       ));
       out.add(const SizedBox(height: 10));
     }
     if (iqCanStudentRelease(q.status)) {
-      out.add(PrimaryButton(
+      out.add(AppPrimaryButton(
         label: '해결 완료 (멘토에게 정산)',
         onPressed: _busy ? null : _release,
       ));
     }
     if (iqCanStudentRefund(q.status)) {
-      out.add(SecondaryButton(
+      out.add(AppSecondaryButton(
         label: '질문 취소 (캐시 환불)',
         onPressed: _busy ? null : _refund,
       ));
@@ -1209,7 +1202,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     if (q.status == IndividualQuestionStatus.released) {
       out.add(const Text(
         '해결 완료했어요. 안전 보관 중이던 캐시가 멘토에게 정산됐어요.',
-        style: AppTypography.caption,
+        style: AppTypography.captionSecondary,
       ));
     }
     // §H: 학생 후속 메시지 컴포저(iq_append_message) — 종결 전 구간에만.
@@ -1221,7 +1214,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
     // 환불·만료·취소 종결 안내 — 하단 영역이 빈 띠로 남지 않게 한다.
     final String? notice = iqReadOnlyNotice(q.status);
     if (notice != null) {
-      out.add(Text(notice, style: AppTypography.caption));
+      out.add(Text(notice, style: AppTypography.captionSecondary));
     }
     return out;
   }
@@ -1240,15 +1233,11 @@ class _IqDetailScreenState extends State<IqDetailScreen>
             onPressed: _busy ? null : _pickPendingAttachment,
           ),
           Expanded(
-            child: TextField(
+            child: AppInputField(
               controller: _chatController,
+              hintText: hint,
               minLines: 1,
               maxLines: 4,
-              decoration: InputDecoration(
-                hintText: hint,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1275,7 +1264,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
               p.error == null ? Icons.attach_file : Icons.error_outline_rounded,
               size: 18,
               color:
-                  p.error == null ? ColorTokens.secondary : ColorTokens.danger,
+                  p.error == null ? AppColors.textSecondary : AppColors.danger,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1284,13 +1273,13 @@ class _IqDetailScreenState extends State<IqDetailScreen>
                 children: <Widget>[
                   Text(
                     '${p.file.fileName} (${_formatBytes(p.file.bytes.length)})',
-                    style: AppTypography.caption,
+                    style: AppTypography.captionSecondary,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (p.error != null)
                     Text(p.error!,
-                        style: AppTypography.caption
-                            .copyWith(color: ColorTokens.danger)),
+                        style: AppTypography.captionSecondary
+                            .copyWith(color: AppColors.danger)),
                 ],
               ),
             ),
@@ -1333,7 +1322,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       if (q.status == IndividualQuestionStatus.answered) {
         return <Widget>[
           const Text('답변을 등록했어요. 학생이 해결 완료하면 정산 예정으로 잡혀요.',
-              style: AppTypography.caption),
+              style: AppTypography.captionSecondary),
           // §H: 첫 답변 이후 추가 답글은 당사자 공용 경로(iq_append_message).
           // 첨부·첨삭본 대기열도 여기서 이어진다(answered 구간 첨삭 §4-1,
           // 첫 답변 첨부 실패분 재시도 포함).
@@ -1345,29 +1334,25 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       }
       if (q.status == IndividualQuestionStatus.released) {
         return const <Widget>[
-          Text('정산이 완료된 질문이에요.', style: AppTypography.caption),
+          Text('정산이 완료된 질문이에요.', style: AppTypography.captionSecondary),
         ];
       }
       final String? notice = iqReadOnlyNotice(q.status);
       if (notice != null) {
-        return <Widget>[Text(notice, style: AppTypography.caption)];
+        return <Widget>[Text(notice, style: AppTypography.captionSecondary)];
       }
       return const <Widget>[];
     }
     return <Widget>[
-      const Text('답변 작성', style: AppTypography.caption),
+      const Text('답변 작성', style: AppTypography.captionSecondary),
       const SizedBox(height: 8),
-      TextField(
+      AppInputField(
         controller: _answerController,
         // 하단 고정 컴포저 — 짧은 뷰포트(가로 모드)에서도 타임라인이 남게
         // 낮게 시작하고, 길어지면 내부 스크롤로 늘어난다(카드 시절 4~10줄).
         minLines: 2,
         maxLines: 5,
-        decoration: const InputDecoration(
-          hintText: '학생이 이해할 수 있게 풀이 과정을 함께 적어 주세요.',
-          border: OutlineInputBorder(),
-          isDense: true,
-        ),
+        hintText: '학생이 이해할 수 있게 풀이 과정을 함께 적어 주세요.',
       ),
       // §6·§2-2: 답변 첨부(이미지·카메라·파일)와 첨삭본 — 대기열에 쌓였다가
       // 답변 등록이 돌려준 message_id 로 등록된다. 실패분은 아래 목록에 남아
@@ -1377,7 +1362,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
       Row(
         children: <Widget>[
           Expanded(
-            child: SecondaryButton(
+            child: AppSecondaryButton(
               label: '파일 첨부',
               icon: Icons.attach_file,
               onPressed: _busy ? null : _pickPendingAttachment,
@@ -1385,7 +1370,7 @@ class _IqDetailScreenState extends State<IqDetailScreen>
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: PrimaryButton(
+            child: AppPrimaryButton(
               label: '답변 등록',
               onPressed: _busy ? null : _submitAnswer,
             ),
@@ -1497,7 +1482,7 @@ class _IqAttachmentGroupState extends State<_IqAttachmentGroup> {
                 }
                 if (snap.hasError || snap.data == null) {
                   return const Text('이미지를 불러오지 못했어요.',
-                      style: AppTypography.caption);
+                      style: AppTypography.captionSecondary);
                 }
                 return GestureDetector(
                   onTap: () => Navigator.of(context).push<void>(
@@ -1518,7 +1503,7 @@ class _IqAttachmentGroupState extends State<_IqAttachmentGroup> {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const Text(
                         '이미지를 불러오지 못했어요.',
-                        style: AppTypography.caption,
+                        style: AppTypography.captionSecondary,
                       ),
                     ),
                   ),
@@ -1549,7 +1534,7 @@ class _IqAttachmentGroupState extends State<_IqAttachmentGroup> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 const Icon(Icons.attach_file,
-                    size: 18, color: ColorTokens.secondary),
+                    size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(

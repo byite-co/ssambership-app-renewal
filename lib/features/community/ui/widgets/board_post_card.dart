@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/shape_tokens.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../../../design/widgets/app_badge.dart';
-import '../../../../design/widgets/app_card.dart';
+import '../../../../design/widgets/glass_card.dart';
 import '../../../../design/widgets/initial_avatar.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../data/community_labels.dart';
@@ -79,10 +79,11 @@ class _BoardPostCardState extends State<BoardPostCard> {
 
   /// 미리보기 실패·로딩용 중립 영역 — 문구·원문 정보 없이 아이콘만.
   Widget _neutralBox() {
-    return const ColoredBox(
-      color: ColorTokens.elevated,
-      child: Center(
-        child: Icon(Icons.image_outlined, size: 28, color: ColorTokens.muted),
+    return ColoredBox(
+      color: AppColors.navy.withValues(alpha: 0.07),
+      child: const Center(
+        child: Icon(Icons.image_outlined,
+            size: 28, color: AppColors.textSecondary),
       ),
     );
   }
@@ -92,7 +93,7 @@ class _BoardPostCardState extends State<BoardPostCard> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: ClipRRect(
-        borderRadius: AppShape.inputRadius,
+        borderRadius: BorderRadius.circular(AppRadius.input),
         child: SizedBox(
           key: const ValueKey<String>('board-card-thumb'),
           height: 160,
@@ -111,8 +112,8 @@ class _BoardPostCardState extends State<BoardPostCard> {
                 // 로드 실패도 이 영역 안에서 끝난다(카드 전체 미전파).
                 errorBuilder: (BuildContext c, Object e, StackTrace? s) =>
                     _neutralBox(),
-                loadingBuilder: (BuildContext c, Widget child,
-                    ImageChunkEvent? progress) {
+                loadingBuilder:
+                    (BuildContext c, Widget child, ImageChunkEvent? progress) {
                   if (progress == null) return child;
                   return _neutralBox();
                 },
@@ -128,7 +129,7 @@ class _BoardPostCardState extends State<BoardPostCard> {
   Widget build(BuildContext context) {
     final BoardPost post = widget.post;
     final Future<Uri?>? thumb = _thumb;
-    return AppCard(
+    return GlassCard(
       onTap: widget.onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,15 +138,16 @@ class _BoardPostCardState extends State<BoardPostCard> {
           if (thumb != null) _preview(thumb),
           Row(
             children: <Widget>[
-              AppBadge(label: communityCategoryLabel(post.category), tinted: true),
+              AppBadge(
+                  label: communityCategoryLabel(post.category), tinted: true),
               const Spacer(),
               Text(Formatters.relativeKorean(post.createdAt),
-                  style: AppType.caption),
+                  style: AppTypography.meta),
             ],
           ),
           const SizedBox(height: 8),
           Text(post.title,
-              style: AppType.title,
+              style: AppTypography.bodyStrong.copyWith(fontSize: 16),
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 10),
@@ -153,11 +155,12 @@ class _BoardPostCardState extends State<BoardPostCard> {
             children: <Widget>[
               InitialAvatar(name: post.authorName, size: 22, tinted: false),
               const SizedBox(width: 6),
-              Text(post.authorName, style: AppType.caption),
+              Text(post.authorName, style: AppTypography.captionSecondary),
               const Spacer(),
               _Metric(icon: Icons.favorite_border, value: post.likeCount),
               const SizedBox(width: 12),
-              _Metric(icon: Icons.mode_comment_outlined, value: post.commentCount),
+              _Metric(
+                  icon: Icons.mode_comment_outlined, value: post.commentCount),
             ],
           ),
         ],
@@ -176,9 +179,9 @@ class _Metric extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(icon, size: 15, color: ColorTokens.muted),
+        Icon(icon, size: 15, color: AppColors.textSecondary),
         const SizedBox(width: 3),
-        Text('$value', style: AppType.caption),
+        Text('$value', style: AppTypography.captionSecondary),
       ],
     );
   }

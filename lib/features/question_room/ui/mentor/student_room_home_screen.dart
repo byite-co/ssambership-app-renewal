@@ -4,11 +4,13 @@ import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/entitlement/subscription_summary.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_page.dart';
 import '../../../../design/widgets/status_pill.dart';
-import '../../../../shared/format/formatters.dart';
+import '../../../../shared/errors/friendly_error.dart';
+import '../../../../shared/labels/subscription_copy.dart';
 import '../../data/models/connection_note.dart';
 import '../../data/models/question_thread.dart';
 import '../../data/models/room.dart';
@@ -18,11 +20,10 @@ import '../connection_notes_screen.dart';
 import '../widgets/entrance_card.dart';
 import '../widgets/thread_status_pill.dart';
 import 'mentor_question_list_screen.dart';
-import '../../../../shared/errors/friendly_error.dart';
 
 /// 멘토 질문방 2뎁스 = 학생방 홈. S4 멘토방 홈의 거울상(멘토 시점).
 ///
-/// 얇은 헤더(학생명 · 구독 상태) + 동등한 두 입구:
+/// 얇은 헤더(구독 문장) + 동등한 두 입구:
 ///  ① 질문 / 답변 — 답변 대기 건수 + 최근 질문 미리보기.
 ///  ② 연결노트 — 내(멘토) 노트 최근 1줄 + 학생 메모 미리보기.
 class StudentRoomHomeScreen extends StatefulWidget {
@@ -90,34 +91,33 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.studentName)),
+    return AppPage(
+      title: widget.studentName,
       body: FutureBuilder<_StudentHomeData>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<_StudentHomeData> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingView(cards: 2);
           }
           if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
+            return AppErrorView(
+              message: friendlyError(snap.error!),
+              onRetry: _refresh,
             );
           }
           final _StudentHomeData d = snap.data!;
-          // 학생 이름은 AppBar 제목에 이미 있으므로 본문 헤더에서는 중복 표시하지 않는다.
-          final Widget? header = _header(d.sub);
+          // 학생 이름은 앱바 제목에 이미 있으므로 본문에는 구독 문장만 둔다.
+          final String? header = SubscriptionCopy.subscriptionSentence(d.sub);
           return ListView(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+            clipBehavior: Clip.none,
+            padding: AppPage.contentPadding(context),
             children: <Widget>[
               if (header != null) ...<Widget>[
-                header,
-                const SizedBox(height: AppSpacing.section),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                  child: Text(header, style: AppTypography.captionSecondary),
+                ),
+                const SizedBox(height: AppSpacing.s12),
               ],
               EntranceCard(
                 icon: Icons.forum_rounded,
@@ -130,13 +130,14 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
                     : null,
                 onTap: _openQuestions,
                 child: d.latestThread == null
-                    ? Text('아직 받은 질문이 없어요.', style: AppType.caption)
+                    ? const Text('아직 받은 질문이 없어요.',
+                        style: AppTypography.captionSecondary)
                     : Row(
                         children: <Widget>[
                           Expanded(
                             child: Text(
                               _threadTitle(d.latestThread!),
-                              style: AppType.body,
+                              style: AppTypography.body,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -146,7 +147,7 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
                         ],
                       ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.listGap),
               EntranceCard(
                 icon: Icons.sticky_note_2_outlined,
                 title: '연결노트',
@@ -160,40 +161,30 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
     );
   }
 
-  /// 구독 상태 한 줄(학생 이름은 AppBar 제목과 중복이라 제외). 표시할 게 없으면 null.
-  Widget? _header(SubscriptionSummary? sub) {
-    final List<String> bits = <String>[
-      if (sub != null) (sub.isActive ? '구독 중' : '구독 만료'),
-      if (sub?.nextRenewal != null)
-        '다음 갱신 ${Formatters.shortDate(sub!.nextRenewal!)}',
-    ];
-    if (bits.isEmpty) return null;
-    return Text(bits.join(' · '), style: AppType.caption);
-  }
-
   Widget _notesPreview(_StudentHomeData d) {
     final String? mine = d.myNote?.body?.trim();
     final String? stu = d.studentNote?.body?.trim();
     if ((mine == null || mine.isEmpty) && (stu == null || stu.isEmpty)) {
-      return Text('아직 노트가 없어요. 내 노트를 추가해 보세요.', style: AppType.caption);
+      return const Text('아직 노트가 없어요. 내 노트를 추가해 보세요.',
+          style: AppTypography.captionSecondary);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         if (mine != null && mine.isNotEmpty) ...<Widget>[
-          Text('내 노트', style: AppType.caption),
+          const Text('내 노트', style: AppTypography.meta),
           const SizedBox(height: 2),
           Text(mine,
-              style: AppType.body,
+              style: AppTypography.body,
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
         ],
         if (stu != null && stu.isNotEmpty) ...<Widget>[
           if (mine != null && mine.isNotEmpty) const SizedBox(height: 8),
-          Text('학생 메모', style: AppType.caption),
+          const Text('학생 메모', style: AppTypography.meta),
           const SizedBox(height: 2),
           Text(stu,
-              style: AppType.body,
+              style: AppTypography.body,
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
         ],
