@@ -264,6 +264,18 @@ abstract class AppTheme {
           fontFamily: AppTypography.fontFamily,
         ),
       ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: roleColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        extendedTextStyle: AppTypography.button,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+      ),
       tabBarTheme: TabBarThemeData(
         labelColor: roleColor,
         unselectedLabelColor: AppColors.textSecondary,

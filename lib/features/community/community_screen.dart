@@ -141,16 +141,10 @@ class _CommunityScreenState extends State<CommunityScreen>
           ),
         ],
       ),
-      // 게시판 탭에서만 노출. 역할색(학생 파랑/멘토 초록)은 RoleTheme 경유.
+      // 게시판 탭에서만 노출. 역할색·모서리·그림자 0 은 테마(floatingActionButtonTheme).
       floatingActionButton: onBoardTab
           ? FloatingActionButton.extended(
               onPressed: _openWrite,
-              backgroundColor: roleTheme.color,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
               icon: const Icon(Icons.edit_rounded),
               label: const Text('작성'),
             )

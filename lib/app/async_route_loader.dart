@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../shared/errors/friendly_error.dart';
 import 'app_scope.dart';
+import '../design/widgets/app_blocks.dart';
+import '../design/widgets/app_empty_state.dart';
+import '../design/widgets/app_page.dart';
 
 typedef AsyncRouteLoad<T> = Future<T?> Function(AppDependencies dependencies);
 typedef AsyncRouteDataBuilder<T> = Widget Function(
@@ -95,37 +98,26 @@ class _AsyncRouteLoaderState<T> extends State<AsyncRouteLoader<T>> {
     );
   }
 
-  Widget _defaultLoading(BuildContext context) => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+  Widget _defaultLoading(BuildContext context) => const AppPage(
+        title: '',
+        body: AppLoadingView(),
       );
 
-  Widget _defaultNotFound(BuildContext context) => Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(widget.notFoundMessage, textAlign: TextAlign.center),
-          ),
+  Widget _defaultNotFound(BuildContext context) => AppPage(
+        title: '',
+        body: AppEmptyState(
+          icon: Icons.search_off_rounded,
+          title: widget.notFoundMessage,
+          description: '삭제됐거나 접근 권한이 없어요.',
         ),
       );
 
-  Widget _defaultError(BuildContext context, Object error) => Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  '${widget.errorMessage}\n${friendlyError(error)}',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                TextButton(onPressed: _retry, child: const Text('다시 시도')),
-              ],
-            ),
-          ),
+  Widget _defaultError(BuildContext context, Object error) => AppPage(
+        title: '',
+        body: AppErrorView(
+          title: widget.errorMessage,
+          message: friendlyError(error),
+          onRetry: _retry,
         ),
       );
 }

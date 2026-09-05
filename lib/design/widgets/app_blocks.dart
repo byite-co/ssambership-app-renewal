@@ -10,7 +10,7 @@ import 'app_skeleton.dart';
 import 'glass_bars.dart';
 import 'glass_inner.dart';
 
-/// 화면 조립용 작은 블록들 — A-4a 가 `V3Page` 옆에 두었던 것을 디자인 시스템으로 옮겼다.
+/// 화면 조립용 작은 블록들 — A-4a 가 임시 셸 옆에 두었던 것을 디자인 시스템으로 옮겼다.
 
 /// v3 글래스 바텀시트. 역할·테마는 앱 루트가 [MaterialApp] 위에 두르므로 시트
 /// 서브트리에 다시 두르지 않는다.

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
-import 'package:ssambership_app/design/theme.dart';
+import 'package:ssambership_app/app/app_chrome.dart';
+import 'package:ssambership_app/design/app_theme.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
 import 'package:ssambership_app/features/mypage/ui/account_delete_screen.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
@@ -683,7 +684,8 @@ void main() {
     }) async {
       // 화면 문구는 역할과 무관하다 — 역할은 테마로만 들어간다(학생/멘토 회귀용).
       await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.build(role),
+        // A-6b: 옛 AppTheme.build(role) → v3 AppTheme.build(role:) (역할 매핑은 앱 루트와 동일).
+        theme: AppTheme.build(role: themeRoleOf(role)),
         home: AccountDeleteScreen(
           port: port,
           pendingOverride: false,
