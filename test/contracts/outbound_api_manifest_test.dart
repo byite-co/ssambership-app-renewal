@@ -40,6 +40,12 @@ const Set<String> kExpectedRpcNames = <String>{
   'set_individual_question_price', // 개별질문 답변 단가
   'mentor_settlement_summary', // 정산 월 요약
   'mentor_settlement_lines', // 정산 건별 내역
+  // A-4b 구독 결제·해지 예약·환불(api_app_v1 — DB-4 199·200)
+  'subscribe_with_cash',
+  'subscription_cancel_at_period_end',
+  'subscription_cancel_undo',
+  'refund_estimate',
+  'refund_request_create',
   // 개별질문
   'add_individual_question_attachment',
   'claim_individual_question_as_mentor',

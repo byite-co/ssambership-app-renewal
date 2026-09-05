@@ -37,6 +37,11 @@ class WebBridgeConfig {
   static const String reviewsPath =
       '/mentor/reviews'; // app/(mentor)/mentor/reviews
 
+  /// 본인인증(NICE) 온보딩 — 앱은 인증 플로우를 두지 않고 웹에 위임한다(S-C).
+  /// 게이트 판정은 앱(IdentityGate)·웹이 같은 플래그로 하고, 인증 자체는 이 페이지.
+  static const String identityVerifyPath =
+      '/onboarding/verify'; // app/onboarding/verify
+
   /// 회원 탈퇴(계정 삭제) — 앱은 삭제하지 않고 웹 페이지만 연다.
   static const String accountDeletePath =
       '/account/delete'; // app/(student)/account/delete

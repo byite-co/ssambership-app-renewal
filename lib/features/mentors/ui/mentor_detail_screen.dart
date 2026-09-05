@@ -21,10 +21,10 @@ import 'widgets/mentor_meta_item.dart';
 import '../../../app/app_tabs.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
-import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/refresh/data_refresh_bus.dart';
 import '../../../design/widgets/app_secondary_button.dart';
-import '../../../shared/widgets/commerce_notice_card.dart';
+import '../../subscription/data/subscription_commerce_repository.dart';
+import '../../subscription/ui/subscribe_entry_section.dart';
 import '../../../app/app_route_paths.dart';
 import '../../individual_question/data/models/individual_question_models.dart';
 import '../../individual_question/iq_flags.dart';
@@ -32,13 +32,12 @@ import '../../individual_question/ui/iq_create_screen.dart';
 import '../../individual_question/ui/iq_detail_screen.dart';
 import '../../../shared/widgets/screen_visibility.dart';
 
-/// 멘토 상세(열람 전용). 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
-/// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](웹 브릿지).
+/// 멘토 상세. 목록에서 받은 항목을 재사용하고, 평균 답변시간·구독 여부만
+/// 추가로 불러온다. CTA 는 구독 상태에 따라 [질문방으로]/[구독하기](A-4b 네이티브 결제 시트).
 ///
-/// §4-2 최신성: 구독은 앱 밖(웹)에서 일어나므로(Commerce-Zero — 앱 내 구독 진입 없음)
-/// 구독 성공 후 앱으로 돌아오면 **resume 재조회**가 정본 경로다. 앱 안에서 구독 상태
-/// 변화를 알게 된 지점은 [DataRefreshBus.bumpSubscription] 으로 보완한다.
-/// 두 경로 모두 세대 토큰(`_extrasGeneration`)을 지나 늦은 이전 응답을 폐기한다.
+/// §4-2 최신성: 구독 성공 지점([SubscribeEntrySection])이 [DataRefreshBus.bumpSubscription]
+/// 을 올리고, 화면 resume 재조회가 이를 보완한다. 두 경로 모두 세대 토큰
+/// (`_extrasGeneration`)을 지나 늦은 이전 응답을 폐기한다.
 class MentorDetailScreen extends StatefulWidget {
   const MentorDetailScreen({
     super.key,
@@ -47,6 +46,9 @@ class MentorDetailScreen extends StatefulWidget {
     this.extrasLoaderOverride,
     this.createCtaOverride,
     this.createScreenOverride,
+    this.subscriptionCommerceOverride,
+    this.identityGateOverride,
+    this.idempotencyKeyFactoryOverride,
   });
 
   final MentorListItem item;
@@ -64,6 +66,15 @@ class MentorDetailScreen extends StatefulWidget {
   /// 테스트용 등록 화면 빌더(폴백 push 에서 사용) — 실사용은 null(기본 화면).
   final Widget Function(BuildContext context, String mentorId)?
       createScreenOverride;
+
+  /// 테스트용 구독 결제 포트 — 실사용은 null([AppScope]).
+  final SubscriptionCommercePort? subscriptionCommerceOverride;
+
+  /// 테스트용 본인인증 게이트 강제 — 실사용은 null(`.env` 플래그).
+  final bool? identityGateOverride;
+
+  /// 테스트용 멱등 키 생성기 — 실사용은 null(uuid v4).
+  final String Function()? idempotencyKeyFactoryOverride;
 
   @override
   State<MentorDetailScreen> createState() => _MentorDetailScreenState();
@@ -92,7 +103,7 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
     _repo = dependencies.mentorDirectory;
     _favRepo = dependencies.mentorFavorites;
     _reloadExtras();
-    // 웹에서 구독을 마치고 앱으로 복귀 → 구독 여부 재조회(CTA stale 제거).
+    // 다른 화면에서 구독 상태가 바뀐 뒤 복귀 → 구독 여부 재조회(CTA stale 제거).
     WidgetsBinding.instance.addObserver(this);
     // 앱 안에서 알게 된 구독 상태 변화 신호.
     DataRefreshBus.subscriptionGeneration.addListener(_onSubscriptionChanged);
@@ -227,11 +238,8 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
               loading: _loading && _extras == null,
             ),
           ),
-          // 컴플라이언스: 요금제 섹션(가격 숫자·안내문) 제거 — 결제 유도 방지.
-          // 구독 CTA는 가격 없이 이동만 유지.
-          // ★ A-4b 네이티브 '구독하기' 버튼 자리: 아래 Builder 의 비구독 분기
-          //   (CommerceNoticeCard 자리)에 AppPrimaryButton('스탠다드로 구독하기')
-          //   를 두면 된다(design-v3 §5-3). 그때까지는 웹 브릿지 안내만.
+          // A-4b: 네이티브 '구독하기'(design-v3 §5-3) — 요금제 시트에서 실제 단가로
+          // 결제한다. 무료 질문은 그 아래 한 줄로 물러난다.
           const SizedBox(height: AppSpacing.s24),
           Builder(
             builder: (BuildContext context) {
@@ -244,12 +252,19 @@ class _MentorDetailScreenState extends State<MentorDetailScreen>
                   onPressed: () => _goToQuestionRoom(context),
                 );
               }
-              // 커머스 제로: 구매 유도(구독하기) 제거 → 비상호작용 안내.
               // 무료 질문(세션1 §3): 비구독 학생 전용 — 개별질문 CTA 와 독립.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const CommerceNoticeCard(text: kSubscribeNoticeText),
+                  SubscribeEntrySection(
+                    mentor: widget.item,
+                    port: widget.subscriptionCommerceOverride,
+                    identityGateOverride: widget.identityGateOverride,
+                    idempotencyKeyFactory: widget.idempotencyKeyFactoryOverride,
+                    onSubscribed: (_) => _reloadExtras(),
+                    onAlreadySubscribed: _reloadExtras,
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
                   FreeQuestionEntrySection(
                     mentorId: widget.item.id,
                     mentorName: widget.item.displayName,

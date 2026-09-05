@@ -58,6 +58,10 @@ class WebBridge {
   Future<WebOpenResult> openReviews({String source = 'app'}) =>
       _open(WebBridgeConfig.reviewsPath, <String, String>{'src': source});
 
+  /// 본인인증 온보딩(웹 위임 — 앱은 인증 플로우를 두지 않는다).
+  Future<WebOpenResult> openIdentityVerify({String source = 'app'}) =>
+      _open(WebBridgeConfig.identityVerifyPath, <String, String>{'src': source});
+
   /// 회원 탈퇴(계정 삭제) — 웹 페이지만 연다(앱 내 삭제 흐름 없음).
   Future<WebOpenResult> openAccountDelete({String source = 'app'}) =>
       _open(WebBridgeConfig.accountDeletePath, <String, String>{'src': source});

@@ -29,6 +29,7 @@ import '../features/question_room/data/question_room_read_repository.dart';
 import '../features/question_room/data/question_room_write_repository.dart';
 import '../features/question_room/data/room_safety_repository.dart';
 import '../features/question_room/data/student_lookup_repository.dart';
+import '../features/subscription/data/subscription_commerce_repository.dart';
 
 /// 앱 의존성 묶음 — 수동 DI(A-2). 앱 시작 시 한 번 만들어 [AppScope] 로 내려보낸다.
 ///
@@ -66,6 +67,7 @@ class AppDependencies {
     this.notifications = const SupabaseNotificationsRepository(),
     this.roomSafety = const SupabaseRoomSafetyRepository(),
     this.userBlocks = const UserBlocksRepository(),
+    this.subscriptionCommerce = const SupabaseSubscriptionCommerceRepository(),
     NotificationBadgeController? notificationBadge,
     DeletionNoticeController? deletionNotice,
     VersionGateController? versionGate,
@@ -132,6 +134,9 @@ class AppDependencies {
   final NotificationsRepository notifications;
   final RoomSafetyPort roomSafety;
   final UserBlocksRepository userBlocks;
+
+  /// 구독 결제·해지 예약·환불(A-4b — `api_app_v1` 래퍼). 자금 판정은 전부 DB.
+  final SubscriptionCommercePort subscriptionCommerce;
 
   // ── 앱 전역 컨트롤러(종전 `.instance`) ──
   final NotificationBadgeController notificationBadge;

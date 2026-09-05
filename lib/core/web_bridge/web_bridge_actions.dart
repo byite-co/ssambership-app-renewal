@@ -54,6 +54,14 @@ Future<void> openReviewsWeb(BuildContext context, {WebBridge? bridge}) async {
   _showNotice(context, r, '리뷰는 웹에서 확인할 수 있어요. (준비 중)');
 }
 
+/// 본인인증(웹 위임) — A-4b 이후에도 남는 웹 진입 둘 중 하나(다른 하나는 충전 안내).
+Future<void> openIdentityVerifyWeb(BuildContext context,
+    {WebBridge? bridge}) async {
+  final WebOpenResult r = await (bridge ?? WebBridge()).openIdentityVerify();
+  if (r == WebOpenResult.opened || !context.mounted) return;
+  _showNotice(context, r, '본인인증은 웹에서 할 수 있어요. (준비 중)');
+}
+
 Future<void> openAccountDeleteWeb(BuildContext context,
     {WebBridge? bridge}) async {
   final WebOpenResult r = await (bridge ?? WebBridge()).openAccountDelete();
