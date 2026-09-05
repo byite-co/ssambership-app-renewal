@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/app_spacing.dart';
+import '../tokens/app_typography.dart';
 import 'app_background.dart';
 import 'glass_bars.dart';
 
@@ -16,6 +17,7 @@ class AppPage extends StatelessWidget {
     super.key,
     required this.title,
     required this.body,
+    this.subtitle,
     this.actions = const <Widget>[],
     this.leading,
     this.automaticallyImplyLeading = true,
@@ -24,6 +26,9 @@ class AppPage extends StatelessWidget {
   });
 
   final String title;
+
+  /// 제목 위 작은 줄(예: 멘토 답변 화면의 학생 이름). null 이면 제목만.
+  final String? subtitle;
   final Widget body;
   final List<Widget> actions;
 
@@ -58,7 +63,16 @@ class AppPage extends StatelessWidget {
         extendBody: bottom != null,
         resizeToAvoidBottomInset: resizeToAvoidBottomInset,
         appBar: GlassAppBar(
-          title: Text(title),
+          title: subtitle == null
+              ? Text(title)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(subtitle!, style: AppTypography.meta),
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
           leading: leading,
           automaticallyImplyLeading: automaticallyImplyLeading,
           actions: actions,

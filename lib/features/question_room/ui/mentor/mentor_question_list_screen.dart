@@ -4,11 +4,12 @@ import '../../../../app/app_navigation.dart';
 import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../data/mappings/subject_labels.dart';
-import '../../../../design/tokens/color_tokens.dart';
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_colors.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/widgets/app_blocks.dart';
+import '../../../../design/widgets/app_empty_state.dart';
+import '../../../../design/widgets/app_page.dart';
 import '../../../../design/widgets/chip_scroll.dart';
-import '../../../../design/widgets/empty_state.dart';
 import '../../data/models/question_thread.dart';
 import '../../data/models/room.dart';
 import '../../data/question_room_read_repository.dart';
@@ -79,33 +80,21 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(widget.studentName,
-                style: AppType.caption.copyWith(color: ColorTokens.muted)),
-            Text('질문 / 답변', style: AppType.body),
-          ],
-        ),
-      ),
+    return AppPage(
+      title: '질문 / 답변',
+      subtitle: widget.studentName,
       body: FutureBuilder<List<QuestionThread>>(
         future: _future,
         builder:
             (BuildContext context, AsyncSnapshot<List<QuestionThread>> snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingView();
           }
           if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('질문을 불러오지 못했어요.\n${friendlyError(snap.error!)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: ColorTokens.danger)),
-              ),
+            return AppErrorView(
+              title: '질문을 불러오지 못했어요',
+              message: friendlyError(snap.error!),
+              onRetry: _refresh,
             );
           }
           final List<QuestionThread> all = snap.data ?? <QuestionThread>[];
@@ -137,7 +126,6 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
             children: <Widget>[
               _statusTabs(counts),
               _filterBar(subjectCodes),
-              const Divider(height: 1, color: ColorTokens.border),
               Expanded(child: _list(visible, all.isEmpty)),
             ],
           );
@@ -155,7 +143,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
     ];
     // 아래 과목 필터 줄과 좌우 기준·줄 간격을 통일(같은 LTRB 프레임, 대칭 세로 간격).
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 6),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.screenH, 8, 4, 6),
       child: ChipScroll(
         labels: labels,
         selectedIndex: _StatusTab.values.indexOf(_tab),
@@ -173,7 +161,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
     final int selected =
         _subjectCode == null ? 0 : subjectCodes.indexOf(_subjectCode!) + 1;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.screenH, 6, 4, 4),
       child: Row(
         children: <Widget>[
           Expanded(
@@ -191,7 +179,7 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
               _newestFirst
                   ? Icons.arrow_downward_rounded
                   : Icons.arrow_upward_rounded,
-              color: ColorTokens.secondary,
+              color: AppColors.textSecondary,
               size: 20,
             ),
             onPressed: () => setState(() => _newestFirst = !_newestFirst),
@@ -203,17 +191,18 @@ class _MentorQuestionListScreenState extends State<MentorQuestionListScreen> {
 
   Widget _list(List<QuestionThread> visible, bool noThreadsAtAll) {
     if (visible.isEmpty) {
-      return EmptyState(
+      return AppEmptyState(
         icon: Icons.inbox_outlined,
         title: noThreadsAtAll ? '아직 받은 질문이 없어요' : '이 조건의 질문이 없어요',
-        message: noThreadsAtAll ? '학생이 질문하면 여기에 표시돼요.' : '다른 탭이나 과목을 선택해 보세요.',
+        description:
+            noThreadsAtAll ? '학생이 질문하면 여기에 표시돼요.' : '다른 탭이나 과목을 선택해 보세요.',
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.screenH, 12, AppSpacing.screenH, 16),
+      clipBehavior: Clip.none,
+      padding: AppPage.contentPadding(context, top: 8),
       itemCount: visible.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.listGap),
       itemBuilder: (BuildContext context, int i) => ThreadCard(
         thread: visible[i],
         onOpen: () => _openAnswer(visible[i]),
