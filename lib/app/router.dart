@@ -182,6 +182,20 @@ class AppRouter {
         destination == AppRoutePaths.mentors) {
       return AppRoutePaths.settlements;
     }
+    // A-4a: 멘토 자기 관리 표면(`/settlements/*`·`/profile/*`)은 멘토 전용,
+    // 네이티브 개별질문 등록(`/iq/new`)은 학생 전용이다. 복사한 URL 로도
+    // 역할 밖 쓰기 화면을 열지 않는다(fail closed — 각 역할의 첫 탭으로 수렴).
+    if (access == AccessState.full) {
+      final AppRole role = dependencies.auth.currentRole;
+      final bool mentorOnly =
+          destination.startsWith('${AppRoutePaths.settlements}/') ||
+              destination.startsWith('${AppRoutePaths.mentorProfile}/');
+      if (mentorOnly && role != AppRole.mentor) return AppRoutePaths.rooms;
+      if (destination == AppRoutePaths.newIndividualQuestion &&
+          role != AppRole.student) {
+        return AppRoutePaths.individualQuestions;
+      }
+    }
     return guarded;
   }
 }
