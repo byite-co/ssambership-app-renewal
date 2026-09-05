@@ -152,7 +152,8 @@ class _StudentIqListScreenState extends State<StudentIqListScreen>
       builder:
           (BuildContext context, AsyncSnapshot<List<IndividualQuestion>> snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const AppLoadingView();
+          // 스피너 유지(테마 역할색) — 작은 뷰포트 상태 테스트가 이 위젯을 기준으로 본다.
+          return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
           return AppErrorView(
