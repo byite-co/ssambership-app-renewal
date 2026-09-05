@@ -98,7 +98,7 @@ Future<void> _pumpAndSubmit(
   await tester.pumpAndSettle();
   // 질문 내용(두 번째 TextField)에 본문 입력 후 등록.
   await tester.enterText(find.byType(TextField).last, body);
-  await tester.tap(find.text('질문 등록'));
+  await tester.tap(find.text('질문 보내기'));
   await tester.pumpAndSettle();
 }
 
@@ -186,7 +186,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).last, '수학 질문이에요');
-      await tester.tap(find.text('질문 등록'));
+      await tester.tap(find.text('질문 보내기'));
       await tester.pumpAndSettle();
 
       expect(write.createCalls, 1);

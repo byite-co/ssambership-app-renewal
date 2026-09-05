@@ -16,6 +16,8 @@ import '../../../design/widgets/app_secondary_button.dart';
 import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/labels/subscription_copy.dart';
 import '../../../shared/widgets/commerce_notice_card.dart';
+import '../../../app/routes/individual_question_routes.dart';
+import '../../mentors/format/mentor_price_format.dart';
 import '../data/models/question_thread.dart';
 import '../data/models/room.dart';
 import '../data/question_room_read_repository.dart';
@@ -141,7 +143,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
     );
   }
 
-  /// 하단 고정 바 — 질문 가능이면 잔여 문장 + 주요 버튼 하나.
+  /// 하단 고정 바 — 질문 가능이면 잔여 문장 + 주요 버튼 하나, 이번 주를 다 썼으면
+  /// 그 자리에서 두 갈래(design-v3 §3-4: 개별질문으로 지금 물어보기 / 웹 안내).
   Widget _askBar() {
     final String? remaining = SubscriptionCopy.quotaSentence(_usage);
     return Column(
@@ -163,12 +166,9 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
           // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
         ] else if (widget.sub?.isActive == true ||
             (_usage != null && _usage!.limit > 0)) ...<Widget>[
-          // 구독 중인데 이번 주 소진 — 안내만(구매 유도 아님).
-          const Text(
-            '이번 주 질문을 다 썼어요',
-            style: AppTypography.captionSecondary,
-            textAlign: TextAlign.center,
-          ),
+          // 구독 중인데 이번 주 소진 — 막지 않고 두 갈래(§3-4). 충전·상위 요금제
+          // 유도는 두지 않는다(커머스 제로) — 웹 안내 한 줄만 담백하게.
+          _exhaustedBlock(),
         ] else ...<Widget>[
           // 커머스 제로: 구매 유도(웹에서 구독) 버튼 제거 → 비상호작용 안내.
           const CommerceNoticeCard(text: kSubscribeNoticeText),
@@ -176,6 +176,63 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
         // 연결노트는 상단 AppBar 액션(우상단 아이콘) 하나로 통일 — 하단 중복 버튼 제거.
       ],
     );
+  }
+
+  /// §3-4 '이번 주 질문을 다 썼을 때' — 주요 행동은 하나(개별질문), 나머지는 물러난다.
+  Widget _exhaustedBlock() {
+    final String? tier = _usage?.planTier?.trim().isNotEmpty == true
+        ? _usage!.planTier
+        : widget.sub?.planTier;
+    final String head = tier == null || tier.trim().isEmpty
+        ? widget.mentorName
+        : '${widget.mentorName} · ${planTierLabel(tier)}';
+    final String? refill = SubscriptionCopy.refillSentence(_usage);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(head, style: AppTypography.meta, textAlign: TextAlign.center),
+        const SizedBox(height: AppSpacing.s4),
+        const Text(
+          '이번 주 질문을 다 썼어요',
+          style: AppTypography.section,
+          textAlign: TextAlign.center,
+        ),
+        if (refill != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.s4),
+          Text(refill,
+              style: AppTypography.captionSecondary,
+              textAlign: TextAlign.center),
+        ],
+        const SizedBox(height: AppSpacing.s12),
+        AppPrimaryButton(
+          label: '개별질문으로 지금 물어보기',
+          onPressed: _openIndividualQuestion,
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        const Text(
+          kSubscriptionManageNoticeText,
+          style: AppTypography.meta,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  /// 이 멘토에게 개별질문(캐시) — 기존 네이티브 작성 화면(C8)으로 간다.
+  Future<void> _openIndividualQuestion() async {
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.newIndividualQuestionFor(
+        widget.room.mentorId,
+        mentorName: widget.mentorName,
+      ),
+      fallbackBuilder: (_) => buildIqCreateFallback(
+        mentorId: widget.room.mentorId,
+        mentorName: widget.mentorName,
+      ),
+    );
+    if (mounted) _refresh();
   }
 
   Future<void> _openNewQuestion() async {

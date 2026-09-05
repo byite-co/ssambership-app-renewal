@@ -132,6 +132,7 @@ class _AppInputFieldState extends State<AppInputField> {
     final Widget field = GlassInner(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ringColor: ring,
+      fillColor: AppColors.inputFill,
       child: TextField(
         controller: widget.controller,
         focusNode: _focusNode,

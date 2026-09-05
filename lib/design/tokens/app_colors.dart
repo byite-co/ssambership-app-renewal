@@ -10,6 +10,10 @@ abstract class AppColors {
   /// 팝업 메뉴처럼 반투명 채움을 쓸 수 없는 Material 표면에 이 값을 쓴다.
   static const Color glass = Color(0xFFF6F9FC);
 
+  /// 텍스트 입력 채움(불투명) — A-6b 지시서 §3-3 `#E9EBEF`. 유리 위에서도 입력
+  /// 영역이 또렷하게 읽히도록 반투명 대신 고정색을 쓴다.
+  static const Color inputFill = Color(0xFFE9EBEF);
+
   static const Color textPrimary = Color(0xFF191F28);
   static const Color textSecondary = Color(0xFF5F6B7A);
 

@@ -3,19 +3,24 @@ import 'package:flutter/material.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
 import '../../../data/mappings/subject_labels.dart';
-import '../../../design/tokens/color_tokens.dart';
-import '../../../design/shape_tokens.dart';
-import '../../../design/spacing_tokens.dart';
-import '../../../design/typography_tokens.dart';
-import '../../../design/widgets/primary_button.dart';
+import '../../../design/tokens/app_spacing.dart';
+import '../../../design/tokens/app_typography.dart';
+import '../../../design/widgets/app_blocks.dart';
+import '../../../design/widgets/app_input_field.dart';
+import '../../../design/widgets/app_page.dart';
+import '../../../design/widgets/app_primary_button.dart';
+import '../../../design/widgets/chip_scroll.dart';
+import '../../../shared/errors/friendly_error.dart';
 import '../data/models/question_thread.dart';
 import '../data/models/room.dart';
 import '../data/question_room_read_repository.dart';
 import '../data/question_room_write_repository.dart';
-import '../../../shared/errors/friendly_error.dart';
 
-/// 새 질문 작성. 제목·내용·과목(선택) → 서버 원자 생성 RPC 한 번(P1-8).
+/// 새 질문 작성(design-v3 §3-3). 제목·과목(선택)·내용 → 서버 원자 생성 RPC 한 번(P1-8).
 /// 활성 구독·잔여>0 확인은 호출부(질문영역)에서 게이팅하지만, 실패 에러는 그대로 노출한다.
+///
+/// 사진은 질문이 만들어진 뒤 대화 화면에서 붙인다(생성 RPC 는 첨부를 받지 않는다) —
+/// 첨부 직후 1회 펜 안내는 그 입력 바([ChatInputBar])에 있다.
 class NewQuestionScreen extends StatefulWidget {
   const NewQuestionScreen({
     super.key,
@@ -42,7 +47,7 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
 
   String? _subjectCode; // null = 선택 안 함
 
-  /// 방 멘토의 담당 과목 코드. null = 로딩 전(드롭다운 잠금), 로드 후 후보 제한 근거.
+  /// 방 멘토의 담당 과목 코드. null = 로딩 전(칩 잠금), 로드 후 후보 제한 근거.
   List<String>? _mentorCodes;
   bool _busy = false;
 
@@ -132,90 +137,69 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('새 질문')),
+    return AppPage(
+      title: '새 질문',
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+        clipBehavior: Clip.none,
+        padding: AppPage.contentPadding(context),
         children: <Widget>[
-          Text('제목 (선택)', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          TextField(
-            controller: _title,
-            style: AppType.body,
-            decoration: _decoration('한 줄 제목'),
+          AppField(
+            label: '제목 (선택)',
+            child: AppInputField(
+              controller: _title,
+              hintText: '한 줄 제목',
+              textInputAction: TextInputAction.next,
+            ),
           ),
-          const SizedBox(height: AppSpacing.s16),
-          Text('과목 (선택)', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          _subjectPicker(),
-          const SizedBox(height: AppSpacing.s16),
-          Text('질문 내용', style: AppType.caption),
-          const SizedBox(height: AppSpacing.titleBody),
-          TextField(
-            controller: _body,
-            style: AppType.body,
-            minLines: 5,
-            maxLines: 10,
-            decoration: _decoration('궁금한 점을 적어주세요.'),
+          const SizedBox(height: AppSpacing.s20),
+          AppField(
+            label: '어떤 과목인가요?',
+            child: _subjectPicker(),
           ),
-          const SizedBox(height: AppSpacing.s24),
-          PrimaryButton(
-            label: _busy ? '등록 중…' : '질문 등록',
-            onPressed: _busy ? null : _submit,
+          const SizedBox(height: AppSpacing.s20),
+          AppField(
+            label: '무엇이 궁금한가요?',
+            child: AppInputField(
+              controller: _body,
+              hintText: '어디까지 풀었는지 함께 적으면 답변이 훨씬 정확해져요',
+              minLines: 6,
+              maxLines: 12,
+              keyboardType: TextInputType.multiline,
+            ),
           ),
         ],
       ),
+      bottom: AppPrimaryButton(
+        label: _busy ? '보내는 중…' : '질문 보내기',
+        onPressed: _busy ? null : _submit,
+      ),
     );
   }
 
+  /// 과목 칩 — 로딩 전(_mentorCodes==null)에는 잠가 두어, 로드 후 후보에서 빠질
+  /// 값이 미리 선택되는 문제를 막는다. 로드되면 정규화된 멘토 담당 과목만 노출하고,
+  /// 담당 과목이 없거나 조회·정규화 결과가 비면 전체 정본 과목으로 폴백한다
+  /// (restrictQuestionSubjectCodes — 빈 목록으로 '선택 안 함'만 남기지 않는다).
+  /// 후보는 전부 정본 code 라 화면엔 한글 라벨, 전송엔 code 또는 null 만 나간다.
   Widget _subjectPicker() {
-    // 로딩 전(_mentorCodes==null)에는 잠가 두어, 로드 후 후보에서 빠질 값이
-    // 미리 선택되는 문제를 막는다. 로드되면 정규화된 멘토 담당 과목만 노출하고,
-    // 담당 과목이 없거나 조회·정규화 결과가 비면 전체 정본 과목으로 폴백한다
-    // (restrictQuestionSubjectCodes — 빈 드롭다운으로 '선택 안 함'만 남기지 않는다).
-    // 후보는 전부 정본 code 라 화면엔 한글 라벨, 전송엔 code 또는 null 만 나간다.
-    final bool loaded = _mentorCodes != null;
-    final List<String> codes =
-        loaded ? restrictQuestionSubjectCodes(_mentorCodes!) : const <String>[];
-    final List<DropdownMenuItem<String?>> items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('선택 안 함')),
-      for (final String code in codes)
-        DropdownMenuItem<String?>(value: code, child: Text(subjectLabel(code))),
-    ];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: ColorTokens.surface,
-        borderRadius: AppShape.inputRadius,
-        border: Border.all(color: ColorTokens.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          isExpanded: true,
-          value: _subjectCode,
-          dropdownColor: ColorTokens.surface,
-          style: AppType.body,
-          hint: Text(loaded ? '선택 안 함' : '과목 불러오는 중…', style: AppType.body),
-          items: items,
-          // 로딩 중에는 비활성(onChanged=null) — 로드 후 제한된 후보로만 선택.
-          onChanged:
-              loaded ? (String? v) => setState(() => _subjectCode = v) : null,
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _decoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: ColorTokens.elevated,
-      border: OutlineInputBorder(
-        borderRadius: AppShape.inputRadius,
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    final List<String>? mentorCodes = _mentorCodes;
+    if (mentorCodes == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Text('과목 불러오는 중…', style: AppTypography.captionSecondary),
+      );
+    }
+    final List<String> codes = restrictQuestionSubjectCodes(mentorCodes);
+    final List<String?> values = <String?>[null, ...codes];
+    final int selected = values.indexOf(_subjectCode);
+    return ChipScroll(
+      padding: EdgeInsets.zero,
+      labels: <String>[
+        '선택 안 함',
+        for (final String code in codes) subjectLabel(code),
+      ],
+      selectedIndex: selected < 0 ? 0 : selected,
+      onSelected: (int i) => setState(() => _subjectCode = values[i]),
     );
   }
 }

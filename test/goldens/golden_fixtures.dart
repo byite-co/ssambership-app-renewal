@@ -328,6 +328,11 @@ class GoldenReadRepository extends QuestionRoomReadRepository {
   Future<WeeklyQuestionUsage?> weeklyUsage({required String mentorId}) async =>
       usage;
 
+  /// 새 질문 과목 칩 후보(멘토 담당 과목) — 픽스처 고정(Supabase 미접속).
+  @override
+  Future<List<String>> mentorTeachingSubjects(String mentorId) async =>
+      const <String>['math', 'english'];
+
   @override
   Future<List<QuestionMessage>> recentMessages(
     String threadId, {
