@@ -38,7 +38,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       TextEditingController(text: widget.profile.name);
   late final TextEditingController _grade =
       TextEditingController(text: widget.profile.grade ?? '');
+  late final TextEditingController _studentStatus =
+      TextEditingController(text: widget.profile.studentStatus ?? '');
   bool _busy = false;
+
+  /// 재학 상태 상한(DB-4 203 `STUDENT_STATUS_TOO_LONG` 과 동일).
+  static const int studentStatusMaxLength = 20;
 
   /// 역할 분기: 멘토는 학년 필드가 없고(웹에서 상세 관리), 학생만 학년을 편집한다.
   bool get _isMentor =>
@@ -54,25 +59,39 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void dispose() {
     _name.dispose();
     _grade.dispose();
+    _studentStatus.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final String name = _name.text.trim();
     final String grade = _grade.text.trim();
+    final String studentStatus = _studentStatus.text.trim();
     if (name.isEmpty) {
       _snack('표시명을 입력해 주세요.');
       return;
     }
+    // A-4b ⑥: 재학 상태(학생만)가 바뀌었을 때만 v2 경로. 비우면 '' 로 서버가
+    // NULL 저장(학년과 같은 규칙). 안 바뀌었으면 종전 v1 경로 그대로.
+    final bool statusChanged =
+        !_isMentor && studentStatus != (widget.profile.studentStatus ?? '');
     setState(() => _busy = true);
     try {
-      await _repository.updateProfile(
-        nickname: name,
-        // 멘토는 p_grade_level 을 payload 에서 제외(null → 레포가 파라미터 생략).
-        // 학생이 학년을 비웠으면 ''(빈 문자열) 를 보내 서버가 NULL 로 비운다 —
-        // 생략(유지)과 비우기를 구분하는 서버 계약이다.
-        gradeLevel: _isMentor ? null : grade,
-      );
+      if (statusChanged) {
+        await _repository.updateProfileWithStudentStatus(
+          nickname: name,
+          gradeLevel: grade,
+          studentStatus: studentStatus,
+        );
+      } else {
+        await _repository.updateProfile(
+          nickname: name,
+          // 멘토는 p_grade_level 을 payload 에서 제외(null → 레포가 파라미터 생략).
+          // 학생이 학년을 비웠으면 ''(빈 문자열) 를 보내 서버가 NULL 로 비운다 —
+          // 생략(유지)과 비우기를 구분하는 서버 계약이다.
+          gradeLevel: _isMentor ? null : grade,
+        );
+      }
       if (!mounted) return;
       _snack('프로필을 저장했어요.');
       Navigator.of(context).pop(true); // 저장됨 → 마이페이지가 새로고침.
@@ -113,6 +132,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               child: AppInputField(
                 controller: _grade,
                 hintText: '예: 고2, 재수생',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s20),
+            AppField(
+              label: '재학 상태 (선택)',
+              help: '예: 재학 중, 휴학, 졸업 · $studentStatusMaxLength자까지',
+              child: AppInputField(
+                controller: _studentStatus,
+                hintText: '재학 중',
+                maxLength: studentStatusMaxLength,
               ),
             ),
           ],

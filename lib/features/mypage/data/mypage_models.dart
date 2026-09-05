@@ -35,6 +35,7 @@ class MyProfile {
   const MyProfile({
     required this.name,
     required this.roleLabel,
+    this.studentStatus,
     this.email,
     this.grade,
   });
@@ -42,6 +43,9 @@ class MyProfile {
   final String name;
   final String roleLabel;
   final String? email;
+
+  /// 재학 상태(`users.student_status` · 자유 텍스트 20자 · 학생만). A-4b ⑥.
+  final String? studentStatus;
 
   /// 학년(예: '고2'). DB grade_level 이 이미 한글 표기라 그대로 쓴다. 없으면 비움.
   final String? grade;

@@ -21,6 +21,7 @@ const Set<String> kExpectedRpcNames = <String>{
   'account_deletion_write_blocked',
   // 프로필
   'user_profile_update_self',
+  'user_profile_update_self_v2', // A-4b ⑥ 재학 상태(DB-4 203) — 학생 경로
   // 질문방(qna_*)
   'ensure_free_question_room', // api_app_v1 — 무료질문 첫 진입 시 방 보장(N1)
   'qna_append_message',
