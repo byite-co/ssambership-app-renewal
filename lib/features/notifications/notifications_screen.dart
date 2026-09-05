@@ -4,12 +4,13 @@ import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../core/deeplink/notification_deep_link_controller.dart';
 import '../../core/refresh/data_refresh_bus.dart';
-import '../../design/spacing_tokens.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_blocks.dart';
+import '../../design/widgets/app_empty_state.dart';
+import '../../design/widgets/app_page.dart';
 import '../../design/widgets/chip_scroll.dart';
 import '../../design/widgets/count_badge.dart';
-import '../../design/widgets/empty_state.dart';
 import '../../shared/errors/friendly_error.dart';
 import 'data/app_notification.dart';
 import 'data/notification_badge_controller.dart';
@@ -368,7 +369,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     // D1-D: 미읽음 수를 카운트 배지로(스캔성↑). 0이면 배지 숨김.
                     child: Row(
                       children: <Widget>[
-                        const Text('안 읽음', style: AppType.title),
+                        const Text('안 읽음', style: AppTypography.section),
                         const SizedBox(width: 8),
                         CountBadge(count: unread),
                       ],
@@ -415,45 +416,35 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null && _items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text('알림을 불러오지 못했어요.\n${friendlyError(_error!)}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: ColorTokens.danger)),
-              const SizedBox(height: 8),
-              TextButton(onPressed: _load, child: const Text('다시 시도')),
-            ],
-          ),
-        ),
+      return AppErrorView(
+        title: '알림을 불러오지 못했어요',
+        message: friendlyError(_error!),
+        onRetry: _load,
       );
     }
     if (_items.isEmpty) {
-      return const EmptyState(
+      return const AppEmptyState(
         icon: Icons.notifications_none_rounded,
         title: '새 알림이 없어요',
-        message: '활동이 생기면 여기에 알려드릴게요',
+        description: '활동이 생기면 여기에 알려드릴게요',
       );
     }
     final List<AppNotification> items = _filtered;
     if (items.isEmpty) {
-      return const EmptyState(
+      return const AppEmptyState(
         icon: Icons.filter_alt_off_outlined,
         title: '조건에 맞는 알림이 없어요',
-        message: '필터를 바꿔보세요.',
+        description: '필터를 바꿔보세요.',
       );
     }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
+        clipBehavior: Clip.none,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenH, 4, AppSpacing.screenH, 16),
+        padding: AppPage.contentPadding(context, top: 4),
         itemCount: items.length + (_hasNext ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.listGap),
         itemBuilder: (BuildContext context, int i) {
           if (i >= items.length) {
             return Padding(
