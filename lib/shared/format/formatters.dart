@@ -13,6 +13,9 @@ class Formatters {
   /// 짧은 날짜(M/D). 갱신일 등 칩/캡션용.
   static String shortDate(DateTime dt) => '${dt.month}/${dt.day}';
 
+  /// '9월 5일' — 문장 안에 넣는 날짜(예: '9월 5일까지', '9월 9일에 갱신돼요').
+  static String monthDay(DateTime dt) => '${dt.month}월 ${dt.day}일';
+
   /// 상대 시간(방금/N분 전/N시간 전/N일 전/그 이전은 날짜). 채팅·목록 활동시각용.
   static String relativeKorean(DateTime dt, {DateTime? now}) {
     final DateTime ref = now ?? DateTime.now();

@@ -21,6 +21,8 @@ void main() {
           roomRows: goldenStudentRooms(),
           statusRows: goldenStudentStatusRows(),
           usageByMentor: goldenUsageByMentor(),
+          // §3-1: 멘토 최근 노트 미리보기(방별 notes 조회 — fake 는 방 무관 동일 목록).
+          noteRows: goldenNotes(),
         ),
         mentorLookup: GoldenMentorLookup(goldenMentors()),
         subscriptions: GoldenSubscriptions(goldenSubscriptionsByMentor()),
