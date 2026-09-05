@@ -5,6 +5,7 @@ import 'package:ssambership_app/features/individual_question/data/models/individ
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/features/individual_question/ui/mentor_iq_list_screen.dart';
 import 'package:ssambership_app/features/individual_question/ui/student_iq_list_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 IndividualQuestion _question({
   String id = 'q1',
@@ -30,16 +31,15 @@ Widget _wrap(Widget child) => MaterialApp(home: child);
 void main() {
   group('StudentIqListScreen', () {
     testWidgets('빈 목록 → 빈 상태 안내', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(StudentIqListScreen(
+      await tester.pumpScopedWidget(_wrap(StudentIqListScreen(
         loaderOverride: () async => <IndividualQuestion>[],
       )));
       await tester.pumpAndSettle();
       expect(find.text('아직 개별질문이 없어요'), findsOneWidget);
     });
 
-    testWidgets('목록: 제목·상태 라벨 표시, 금액 비노출(컴플라이언스)',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(StudentIqListScreen(
+    testWidgets('목록: 제목·상태 라벨 표시, 금액 비노출(컴플라이언스)', (WidgetTester tester) async {
+      await tester.pumpScopedWidget(_wrap(StudentIqListScreen(
         loaderOverride: () async => <IndividualQuestion>[
           _question(status: IndividualQuestionStatus.answered),
         ],
@@ -53,7 +53,7 @@ void main() {
 
   group('MentorIqListScreen', () {
     testWidgets('수락 대기(공개형) + 내 질문 섹션', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(MentorIqListScreen(
+      await tester.pumpScopedWidget(_wrap(MentorIqListScreen(
         loaderOverride: () async => MentorIqListData(
           open: <OpenIndividualQuestion>[
             OpenIndividualQuestion(
@@ -82,7 +82,7 @@ void main() {
     });
 
     testWidgets('둘 다 비면 빈 상태', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(MentorIqListScreen(
+      await tester.pumpScopedWidget(_wrap(MentorIqListScreen(
         loaderOverride: () async => const MentorIqListData(
           open: <OpenIndividualQuestion>[],
           mine: <IndividualQuestion>[],
@@ -112,7 +112,7 @@ void main() {
     }
 
     testWidgets('학생 목록: 칩 4개 + 지정/공개·대기 전환', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(StudentIqListScreen(
+      await tester.pumpScopedWidget(_wrap(StudentIqListScreen(
         loaderOverride: () async => <IndividualQuestion>[
           _question(
               id: 'd',
@@ -155,7 +155,7 @@ void main() {
     });
 
     testWidgets('멘토 목록: 필터로 섹션·행 전환', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(MentorIqListScreen(
+      await tester.pumpScopedWidget(_wrap(MentorIqListScreen(
         loaderOverride: () async => MentorIqListData(
           open: <OpenIndividualQuestion>[
             OpenIndividualQuestion(
@@ -220,7 +220,7 @@ void main() {
 
     testWidgets('학생·답변 도착(answered) → 해결 완료 버튼, 취소 버튼 없음',
         (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q1',
         roleOverride: AppRole.student,
         loaderOverride: () async => detail(
@@ -242,9 +242,8 @@ void main() {
       expect(find.text('이렇게 풀어요'), findsOneWidget);
     });
 
-    testWidgets('학생·답변 대기 → 취소 버튼, 해결 완료 없음',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+    testWidgets('학생·답변 대기 → 취소 버튼, 해결 완료 없음', (WidgetTester tester) async {
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q1',
         roleOverride: AppRole.student,
         loaderOverride: () async => detail(IndividualQuestionStatus.open),
@@ -255,7 +254,7 @@ void main() {
     });
 
     testWidgets('멘토·답변중 → 답변 작성 폼', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q1',
         roleOverride: AppRole.mentor,
         loaderOverride: () async => detail(IndividualQuestionStatus.claimed),
@@ -266,7 +265,7 @@ void main() {
     });
 
     testWidgets('멘토·정산 완료 → 안내만', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q1',
         roleOverride: AppRole.mentor,
         loaderOverride: () async => detail(IndividualQuestionStatus.released),

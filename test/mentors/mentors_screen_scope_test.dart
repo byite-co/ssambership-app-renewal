@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
 import 'package:ssambership_app/features/mentors/mentors_screen.dart';
 import 'package:ssambership_app/features/mentors/ui/widgets/mentor_card.dart';
 import 'package:ssambership_app/features/mentors/ui/widgets/mentor_favorite_button.dart';
+import '../support/app_scope_test_harness.dart';
 
 MentorListItem _m(String id,
         {String? name, List<String> subjects = const <String>[]}) =>
@@ -96,7 +97,7 @@ void main() {
 
   testWidgets('비로그인 → scope 세그먼트 미노출, 전체 목록은 표시', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(loggedIn: false);
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -107,7 +108,7 @@ void main() {
 
   testWidgets('로그인 → 세그먼트 노출 + 찜 카운트 라벨 통합', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{'m1', 'm2'});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -119,7 +120,7 @@ void main() {
 
   testWidgets('찜 scope 선택 → 찜한 멘토만 표시', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{'m1'});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -133,7 +134,7 @@ void main() {
 
   testWidgets('찜 scope + 검색 교집합', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{'m1', 'm2'});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -151,7 +152,7 @@ void main() {
       (WidgetTester tester) async {
     final _FakeFavorites fav =
         _FakeFavorites(ids: <String>{'m1'}, loadError: true);
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -173,7 +174,7 @@ void main() {
 
   testWidgets('찜 0개(성공) → 아직 찜한 멘토가 없어요(오류와 구분)', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -187,7 +188,7 @@ void main() {
   testWidgets('찜 scope 에서 하트 해제 → 카드 즉시 제외 + 카운트 갱신',
       (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{'m1', 'm2'});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -207,7 +208,7 @@ void main() {
   testWidgets('서버 실패 → 하트·카드 원복 + 안내', (WidgetTester tester) async {
     final _FakeFavorites fav =
         _FakeFavorites(ids: <String>{'m1'}, failOps: true);
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -227,7 +228,7 @@ void main() {
   testWidgets('하트 연타 → 서버 반영 1회, 최종 UI=서버 상태', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{});
     fav.opGate = Completer<bool>();
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 
@@ -250,7 +251,7 @@ void main() {
 
   testWidgets('상세 복귀 → 찜 카운트/목록 재동기화', (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
     expect(find.text('찜한 멘토 0'), findsOneWidget);
@@ -271,7 +272,7 @@ void main() {
   testWidgets('로그인인데 찜 0 → 찜 scope 진입해도 전체 scope 복귀 없음(빈 상태 유지)',
       (WidgetTester tester) async {
     final _FakeFavorites fav = _FakeFavorites(ids: <String>{});
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         MentorsScreen(directory: _FakeDirectory(mentors), favorites: fav)));
     await tester.pumpAndSettle();
 

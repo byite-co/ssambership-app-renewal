@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/question_room/data/models/question_thread.dart';
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/mentor/mentor_answer_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 채팅/답변 화면의 '입력창 하단 고정' 구조 검증.
 /// 입력 바는 FutureBuilder(데이터) 바깥 Column 에 있어, 백엔드 없이도 항상 렌더된다.
@@ -23,10 +24,9 @@ QuestionThread _thread() {
 Widget _wrap(Widget child) => MaterialApp(home: child);
 
 void main() {
-  testWidgets('학생 채팅: 입력창이 하단에 있고 첨부·전송 아이콘이 있다',
-      (WidgetTester tester) async {
-    await tester
-        .pumpWidget(_wrap(ChatScreen(thread: _thread(), mentorName: '김선생')));
+  testWidgets('학생 채팅: 입력창이 하단에 있고 첨부·전송 아이콘이 있다', (WidgetTester tester) async {
+    await tester.pumpScopedWidget(
+        _wrap(ChatScreen(thread: _thread(), mentorName: '김선생')));
     await tester.pump(); // FutureBuilder 1프레임(데이터는 무시)
 
     expect(find.byType(TextField), findsOneWidget);
@@ -43,7 +43,7 @@ void main() {
 
   testWidgets('멘토 답변: 입력창 하단 + 전송 버튼 tooltip "답변 전송" + 학생명/제목 헤더',
       (WidgetTester tester) async {
-    await tester.pumpWidget(
+    await tester.pumpScopedWidget(
         _wrap(MentorAnswerScreen(thread: _thread(), studentName: '로컬학생')));
     await tester.pump();
 

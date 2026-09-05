@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/widgets/chip_scroll.dart';
@@ -152,13 +154,13 @@ class BoardListViewState extends State<BoardListView> {
   Future<void> _open(BoardPost post) async {
     // §4: 상세에서 댓글·반응 등 변경(pop true)이 있었을 때만 첫 페이지 재조회
     // — 카드의 댓글수·좋아요수 stale 해소(무조건 재조회로 인한 중복 호출 없음).
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardDetailScreen(
-          post: post,
-          read: widget.read,
-          write: widget.write,
-        ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.boardPost(post.id),
+      fallbackBuilder: (_) => BoardDetailScreen(
+        post: post,
+        read: widget.read,
+        write: widget.write,
       ),
     );
     if (changed == true && mounted) await _pager.refresh();

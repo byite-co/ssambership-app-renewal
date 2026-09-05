@@ -22,15 +22,18 @@ import '../question_room/data/question_room_read_repository.dart';
 /// ★ dev 전용(출시 빌드 미등록). 디자인은 기존 위젯/토큰만, 색 추가 없음.
 ///   내부 UUID·테이블명·영문 status 를 그대로 노출하지 않는다(라벨/요약만).
 class S3DataInspector extends StatefulWidget {
-  const S3DataInspector({super.key});
+  const S3DataInspector({
+    super.key,
+    required this.repository,
+  });
+
+  final QuestionRoomReadRepository repository;
 
   @override
   State<S3DataInspector> createState() => _S3DataInspectorState();
 }
 
 class _S3DataInspectorState extends State<S3DataInspector> {
-  final QuestionRoomReadRepository _repo = const QuestionRoomReadRepository();
-
   Room? _room;
   int _roomIndex = 0;
   QuestionThread? _thread;
@@ -54,17 +57,17 @@ class _S3DataInspectorState extends State<S3DataInspector> {
             : null,
       ),
       body: _thread != null
-          ? _MessagesView(repo: _repo, thread: _thread!)
+          ? _MessagesView(repo: widget.repository, thread: _thread!)
           : _room != null
               ? _RoomDetailView(
-                  repo: _repo,
+                  repo: widget.repository,
                   room: _room!,
                   index: _roomIndex,
                   onOpenThread: (QuestionThread t) =>
                       setState(() => _thread = t),
                 )
               : _RoomsView(
-                  repo: _repo,
+                  repo: widget.repository,
                   onOpenRoom: (Room r, int i) => setState(() {
                     _room = r;
                     _roomIndex = i;

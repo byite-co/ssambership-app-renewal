@@ -7,6 +7,7 @@ import 'package:ssambership_app/features/question_room/data/question_room_read_r
 import 'package:ssambership_app/features/question_room/data/thread_realtime.dart';
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/mentor/mentor_answer_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// N21 화면 계약 — 학생 채팅·멘토 답변 두 표면의 페이지 로드/이전 병합/커서.
 class _NoopRealtime implements ThreadRealtimePort {
@@ -115,7 +116,7 @@ void main() {
           _FakePagingRead(<String, List<QuestionMessage>>{
         'tA': <QuestionMessage>[for (int i = 0; i < 250; i++) _msg('tA', i)],
       });
-      await tester.pumpWidget(student(read, 'tA'));
+      await tester.pumpScopedWidget(student(read, 'tA'));
       await tester.pumpAndSettle();
 
       expect(read.recentCalls, <String>['tA']);
@@ -138,7 +139,7 @@ void main() {
           _FakePagingRead(<String, List<QuestionMessage>>{
         'tA': <QuestionMessage>[for (int i = 0; i < 5; i++) _msg('tA', i)],
       });
-      await tester.pumpWidget(student(read, 'tA'));
+      await tester.pumpScopedWidget(student(read, 'tA'));
       await tester.pumpAndSettle();
       expect(find.text('이전 대화 불러오기'), findsNothing);
     });
@@ -150,9 +151,9 @@ void main() {
         'tA': <QuestionMessage>[for (int i = 0; i < 250; i++) _msg('tA', i)],
         'tB': <QuestionMessage>[for (int i = 0; i < 3; i++) _msg('tB', i)],
       });
-      await tester.pumpWidget(student(read, 'tA'));
+      await tester.pumpScopedWidget(student(read, 'tA'));
       await tester.pumpAndSettle();
-      await tester.pumpWidget(student(read, 'tB'));
+      await tester.pumpScopedWidget(student(read, 'tB'));
       await tester.pumpAndSettle();
 
       expect(read.recentCalls, <String>['tA', 'tB']);
@@ -172,7 +173,7 @@ void main() {
           _FakePagingRead(<String, List<QuestionMessage>>{
         'tM': <QuestionMessage>[for (int i = 0; i < 201; i++) _msg('tM', i)],
       });
-      await tester.pumpWidget(mentor(read, 'tM'));
+      await tester.pumpScopedWidget(mentor(read, 'tM'));
       await tester.pumpAndSettle();
 
       expect(read.recentCalls, <String>['tM']);

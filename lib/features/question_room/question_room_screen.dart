@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../core/auth/auth_service.dart' show AppRole;
@@ -87,7 +89,6 @@ class _RoomItem {
 
 class _StudentRoomListState extends State<_StudentRoomList>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
   // A-2: 레포지토리·구독 리더·사용자 id 는 AppScope 에서 받는다(직접 생성 0).
   late final AppDependencies _deps;
   QuestionRoomReadRepository get _repo => _deps.questionRoomRead;
@@ -158,6 +159,7 @@ class _StudentRoomListState extends State<_StudentRoomList>
       final DateTime? t = lastByRoom[r.id];
       return (t != null && t.isAfter(r.updatedAt)) ? t : r.updatedAt;
     }
+
     final List<_RoomItem> items = rooms
         .map((Room r) => _RoomItem(
               lastActivity: activityOf(r),
@@ -175,7 +177,9 @@ class _StudentRoomListState extends State<_StudentRoomList>
 
   void _refresh() {
     if (!mounted) return; // §4: dispose 후 setState 금지.
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
   }
 
   @override
@@ -282,13 +286,13 @@ class _StudentRoomListState extends State<_StudentRoomList>
   }
 
   Future<void> _open(_RoomItem it) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorRoomHomeScreen(
-          room: it.room,
-          mentorName: it.mentorName,
-          sub: it.sub,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.room(it.room.id),
+      fallbackBuilder: (_) => MentorRoomHomeScreen(
+        room: it.room,
+        mentorName: it.mentorName,
+        sub: it.sub,
       ),
     );
     if (mounted) _refresh(); // 돌아오면 최신화(새 질문/확인 반영).

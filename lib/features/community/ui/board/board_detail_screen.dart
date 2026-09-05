@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../design/role_accent.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/shape_tokens.dart';
@@ -247,12 +249,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen>
   /// 내 글 수정 — 수정 화면으로. 성공(pop true)하면 상세를 닫아 목록을
   /// 새로고침시킨다(상세의 글 스냅샷은 이미 낡은 값이라 유지하지 않는다).
   Future<void> _editMyPost() async {
-    final bool? updated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardWriteScreen(
-          write: widget.write,
-          editing: widget.post,
-        ),
+    final bool? updated = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.editBoardPost(widget.post.id),
+      fallbackBuilder: (_) => BoardWriteScreen(
+        write: widget.write,
+        editing: widget.post,
       ),
     );
     if (updated == true && mounted) Navigator.of(context).pop(true);

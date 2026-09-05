@@ -10,6 +10,7 @@ import 'package:ssambership_app/features/individual_question/ui/iq_create_screen
 import 'package:ssambership_app/features/individual_question/ui/student_iq_list_screen.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
 import 'package:ssambership_app/features/mentors/ui/mentor_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 제품 경계 계약(2026-08-05): 신규 개별질문 등록은 **웹 전용**이다.
 ///
@@ -156,7 +157,7 @@ void main() {
         opened.add(u);
         return true;
       });
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: StudentIqListScreen(
           loaderOverride: () async => <IndividualQuestion>[question()],
           webBridgeOverride: fake,
@@ -179,7 +180,7 @@ void main() {
         opened.add(u);
         return true;
       });
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: StudentIqListScreen(
           loaderOverride: () async => <IndividualQuestion>[],
           webBridgeOverride: fake,
@@ -205,7 +206,7 @@ void main() {
         opened.add(u);
         return true;
       });
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: MentorDetailScreen(
           item: const MentorListItem(id: 'm1', nickname: '멘토A'),
           extrasLoaderOverride: () async =>
@@ -229,7 +230,7 @@ void main() {
   group('실패 UX', () {
     testWidgets('웹 열기 실패 → 재시도 안내 스낵바', (WidgetTester tester) async {
       final WebBridge failing = WebBridge(launcher: (Uri u) async => false);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: Builder(
             builder: (BuildContext context) => TextButton(
@@ -249,7 +250,7 @@ void main() {
         baseUrl: '',
         launcher: (Uri u) async => fail('미확정이면 launcher 호출 금지'),
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: Builder(
             builder: (BuildContext context) => TextButton(

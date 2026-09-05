@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
+import '../../../app/app_scope.dart';
 import '../../../core/commerce/commerce_policy.dart';
 import '../../../core/entitlement/subscription_summary.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
@@ -28,25 +31,25 @@ class QuestionListScreen extends StatefulWidget {
     required this.room,
     required this.mentorName,
     this.sub,
-    this.readRepository = const QuestionRoomReadRepository(),
-    this.writeRepository = const QuestionRoomWriteRepository(),
+    this.readRepository,
+    this.writeRepository,
   });
 
   final Room room;
   final String mentorName;
   final SubscriptionSummary? sub;
 
-  /// 테스트 주입 지점(기본: 운영 레포).
-  final QuestionRoomReadRepository readRepository;
-  final QuestionRoomWriteRepository writeRepository;
+  /// 테스트 주입 지점. null 이면 AppScope의 운영 레포를 사용.
+  final QuestionRoomReadRepository? readRepository;
+  final QuestionRoomWriteRepository? writeRepository;
 
   @override
   State<QuestionListScreen> createState() => _QuestionListScreenState();
 }
 
 class _QuestionListScreenState extends State<QuestionListScreen> {
-  QuestionRoomReadRepository get _read => widget.readRepository;
-  QuestionRoomWriteRepository get _write => widget.writeRepository;
+  late final QuestionRoomReadRepository _read;
+  late final QuestionRoomWriteRepository _write;
 
   late Future<List<QuestionThread>> _future;
   bool _busy = false;
@@ -57,6 +60,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   @override
   void initState() {
     super.initState();
+    _read = widget.readRepository ?? AppScope.of(context).questionRoomRead;
+    _write = widget.writeRepository ?? AppScope.of(context).questionRoomWrite;
     _future = _read.threads(widget.room.id);
     _loadUsage();
   }
@@ -73,7 +78,8 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
 
   /// 주간 사용량 조회(읽기전용). 실패해도 화면 흐름은 막지 않는다.
   Future<void> _loadUsage() async {
-    final WeeklyQuestionUsage? u = await _read.weeklyUsage(mentorId: widget.room.mentorId);
+    final WeeklyQuestionUsage? u =
+        await _read.weeklyUsage(mentorId: widget.room.mentorId);
     if (mounted) setState(() => _usage = u);
   }
 
@@ -168,9 +174,9 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
                 label: '+ 새로운 질문하기',
                 onPressed: _busy ? null : _openNewQuestion,
               ),
-            // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
-            // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
-            // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
+              // N28: 딥링크 진입은 구독 스냅샷(sub) 없이 열린다 — 서버 사용량이
+              // limit>0 이면 구독 자격이 있는 것(정본 판정)이므로 소진 안내로
+              // 분기한다(구독 중 학생에게 구독 안내 카드를 띄우는 모순 제거).
             ] else if (widget.sub?.isActive == true ||
                 (_usage != null && _usage!.limit > 0)) ...<Widget>[
               // 구독 중인데 이번 주 소진 — 안내만(구매 유도 아님).
@@ -191,34 +197,38 @@ class _QuestionListScreenState extends State<QuestionListScreen> {
   }
 
   Future<void> _openNewQuestion() async {
-    final bool? created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => NewQuestionScreen(room: widget.room),
+    final bool? created = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.newRoomThread(widget.room.id),
+      fallbackBuilder: (_) => NewQuestionScreen(
+        room: widget.room,
+        readRepository: _read,
+        writeRepository: _write,
       ),
     );
     if (created == true && mounted) _refresh();
   }
 
   Future<void> _openChat(QuestionThread t) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatScreen(
-          thread: t,
-          mentorName: widget.mentorName,
-          room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomThread(widget.room.id, t.id),
+      fallbackBuilder: (_) => ChatScreen(
+        thread: t,
+        mentorName: widget.mentorName,
+        room: widget.room, // 신고·차단 상대 도출의 정본(참여자 데이터).
       ),
     );
     if (mounted) _refresh();
   }
 
   Future<void> _openNotes() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ConnectionNotesScreen(
-          room: widget.room,
-          mentorName: widget.mentorName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomNotes(widget.room.id),
+      fallbackBuilder: (_) => ConnectionNotesScreen(
+        room: widget.room,
+        mentorName: widget.mentorName,
       ),
     );
   }

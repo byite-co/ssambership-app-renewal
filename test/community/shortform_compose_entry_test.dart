@@ -7,6 +7,7 @@ import 'package:ssambership_app/features/community/ui/shortform/shortform_compos
 import 'package:ssambership_app/features/community/ui/shortform/shortform_feed_view.dart';
 
 import 'fakes.dart';
+import '../support/app_scope_test_harness.dart';
 
 Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
@@ -23,35 +24,35 @@ ShortformFeedView _feed({
 
 void main() {
   testWidgets('학생 → 숏폼 작성 CTA 미노출(목록·빈 화면 모두)', (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(_feed(
+    await tester.pumpScopedWidget(_wrap(_feed(
         role: AppRole.student, posts: <ShortformPost>[sampleShortform()])));
     await tester.pumpAndSettle();
     expect(find.text('숏폼 작성'), findsNothing);
 
     // State 재사용 방지(같은 위치 재-pump 는 initState 재조회를 하지 않는다).
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    await tester.pumpWidget(_wrap(_feed(role: AppRole.student)));
+    await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpScopedWidget(_wrap(_feed(role: AppRole.student)));
     await tester.pumpAndSettle();
     expect(find.text('숏폼 작성'), findsNothing);
     expect(find.text('멘토들의 숏폼이 올라오면 여기에 표시돼요.'), findsOneWidget);
   });
 
   testWidgets('게스트 → CTA 미노출(열람만)', (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(
+    await tester.pumpScopedWidget(_wrap(
         _feed(role: AppRole.guest, posts: <ShortformPost>[sampleShortform()])));
     await tester.pumpAndSettle();
     expect(find.text('숏폼 작성'), findsNothing);
   });
 
   testWidgets('멘토 → 목록 상단 CTA 노출', (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(_feed(
+    await tester.pumpScopedWidget(_wrap(_feed(
         role: AppRole.mentor, posts: <ShortformPost>[sampleShortform()])));
     await tester.pumpAndSettle();
     expect(find.text('숏폼 작성'), findsOneWidget);
   });
 
   testWidgets('멘토 + 빈 피드 → 작성 유도 빈 화면(문구·CTA)', (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(_feed(role: AppRole.mentor)));
+    await tester.pumpScopedWidget(_wrap(_feed(role: AppRole.mentor)));
     await tester.pumpAndSettle();
     expect(find.text('아직 숏폼이 없어요'), findsOneWidget);
     expect(find.text('앱 안에서 영상을 선택해 작성할 수 있어요.'), findsOneWidget);
@@ -60,7 +61,7 @@ void main() {
 
   testWidgets('CTA 탭 → 작성 화면 push, 세션 없음 → 로그인 유도(크래시 0)',
       (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(_feed(role: AppRole.mentor)));
+    await tester.pumpScopedWidget(_wrap(_feed(role: AppRole.mentor)));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('숏폼 작성'));
@@ -83,7 +84,7 @@ void main() {
   testWidgets('작성 draft 완료 복귀 → 피드 서버 재조회 + 임시저장 안내',
       (WidgetTester tester) async {
     final _CountingRead read = _CountingRead();
-    await tester.pumpWidget(_wrap(ShortformFeedView(
+    await tester.pumpScopedWidget(_wrap(ShortformFeedView(
       read: read,
       write: FakeCommunityWrite(),
       roleOf: () => AppRole.mentor,
@@ -108,7 +109,7 @@ void main() {
   testWidgets('작성 published 완료 복귀 → 재조회로 새 카드 표시(로컬 가짜 카드 아님)',
       (WidgetTester tester) async {
     final _CountingRead read = _CountingRead();
-    await tester.pumpWidget(_wrap(ShortformFeedView(
+    await tester.pumpScopedWidget(_wrap(ShortformFeedView(
       read: read,
       write: FakeCommunityWrite(),
       roleOf: () => AppRole.mentor,

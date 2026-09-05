@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/shape_tokens.dart';
@@ -49,7 +51,6 @@ class _StudentItem {
 
 class _MentorInboxScreenState extends State<MentorInboxScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
   // A-2: 레포지토리는 AppScope 에서 받는다(직접 생성 0).
   late final AppDependencies _deps;
   QuestionRoomReadRepository get _repo => _deps.questionRoomRead;
@@ -130,7 +131,12 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
     return last;
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {
+      _future = _load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +150,8 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
             onChanged: (String v) => setState(() => _query = v.trim()),
             decoration: InputDecoration(
               hintText: '학생 검색',
-              prefixIcon: const Icon(Icons.search_rounded, color: ColorTokens.muted),
+              prefixIcon:
+                  const Icon(Icons.search_rounded, color: ColorTokens.muted),
               filled: true,
               fillColor: ColorTokens.elevated,
               border: OutlineInputBorder(
@@ -206,7 +213,8 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
           padding: const EdgeInsets.fromLTRB(
               AppSpacing.screenH, 4, AppSpacing.screenH, 12),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+          separatorBuilder: (_, __) =>
+              const SizedBox(height: AppSpacing.cardGap),
           itemBuilder: (BuildContext context, int i) =>
               _StudentTile(item: items[i], onOpen: () => _open(items[i])),
         );
@@ -215,12 +223,12 @@ class _MentorInboxScreenState extends State<MentorInboxScreen>
   }
 
   Future<void> _open(_StudentItem it) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StudentRoomHomeScreen(
-          room: it.room,
-          studentName: it.studentName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.room(it.room.id),
+      fallbackBuilder: (_) => StudentRoomHomeScreen(
+        room: it.room,
+        studentName: it.studentName,
       ),
     );
     if (mounted) _refresh(); // 돌아오면 최신화(답변/상태 반영).

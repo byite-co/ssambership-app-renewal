@@ -6,6 +6,7 @@ import 'package:ssambership_app/features/individual_question/data/iq_messages_co
 import 'package:ssambership_app/features/individual_question/data/iq_realtime.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// §G/§H — IQ 실시간(dedup upsert·채널 정리)과 당사자 공용 컴포저
 /// (iq_append_message) 배선. 실네트워크 없이 fake 포트/레포로 검증한다.
@@ -78,7 +79,7 @@ Future<void> _pump(
   List<(String, String)>? appendLog,
   List<IqMessage> messages = const <IqMessage>[],
 }) async {
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(MaterialApp(
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,
@@ -109,7 +110,8 @@ void main() {
     test('resetTo(재조회) 와 실시간 수신이 id 로 수렴한다', () {
       final IqMessagesController c = IqMessagesController();
       c.upsertFromServer(_m('a', '실시간', minute: 1));
-      c.resetTo(<IqMessage>[_m('a', '재조회 정본', minute: 1), _m('b', '둘째', minute: 2)]);
+      c.resetTo(
+          <IqMessage>[_m('a', '재조회 정본', minute: 1), _m('b', '둘째', minute: 2)]);
       expect(c.length, 2);
       expect(c.items.first.body, '재조회 정본');
     });
@@ -153,7 +155,7 @@ void main() {
         status: IndividualQuestionStatus.answered,
         realtime: rt,
       );
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
       await tester.pumpAndSettle();
       expect(rt.disposeCalls, 1);
     });
@@ -227,7 +229,8 @@ void main() {
         status: IndividualQuestionStatus.claimed,
         realtime: _FakeIqRealtime(),
       );
-      expect(find.text('답변 등록'), findsOneWidget); // answer_individual_question 경로
+      expect(
+          find.text('답변 등록'), findsOneWidget); // answer_individual_question 경로
       expect(find.byTooltip('보내기'), findsNothing);
     });
   });

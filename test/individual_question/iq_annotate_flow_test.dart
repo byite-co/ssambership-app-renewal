@@ -12,6 +12,7 @@ import 'package:ssambership_app/features/individual_question/data/models/individ
 import 'package:ssambership_app/features/individual_question/ui/iq_create_screen.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/features/scan_annotation/annotation_target.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// S18·§4 첨삭 흐름 — 학생(전송 전 필기 = 첨부 대체·이어 그리기)과 멘토
 /// (첨삭하기 노출·ink.json 분기·완료 = **대기 첨부 추가**, 즉시 등록 0,
@@ -162,7 +163,7 @@ void main() {
       final _FakeIqAttachments attachments = _FakeIqAttachments();
       final Uint8List flat = Uint8List.fromList(List<int>.filled(16, 200));
 
-      await tester.pumpWidget(_wrap(IqCreateScreen(
+      await tester.pumpScopedWidget(_wrap(IqCreateScreen(
         prefillOverride: () async =>
             const IqCreatePrefill(balanceCents: 10000000),
         submitOverride: ({
@@ -202,7 +203,7 @@ void main() {
           <(PickedImage, InkDocument?)>[];
       final InkDocument first = _doc(width: 111);
 
-      await tester.pumpWidget(_wrap(IqCreateScreen(
+      await tester.pumpScopedWidget(_wrap(IqCreateScreen(
         prefillOverride: () async =>
             const IqCreatePrefill(balanceCents: 10000000),
         scanPicker: _FakeScanPort(),
@@ -257,7 +258,7 @@ void main() {
         IndividualQuestionStatus.claimed,
         IndividualQuestionStatus.answered,
       ]) {
-        await tester.pumpWidget(_wrap(IqDetailScreen(
+        await tester.pumpScopedWidget(_wrap(IqDetailScreen(
           questionId: 'q-1',
           roleOverride: AppRole.mentor,
           loaderOverride: () async => data(status: status),
@@ -270,7 +271,7 @@ void main() {
     });
 
     testWidgets('학생에게도 첨삭하기 비노출(기존과 동일)', (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q-1',
         roleOverride: AppRole.student,
         loaderOverride: () async => data(),
@@ -296,7 +297,7 @@ void main() {
       final List<(String, String)> appendLog = <(String, String)>[];
       final Uint8List flat = _flatPng(250);
 
-      await tester.pumpWidget(_wrap(IqDetailScreen(
+      await tester.pumpScopedWidget(_wrap(IqDetailScreen(
         questionId: 'q-1',
         roleOverride: AppRole.student,
         loaderOverride: () async => data(),

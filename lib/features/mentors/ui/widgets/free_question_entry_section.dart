@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../core/auth/auth_service.dart' show AppRole;
 import '../../../../design/tokens/color_tokens.dart';
@@ -24,7 +26,7 @@ class FreeQuestionEntrySection extends StatefulWidget {
     required this.mentorId,
     required this.mentorName,
     required this.alreadySubscribed,
-    this.port = const SupabaseFreeQuestionEntryRepository(),
+    this.port,
     this.isStudentOverride,
     this.onCreated,
   });
@@ -35,7 +37,8 @@ class FreeQuestionEntrySection extends StatefulWidget {
   /// 멘토 상세 extras 의 구독 여부(null=미확정 — 활성 CTA 0).
   final bool? alreadySubscribed;
 
-  final FreeQuestionEntryPort port;
+  /// Optional test seam. Production resolves the port from [AppScope].
+  final FreeQuestionEntryPort? port;
 
   /// 테스트 주입(기본: AuthService.currentRole == student).
   final bool? isStudentOverride;
@@ -49,6 +52,7 @@ class FreeQuestionEntrySection extends StatefulWidget {
 }
 
 class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
+  late final FreeQuestionEntryPort _port;
   FreeQuestionEntrySnapshot? _snapshot;
   bool _loading = false;
   bool _failed = false;
@@ -61,6 +65,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
   @override
   void initState() {
     super.initState();
+    _port = widget.port ?? AppScope.of(context).freeQuestionEntry;
     // 학생 + 비구독 확정일 때만 조회(그 외엔 조회 자체가 불필요).
     if (_isStudent && widget.alreadySubscribed == false) {
       _fetch();
@@ -86,8 +91,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
       _failed = false;
     });
     try {
-      final FreeQuestionEntrySnapshot s =
-          await widget.port.fetch(widget.mentorId);
+      final FreeQuestionEntrySnapshot s = await _port.fetch(widget.mentorId);
       if (!mounted) return;
       setState(() {
         _snapshot = s;
@@ -116,7 +120,7 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
         // 방 부재 — 첫 질문 직전에 서버 RPC 로 방을 보장한다. 자격(가입 7일/
         // 전역/멘토별 한도)·차단·계정 상태 판정은 전부 서버 몫.
         try {
-          roomId = await widget.port.ensureRoom(widget.mentorId);
+          roomId = await _port.ensureRoom(widget.mentorId);
         } catch (e) {
           if (!mounted) return;
           ScaffoldMessenger.of(context)
@@ -137,13 +141,13 @@ class _FreeQuestionEntrySectionState extends State<FreeQuestionEntrySection> {
         });
       }
       final CreatedFreeQuestion? created =
-          await Navigator.of(context).push<CreatedFreeQuestion>(
-        MaterialPageRoute<CreatedFreeQuestion>(
-          builder: (_) => FreeQuestionComposeScreen(
-            roomId: roomId,
-            mentorName: widget.mentorName,
-            port: widget.port,
-          ),
+          await AppNavigation.push<CreatedFreeQuestion>(
+        context,
+        AppRoutePaths.freeQuestion(roomId),
+        fallbackBuilder: (_) => FreeQuestionComposeScreen(
+          roomId: roomId,
+          mentorName: widget.mentorName,
+          port: _port,
         ),
       );
       if (!mounted) return;

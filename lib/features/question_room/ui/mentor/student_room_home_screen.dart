@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/entitlement/subscription_summary.dart';
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
+import '../../../../core/entitlement/subscription_summary.dart';
 import '../../../../design/tokens/color_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
 import '../../../../design/typography_tokens.dart';
@@ -173,8 +175,7 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
     final String? mine = d.myNote?.body?.trim();
     final String? stu = d.studentNote?.body?.trim();
     if ((mine == null || mine.isEmpty) && (stu == null || stu.isEmpty)) {
-      return Text('아직 노트가 없어요. 내 노트를 추가해 보세요.',
-          style: AppType.caption);
+      return Text('아직 노트가 없어요. 내 노트를 추가해 보세요.', style: AppType.caption);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,12 +205,12 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
       t.title?.trim().isNotEmpty == true ? t.title!.trim() : '(제목 없음)';
 
   Future<void> _openQuestions() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorQuestionListScreen(
-          room: widget.room,
-          studentName: widget.studentName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomThreads(widget.room.id),
+      fallbackBuilder: (_) => MentorQuestionListScreen(
+        room: widget.room,
+        studentName: widget.studentName,
       ),
     );
     if (mounted) _refresh();
@@ -218,12 +219,12 @@ class _StudentRoomHomeScreenState extends State<StudentRoomHomeScreen> {
   Future<void> _openNotes() async {
     // S4 연결노트 화면 재사용 — 역할 무관(본인 author 행만 추가/수정).
     // 멘토에겐 '상대 노트'=학생, '내 노트'=멘토로 자연스럽게 매핑된다.
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ConnectionNotesScreen(
-          room: widget.room,
-          mentorName: widget.studentName,
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.roomNotes(widget.room.id),
+      fallbackBuilder: (_) => ConnectionNotesScreen(
+        room: widget.room,
+        mentorName: widget.studentName,
       ),
     );
     if (mounted) _refresh();

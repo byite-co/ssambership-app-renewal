@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/features/question_room/data/models/connection_note.dart';
 import 'package:ssambership_app/features/question_room/data/models/room.dart';
 import 'package:ssambership_app/features/question_room/ui/connection_notes_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 Room _room() => Room(
       id: 'r1',
@@ -32,7 +33,7 @@ void main() {
   testWidgets('상대 노트 렌더 + 내 노트 저장이 save 경로(본인 author)를 호출',
       (WidgetTester tester) async {
     String? saved;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: ConnectionNotesScreen(
         room: _room(),
         mentorName: '김멘토',

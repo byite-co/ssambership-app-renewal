@@ -13,6 +13,7 @@ import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 
 import '../community/fakes.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 세션1 §4 — 캐시 무효화·재조회 수렴.
 /// (a) 댓글 mutation 후 상세·목록 count, (b) 외부 변경(숨김·복구)의
@@ -51,8 +52,9 @@ class _MutableRead extends CommunityReadRepository {
   Future<CommunityPage<BoardPost>> boards(
       {String? category, int? limit, int offset = 0}) async {
     boardsCalls++;
-    final List<BoardPost> items =
-        offset >= boardsData.length ? <BoardPost>[] : boardsData.sublist(offset);
+    final List<BoardPost> items = offset >= boardsData.length
+        ? <BoardPost>[]
+        : boardsData.sublist(offset);
     return CommunityPage<BoardPost>(
       items: limit == null ? items : items.take(limit).toList(),
       rawCount: items.length,
@@ -94,7 +96,7 @@ void main() {
       );
       final FakeCommunityWrite write = FakeCommunityWrite();
 
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: BoardListView(read: read, write: write))));
       await tester.pumpAndSettle();
       expect(find.text('글p1'), findsOneWidget);
@@ -136,7 +138,7 @@ void main() {
       );
       final FakeCommunityWrite write = FakeCommunityWrite();
       // AuthService 상태와 무관한 목록 화면만 검증(커뮤니티 탭 셸).
-      await tester.pumpWidget(
+      await tester.pumpScopedWidget(
           MaterialApp(home: CommunityScreen(read: read, write: write)));
       await tester.pumpAndSettle();
       // 게시판 탭으로 전환.
@@ -147,16 +149,14 @@ void main() {
 
       // 관리자 숨김(외부 변경) → 앱 복귀(resumed) → 목록에서 제거.
       read.boardsData = <BoardPost>[_post('p2')];
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(find.text('글p1'), findsNothing);
       expect(find.text('글p2'), findsOneWidget);
 
       // 복구 → 다시 resumed → 재노출.
       read.boardsData = <BoardPost>[_post('p1'), _post('p2')];
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(find.text('글p1'), findsOneWidget);
     });
@@ -168,7 +168,7 @@ void main() {
         boardsData: <BoardPost>[_post('p1')],
         commentsData: const <CommunityComment>[],
       );
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(
               body: BoardListView(read: read, write: FakeCommunityWrite()))));
       await tester.pumpAndSettle();
@@ -206,7 +206,7 @@ void main() {
       _bigSurface(tester);
       int calls = 0;
       int balance = 5000000;
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
           body: MyPageScreen(loaderOverride: () async {
             calls++;
@@ -230,7 +230,7 @@ void main() {
     testWidgets('dispose 후 bump → 상태 변경·크래시 없음', (WidgetTester tester) async {
       _bigSurface(tester);
       int calls = 0;
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(body: MyPageScreen(loaderOverride: () async {
           calls++;
           return data(1000);
@@ -238,7 +238,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       // 화면 제거(dispose — 리스너 해제).
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
       final int before = calls;
       DataRefreshBus.bumpWallet();
       await tester.pump();
@@ -250,7 +250,7 @@ void main() {
       _bigSurface(tester);
       final Completer<MyPageData> slow = Completer<MyPageData>();
       int calls = 0;
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(body: MyPageScreen(loaderOverride: () {
           calls++;
           if (calls == 1) return slow.future; // 환불 '전' 스냅샷 — 늦게 도착

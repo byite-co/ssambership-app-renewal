@@ -12,6 +12,7 @@ import 'package:ssambership_app/features/notifications/notifications_screen.dart
 import 'package:ssambership_app/features/notifications/ui/notification_target_opener.dart';
 import 'package:ssambership_app/features/notifications/ui/widgets/notification_card.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 단순 fake — 전 항목을 한 페이지로 돌려준다(실패 주입 가능).
 class _FakeRepo implements NotificationsRepository {
@@ -174,7 +175,7 @@ void main() {
   testWidgets('모든 유형 렌더 — 맞춤의뢰·환불·미지 포함(숨김 없음) + 안읽음 카운트',
       (WidgetTester tester) async {
     await _tall(tester);
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: _FakeRepo(_sample()),
       onDeepLinkTab: (_) {},
     )));
@@ -198,7 +199,7 @@ void main() {
   testWidgets('필터 칩: 맞춤의뢰 칩 미노출(CR 게이트 OFF), 기타 는 전용 칩 없음(전체에서만)',
       (WidgetTester tester) async {
     await _tall(tester);
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: _FakeRepo(_sample()),
       onDeepLinkTab: (_) {},
     )));
@@ -235,9 +236,9 @@ void main() {
           minute: 5, questionId: questionUuid),
       _n('g', 'weird_unknown_type', 'G 미지 알림', minute: 4),
     ]);
-    final List<int> tabs = <int>[];
+    final List<String> tabs = <String>[];
     final _FakeOpener opener = _FakeOpener();
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: tabs.add,
       detailOpener: opener,
@@ -260,7 +261,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('B 구독 알림'));
     await tester.pumpAndSettle();
-    expect(tabs, <int>[AppTab.notifications, AppTab.myPage]);
+    expect(tabs, <String>[AppTab.notifications, AppTab.myPage]);
 
     // 맞춤의뢰(stay)·미지(unknown) — 이동하지 않고 읽음 처리만 된다.
     await tester.tap(find.text('D 맞춤의뢰 알림'));
@@ -275,7 +276,7 @@ void main() {
   testWidgets('읽음 처리 성공 → repo 호출 + 안읽음 카운트 감소', (WidgetTester tester) async {
     await _tall(tester);
     final _FakeRepo repo = _FakeRepo(_sample());
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -293,7 +294,7 @@ void main() {
       (WidgetTester tester) async {
     await _tall(tester);
     final _FakeRepo repo = _FakeRepo(_sample())..failMarkRead = true;
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -310,7 +311,7 @@ void main() {
   testWidgets('모두 읽음 성공 → RPC 1회 + 전부 읽음 + 카운트 0', (WidgetTester tester) async {
     await _tall(tester);
     final _FakeRepo repo = _FakeRepo(_sample());
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -327,7 +328,7 @@ void main() {
   testWidgets('모두 읽음 실패 → 이전 상태 유지 + 스낵바', (WidgetTester tester) async {
     await _tall(tester);
     final _FakeRepo repo = _FakeRepo(_sample())..failMarkAll = true;
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -343,7 +344,7 @@ void main() {
   testWidgets('새로고침 실패 → 기존 목록 유지 + 스낵바', (WidgetTester tester) async {
     await _tall(tester);
     final _FakeRepo repo = _FakeRepo(_sample());
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -383,7 +384,7 @@ void main() {
         hasNext: false,
       ),
     ]);
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -404,7 +405,7 @@ void main() {
       (WidgetTester tester) async {
     await _tall(tester);
     final _ManualRepo repo = _ManualRepo();
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -453,7 +454,7 @@ void main() {
 
   testWidgets('첫 로드 실패 → 오류 안내 + 다시 시도로 복구', (WidgetTester tester) async {
     final _FakeRepo repo = _FakeRepo(_sample())..failFetch = true;
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: repo,
       onDeepLinkTab: (_) {},
     )));
@@ -470,7 +471,7 @@ void main() {
   });
 
   testWidgets('빈 상태 안내', (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(NotificationsScreen(
+    await tester.pumpScopedWidget(_wrap(NotificationsScreen(
       repository: _FakeRepo(<AppNotification>[]),
       onDeepLinkTab: (_) {},
     )));

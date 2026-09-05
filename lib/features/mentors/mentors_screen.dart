@@ -1,8 +1,8 @@
-// TODO(S10): router에 mentors 라우트 등록 필요 — S5 완료 후 합침
-// (참고: 멘토 찾기 '탭'은 HomeShell 에 이미 연결돼 있고, 상세는 Navigator.push 로 띄우므로
-//  현재 router.dart 변경 없이 동작한다. 별도 named-route 가 필요해지면 S5 머지 후 등록할 것.)
 import 'package:flutter/material.dart';
 
+import '../../app/app_navigation.dart';
+import '../../app/app_route_paths.dart';
+import '../../app/app_scope.dart';
 import '../../design/role_accent.dart';
 import '../../design/shape_tokens.dart';
 import '../../design/spacing_tokens.dart';
@@ -31,18 +31,21 @@ import '../../shared/errors/friendly_error.dart';
 class MentorsScreen extends StatefulWidget {
   const MentorsScreen({
     super.key,
-    this.directory = const MentorDirectoryRepository(),
-    this.favorites = const MentorFavoritesRepository(),
+    this.directory,
+    this.favorites,
   });
 
-  final MentorDirectoryRepository directory;
-  final MentorFavoritesRepository favorites;
+  /// Optional test seams. Production resolves both repositories from [AppScope].
+  final MentorDirectoryRepository? directory;
+  final MentorFavoritesRepository? favorites;
 
   @override
   State<MentorsScreen> createState() => _MentorsScreenState();
 }
 
 class _MentorsScreenState extends State<MentorsScreen> {
+  late final MentorDirectoryRepository _directory;
+  late final MentorFavoritesRepository _favorites;
   late Future<MentorDirectoryResult> _future;
 
   String _query = '';
@@ -63,18 +66,20 @@ class _MentorsScreenState extends State<MentorsScreen> {
   @override
   void initState() {
     super.initState();
-    _future = widget.directory.listComplete();
+    final AppDependencies dependencies = AppScope.of(context);
+    _directory = widget.directory ?? dependencies.mentorDirectory;
+    _favorites = widget.favorites ?? dependencies.mentorFavorites;
+    _future = _directory.listComplete();
     _loadFavorites();
   }
 
   // 블록 바디: setState(() => _future = future)는 Future를 반환해 리빌드가 취소된다.
   void _reload() => setState(() {
-        _future = widget.directory.listComplete();
+        _future = _directory.listComplete();
       });
 
   Future<void> _loadFavorites() async {
-    final MentorFavoritesLoad load =
-        await widget.favorites.loadMyFavoriteMentorIds();
+    final MentorFavoritesLoad load = await _favorites.loadMyFavoriteMentorIds();
     if (!mounted) return;
     setState(() {
       _favLoad = load;
@@ -90,7 +95,7 @@ class _MentorsScreenState extends State<MentorsScreen> {
 
   /// 하트 탭 — 비로그인이면 로그인 유도, 아니면 낙관적 토글 후 서버 반영(실패 시 되돌림).
   Future<void> _toggleFavorite(String mentorId) async {
-    if (!widget.favorites.isLoggedIn) {
+    if (!_favorites.isLoggedIn) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('로그인하면 멘토를 찜할 수 있어요.')),
@@ -104,8 +109,8 @@ class _MentorsScreenState extends State<MentorsScreen> {
     final bool wasFav = _favoriteIds.contains(mentorId);
     setState(() => _favoriteIds = _withToggle(_favoriteIds, mentorId, !wasFav));
     final bool ok = wasFav
-        ? await widget.favorites.remove(mentorId)
-        : await widget.favorites.add(mentorId);
+        ? await _favorites.remove(mentorId)
+        : await _favorites.add(mentorId);
     _favPending.remove(mentorId);
     if (!ok && mounted) {
       setState(
@@ -129,7 +134,7 @@ class _MentorsScreenState extends State<MentorsScreen> {
 
   /// 비로그인(또는 판정 전 로그아웃 전환)에는 찜 scope 를 강제 해제한 유효 scope.
   MentorListScope get _effectiveScope =>
-      widget.favorites.isLoggedIn ? _scope : MentorListScope.all;
+      _favorites.isLoggedIn ? _scope : MentorListScope.all;
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +162,7 @@ class _MentorsScreenState extends State<MentorsScreen> {
         ),
         // 전체 / 찜한 멘토 scope 세그먼트(로그인 시). 기존 '찜한 멘토 N' 카운트는
         // 세그먼트 라벨에 통합했다(웹 `?scope=favorite` 패리티).
-        if (widget.favorites.isLoggedIn)
+        if (_favorites.isLoggedIn)
           Padding(
             padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenH, 0, AppSpacing.screenH, 6),
@@ -346,12 +351,12 @@ class _MentorsScreenState extends State<MentorsScreen> {
   }
 
   Future<void> _open(MentorListItem item) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorDetailScreen(
-          item: item,
-          initialFavorited: _favoriteIds.contains(item.id),
-        ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.mentor(item.id),
+      fallbackBuilder: (_) => MentorDetailScreen(
+        item: item,
+        initialFavorited: _favoriteIds.contains(item.id),
       ),
     );
     if (mounted) {

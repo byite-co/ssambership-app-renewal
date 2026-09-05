@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_scope.dart';
 import '../../../../core/scan/picked_image.dart';
 import '../../../../design/shape_tokens.dart';
 import '../../../../design/spacing_tokens.dart';
@@ -25,12 +26,13 @@ import '../../../../shared/errors/friendly_error.dart';
 class BoardWriteScreen extends StatefulWidget {
   const BoardWriteScreen({
     super.key,
-    this.write = const CommunityWriteRepository(),
+    this.write,
     this.editing,
     this.imagePicker = const DeviceImagePicker(),
   });
 
-  final CommunityWriteRepository write;
+  /// Optional test seam. Production resolves the writer from [AppScope].
+  final CommunityWriteRepository? write;
 
   /// null = 새 글, 지정 시 이 글의 수정.
   final BoardPost? editing;
@@ -51,6 +53,7 @@ class _PendingImage {
 }
 
 class _BoardWriteScreenState extends State<BoardWriteScreen> {
+  late final CommunityWriteRepository _write;
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
   String _category = communityCategoryOptions.first.key;
@@ -76,6 +79,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   @override
   void initState() {
     super.initState();
+    _write = widget.write ?? AppScope.of(context).communityWrite;
     final BoardPost? editing = widget.editing;
     if (editing != null) {
       _title.text = editing.title;
@@ -117,8 +121,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   /// 만든다. 이미 올라간 이미지는 다시 올리지 않는다(재시도 중복 방지).
   Future<List<String>> _uploadNewImagesAndCollectRefs() async {
     for (final _PendingImage pending in _newImages) {
-      pending.uploadedRef ??=
-          await widget.write.uploadPostImage(pending.image);
+      pending.uploadedRef ??= await _write.uploadPostImage(pending.image);
     }
     return <String>[
       ..._keptExistingRefs,
@@ -151,7 +154,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     final String operationKey = _operationKey ??= newBoardPostIdempotencyKey();
     try {
       final List<String> imageRefs = await _uploadNewImagesAndCollectRefs();
-      await widget.write.createPost(
+      await _write.createPost(
         title: title,
         body: body,
         category: _category,
@@ -179,7 +182,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     }
     try {
       final List<String> imageRefs = await _uploadNewImagesAndCollectRefs();
-      await widget.write.updatePost(
+      await _write.updatePost(
         postId: editing.id,
         title: title,
         body: body,
@@ -291,8 +294,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
             style: AppType.body,
             minLines: 8,
             maxLines: 16,
-            decoration:
-                _decoration('내용', hint: '커뮤니티 가이드에 맞게 작성해 주세요.'),
+            decoration: _decoration('내용', hint: '커뮤니티 가이드에 맞게 작성해 주세요.'),
           ),
           const SizedBox(height: 12),
           _imagesSection(),

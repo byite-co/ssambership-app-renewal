@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/auth_service.dart' show AppRole;
 import '../core/refresh/data_refresh_bus.dart';
+import '../design/spacing_tokens.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/mypage/data/mypage_models.dart';
-import '../features/mypage/mypage_screen.dart';
+import '../features/mypage/ui/sections/mentor_dashboard_section.dart';
 import '../features/notifications/data/notification_badge_controller.dart'
     show notificationBadgeLabel;
 import '../features/notifications/notifications_screen.dart';
@@ -14,22 +16,34 @@ import '../features/question_room/question_room_screen.dart';
 import '../shared/constants/app_constants.dart';
 import '../shared/widgets/screen_visibility.dart';
 import '../shared/widgets/withdrawal_pending_banner.dart';
+import 'app_navigation.dart';
+import 'app_route_paths.dart';
 import 'app_scope.dart';
 import 'app_tabs.dart';
+import 'async_route_loader.dart';
 import 'entry_guard.dart';
+import 'routes/mypage_routes.dart';
 
-/// 하단 탭 5개 셸(질문방·커뮤니티·멘토찾기·알림·개별질문).
+/// 역할별 5탭 셸.
 ///
-/// 마이페이지는 하단 탭이 아니라 AppBar 우측 상단의 '원형 프로필' 버튼으로
-/// 진입한다(push). 개별질문이 그 자리를 이어받아 다른 기능과 동일 위상이 된다.
-///
-/// 게스트(둘러보기)는 커뮤니티·멘토찾기만 접근 가능.
-/// 질문방·알림·개별질문·마이페이지를 누르면 "로그인이 필요해요" 안내와 함께
-/// 로그인 화면으로 보낸다.
+/// 운영 라우터에서는 [StatefulNavigationShell.currentIndex]가 선택 상태의 정본이고
+/// 각 branch Navigator가 탭별 상태를 보존한다. [navigationShell]이 없는 경우는
+/// 기존 직접-pump 테스트를 위한 작은 IndexedStack 폴백이다.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.myPageLoaderOverride});
+  const HomeShell({
+    super.key,
+    this.navigationShell,
+    this.location,
+    this.myPageLoaderOverride,
+  });
 
-  /// 테스트용 마이페이지 데이터 주입(loaderOverride 패턴) — 실사용은 null.
+  /// 운영에서는 `StatefulShellRoute.indexedStack`이 제공한다.
+  final StatefulNavigationShell? navigationShell;
+
+  /// 현재 matched URL. AppBar 제목과 shared branch의 deep-only 표면 판정에 쓴다.
+  final String? location;
+
+  /// 직접-pump 테스트용 마이페이지 데이터 주입. 운영에서는 null이다.
   final Future<MyPageData> Function()? myPageLoaderOverride;
 
   @override
@@ -37,43 +51,88 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  // A-2: 인증 상태·알림 배지 컨트롤러는 AppScope 에서 받는다(싱글턴 직접 참조 0).
   late final AppDependencies _deps;
-  late int _index;
+  late int _fallbackIndex;
+  final List<bool> _fallbackBuilt = List<bool>.filled(5, false);
 
-  /// N13: 방문한 탭만 실제 화면을 빌드한다(lazy). IndexedStack 이 5개 탭을
-  /// 기동 즉시 전부 마운트해 각 탭의 initState 로드(질문방 체인·커뮤니티
-  /// 3종·알림 목록+실시간 구독 등)가 한꺼번에 발화하던 시작 팬아웃을 없앤다.
-  /// 한 번 방문한 탭은 계속 살아 있어(IndexedStack) 상태·스크롤이 유지된다.
-  final List<bool> _built = List<bool>.filled(_pages.length, false);
-
-  static const List<Widget> _pages = <Widget>[
-    QuestionRoomScreen(),
-    CommunityScreen(),
-    MentorsScreen(),
-    NotificationsScreen(),
-    IndividualQuestionTabScreen(),
+  static const List<_HomeTabDestination> _studentTabs = <_HomeTabDestination>[
+    _HomeTabDestination(
+      location: AppTab.questionRoom,
+      label: '질문방',
+      icon: Icons.forum_rounded,
+      fallbackPage: QuestionRoomScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.individualQuestion,
+      label: '개별질문',
+      icon: Icons.question_answer_rounded,
+      fallbackPage: IndividualQuestionTabScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.mentors,
+      label: '멘토 찾기',
+      icon: Icons.search_rounded,
+      fallbackPage: MentorsScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.community,
+      label: '커뮤니티',
+      icon: Icons.groups_rounded,
+      fallbackPage: CommunityScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.notifications,
+      label: '알림',
+      icon: Icons.notifications_rounded,
+      fallbackPage: NotificationsScreen(),
+      hasNotificationBadge: true,
+    ),
   ];
 
-  // 아이콘 통일: Material Symbols rounded 한 세트(하단 탭·검색·액션 혼용 제거).
-  static const List<IconData> _icons = <IconData>[
-    Icons.forum_rounded,
-    Icons.groups_rounded,
-    Icons.search_rounded,
-    Icons.notifications_rounded,
-    Icons.question_answer_rounded,
+  static const List<_HomeTabDestination> _mentorTabs = <_HomeTabDestination>[
+    _HomeTabDestination(
+      location: AppTab.questionRoom,
+      label: '질문방',
+      icon: Icons.forum_rounded,
+      fallbackPage: QuestionRoomScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.individualQuestion,
+      label: '개별질문',
+      icon: Icons.question_answer_rounded,
+      fallbackPage: IndividualQuestionTabScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.settlements,
+      label: '정산',
+      icon: Icons.account_balance_wallet_rounded,
+      fallbackPage: MentorSettlementsTabBody(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.community,
+      label: '커뮤니티',
+      icon: Icons.groups_rounded,
+      fallbackPage: CommunityScreen(),
+    ),
+    _HomeTabDestination(
+      location: AppTab.notifications,
+      label: '알림',
+      icon: Icons.notifications_rounded,
+      fallbackPage: NotificationsScreen(),
+      hasNotificationBadge: true,
+    ),
   ];
+
+  List<_HomeTabDestination> get _tabs =>
+      _deps.auth.currentRole == AppRole.mentor ? _mentorTabs : _studentTabs;
 
   @override
   void initState() {
     super.initState();
     _deps = AppScope.of(context);
-    // 게스트는 접근 가능한 탭(멘토 찾기=2)에서 시작.
-    _index = _deps.auth.isGuest ? 2 : 0;
-    _built[_index] = true; // N13: 시작 탭만 빌드.
-    // 알림 딥링크 등 앱 내 탭 전환 요청 수신.
+    _fallbackIndex = _deps.auth.isGuest ? 2 : 0;
+    _fallbackBuilt[_fallbackIndex] = true;
     TabNavigator.request.addListener(_onTabRequest);
-    // 로그인 사용자 — 알림 배지 서버 개수 1회 조회(이후는 실시간·화면이 갱신).
     if (!_deps.auth.isGuest) {
       _deps.notificationBadge.refresh();
     }
@@ -82,119 +141,293 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     TabNavigator.request.removeListener(_onTabRequest);
-    // 로그아웃/계정 전환으로 셸이 내려가면 이전 사용자 배지 개수를 폐기한다
-    // (다음 로그인 셸이 서버에서 새로 조회 — 교차 사용자 잔상 0).
     _deps.notificationBadge.clear();
     super.dispose();
   }
 
-  /// 탭 전환 요청 처리(딥링크). 처리 후 -1 로 되돌려 같은 탭 재요청도 감지.
-  /// AppTab.myPage(가상 목적지)는 탭 전환이 아니라 마이페이지 push 로 처리.
+  /// 경로 요청을 처리한 뒤 null로 되돌려 같은 경로 재요청도 알린다.
   void _onTabRequest() {
-    final int i = TabNavigator.request.value;
-    if (i < 0) return;
-    if (i == AppTab.myPage) {
+    final String? location = TabNavigator.request.value;
+    if (location == null) return;
+    TabNavigator.request.value = null;
+    if (location == AppTab.myPage) {
       _openMyPage();
-    } else {
-      _onSelect(i);
-    }
-    TabNavigator.request.value = -1;
-  }
-
-  void _onSelect(int i) {
-    if (_deps.auth.isGuest && !EntryGuard.isTabAllowedForGuest(i)) {
-      context.go('${EntryGuard.login}?notice=login_required');
       return;
     }
-    // 알림 탭 선택(재선택 포함) — 살아 있는 알림 화면에 재조회 신호.
-    if (i == AppTab.notifications) DataRefreshBus.bumpNotifications();
-    // 질문방 탭 선택(재선택 포함) — 학생 목록·멘토 인박스 재조회 신호(N35).
-    if (i == AppTab.questionRoom) DataRefreshBus.bumpQuestionRooms();
+    _selectLocation(location);
+  }
+
+  void _selectLocation(String location) {
+    if (_deps.auth.isGuest && !EntryGuard.isTabAllowedForGuest(location)) {
+      context.go(AppRoutePaths.loginWithNotice('login_required'));
+      return;
+    }
+
+    if (location == AppTab.notifications) {
+      DataRefreshBus.bumpNotifications();
+    }
+    if (location == AppTab.questionRoom) {
+      DataRefreshBus.bumpQuestionRooms();
+    }
+
+    final StatefulNavigationShell? shell = widget.navigationShell;
+    if (shell != null) {
+      final int? branchIndex = _branchIndexFor(location);
+      if (branchIndex == null) return;
+
+      // branch 2는 역할별 `/mentors`와 `/settlements` URL을 공유한다.
+      // 버튼은 정확한 canonical URL로 보내고, 역할에 맞지 않는 형제 URL은
+      // AppRouter가 정규화한다. 이후에는 branch의 마지막 상태를 복원한다.
+      if (branchIndex == 2) {
+        context.go(location);
+      } else {
+        shell.goBranch(
+          branchIndex,
+          initialLocation: branchIndex == shell.currentIndex,
+        );
+      }
+      return;
+    }
+
+    // 작은 widget-test/골든용 폴백. 운영 선택 상태에는 사용되지 않는다.
+    final int index = _tabs.indexWhere(
+      (_HomeTabDestination tab) => tab.location == location,
+    );
+    if (index < 0) return;
     setState(() {
-      _index = i;
-      _built[i] = true; // N13: 첫 방문 시점에 빌드.
+      _fallbackIndex = index;
+      _fallbackBuilt[index] = true;
     });
   }
 
-  /// 우측 상단 프로필(원형) → 마이페이지 push. 게스트는 로그인 안내로 보낸다.
-  ///
-  /// 마이페이지 안의 '알림'·'받은 질문 보기' 등 탭 이동 액션은 **pop 결과(탭 index)**
-  /// 로 돌아온다 — push 된 마이페이지가 화면을 덮은 채 숨은 탭 index 만 바뀌던
-  /// 무반응 구조를 제거한다(route 를 닫고 나서 실제 보이는 탭을 전환).
   Future<void> _openMyPage() async {
     if (_deps.auth.isGuest) {
-      context.go('${EntryGuard.login}?notice=login_required');
+      context.go(AppRoutePaths.loginWithNotice('login_required'));
       return;
     }
-    final int? tab = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
-        builder: (_) =>
-            _MyPagePage(loaderOverride: widget.myPageLoaderOverride),
-      ),
+    final String? location = await AppNavigation.push<String>(
+      context,
+      AppRoutePaths.myPage,
+      fallbackBuilder: (_) =>
+          MyPageRoutePage(loaderOverride: widget.myPageLoaderOverride),
     );
-    if (!mounted || tab == null) return;
-    _onSelect(tab);
+    if (!mounted || location == null) return;
+    _selectLocation(location);
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<_HomeTabDestination> tabs = _tabs;
+    final StatefulNavigationShell? shell = widget.navigationShell;
+    final int selectedIndex = shell?.currentIndex ?? _fallbackIndex;
+    final String activeLocation =
+        widget.location ?? tabs[selectedIndex].location;
+    final bool shellRouteVisible = ModalRoute.of(context)?.isCurrent ?? true;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppConstants.bottomTabLabels[_index]),
+        title: Text(_titleFor(activeLocation, tabs[selectedIndex].label)),
         actions: <Widget>[
-          // 마이페이지 진입점: 원형 도형 속 프로필(person) 아이콘.
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _ProfileCircleButton(onTap: _openMyPage),
           ),
         ],
       ),
-      // §5-1: 탈퇴 예약 상시 배너 — 어느 탭에 있어도 보이도록 셸 레벨에 둔다.
-      // 노출·취소버튼 판정은 전부 서버 정본(DeletionNoticeController).
       body: Column(
         children: <Widget>[
           const WithdrawalPendingBanner(),
           Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: <Widget>[
-                // N13: 미방문 탭은 빈 자리표시자 — 첫 방문 때 실제 화면으로
-                // 교체되고 이후에는 계속 살아 있다(상태 유지).
-                // N12: 활성 탭 여부를 ScreenVisibility 로 알려 복귀(resumed)
-                // 재조회가 보이는 탭에서만 즉시 돌게 한다(나머지는 재방문 시).
-                for (int i = 0; i < _pages.length; i++)
-                  ScreenVisibility(
-                    visible: i == _index,
-                    child: _built[i] ? _pages[i] : const SizedBox.shrink(),
+            child: shell == null
+                ? IndexedStack(
+                    index: selectedIndex,
+                    children: <Widget>[
+                      for (int i = 0; i < tabs.length; i++)
+                        ScreenVisibility(
+                          visible: i == selectedIndex,
+                          child: _fallbackBuilt[i]
+                              ? tabs[i].fallbackPage
+                              : const SizedBox.shrink(),
+                        ),
+                    ],
+                  )
+                : _HomeTabVisibilityScope(
+                    activeIndex: selectedIndex,
+                    shellRouteVisible: shellRouteVisible,
+                    child: shell,
                   ),
-              ],
-            ),
           ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _onSelect,
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (int index) =>
+            _selectLocation(tabs[index].location),
         destinations: <NavigationDestination>[
-          for (int i = 0; i < _pages.length; i++)
+          for (final _HomeTabDestination tab in tabs)
             NavigationDestination(
-              // 알림 탭만 서버 미읽음 개수 배지(0/미확인이면 숨김, 100+ → '99+').
-              icon: i == AppTab.notifications
-                  ? _NotificationsTabIcon(icon: _icons[i])
-                  : Icon(_icons[i]),
-              label: AppConstants.bottomTabLabels[i],
+              icon: tab.hasNotificationBadge
+                  ? _NotificationsTabIcon(icon: tab.icon)
+                  : Icon(tab.icon),
+              label: tab.label,
             ),
         ],
       ),
     );
   }
+
+  static int? _branchIndexFor(String location) {
+    switch (location) {
+      case AppTab.questionRoom:
+        return 0;
+      case AppTab.individualQuestion:
+        return 1;
+      case AppTab.mentors:
+      case AppTab.settlements:
+        return 2;
+      case AppTab.community:
+        return 3;
+      case AppTab.notifications:
+        return 4;
+    }
+    return null;
+  }
+
+  static String _titleFor(String location, String fallback) {
+    switch (location) {
+      case AppTab.questionRoom:
+        return '질문방';
+      case AppTab.individualQuestion:
+        return '개별질문';
+      case AppTab.mentors:
+        return '멘토 찾기';
+      case AppTab.settlements:
+        return '정산';
+      case AppTab.community:
+        return '커뮤니티';
+      case AppTab.notifications:
+        return '알림';
+    }
+    return fallback;
+  }
 }
 
-/// 알림 탭 아이콘 + 서버 미읽음 배지.
+/// Shell branch의 resume 가시성 게이트.
 ///
-/// ★ 배지의 유일한 소스는 서버 개수([NotificationBadgeController] —
-///   notification_unread_count_self)다. 로컬 목록으로 개수를 계산하지 않는다.
-///   null(미확인)·0 → 배지 숨김, 100 이상 → '99+'.
+/// indexedStack은 각 Navigator를 계속 살려 두므로, URL에서 계산한 활성 branch만
+/// 보이는 것으로 표시해 백그라운드 복귀 시 숨은 화면의 동시 재조회를 막는다.
+class HomeTabBranch extends StatelessWidget {
+  const HomeTabBranch({
+    super.key,
+    required this.branchIndex,
+    required this.child,
+  });
+
+  final int branchIndex;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final _HomeTabVisibilityScope? scope =
+        _HomeTabVisibilityScope.maybeOf(context);
+    return ScreenVisibility(
+      visible: scope == null ||
+          (scope.activeIndex == branchIndex && scope.shellRouteVisible),
+      child: child,
+    );
+  }
+}
+
+class _HomeTabVisibilityScope extends InheritedWidget {
+  const _HomeTabVisibilityScope({
+    required this.activeIndex,
+    required this.shellRouteVisible,
+    required super.child,
+  });
+
+  final int activeIndex;
+  final bool shellRouteVisible;
+
+  static _HomeTabVisibilityScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_HomeTabVisibilityScope>();
+
+  @override
+  bool updateShouldNotify(_HomeTabVisibilityScope oldWidget) =>
+      activeIndex != oldWidget.activeIndex ||
+      shellRouteVisible != oldWidget.shellRouteVisible;
+}
+
+class _HomeTabDestination {
+  const _HomeTabDestination({
+    required this.location,
+    required this.label,
+    required this.icon,
+    required this.fallbackPage,
+    this.hasNotificationBadge = false,
+  });
+
+  final String location;
+  final String label;
+  final IconData icon;
+  final Widget fallbackPage;
+  final bool hasNotificationBadge;
+}
+
+/// 멘토 탭은 새 정산 화면을 만들지 않고 MyPage의 기존 답변·정산 요약을 재사용한다.
+class MentorSettlementsTabBody extends StatelessWidget {
+  const MentorSettlementsTabBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AsyncRouteLoader<MentorDashboard>(
+      load: (AppDependencies dependencies) async =>
+          (await dependencies.myPage.load()).mentor,
+      loadingBuilder: (_) => const Center(child: CircularProgressIndicator()),
+      notFoundBuilder: (_) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('정산 요약을 불러올 수 없어요.'),
+        ),
+      ),
+      errorBuilder: (BuildContext context, Object error, VoidCallback retry) =>
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Text('정산 요약을 불러오지 못했어요.'),
+                  const SizedBox(height: AppSpacing.s12),
+                  TextButton(onPressed: retry, child: const Text('다시 시도')),
+                ],
+              ),
+            ),
+          ),
+      builder:
+          (
+            BuildContext context,
+            MentorDashboard dashboard,
+            AppDependencies dependencies,
+          ) => ListView(
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              AppSpacing.s16,
+              20,
+              AppSpacing.s24,
+            ),
+            children: <Widget>[
+              MentorDashboardSection(
+                data: dashboard,
+                onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
+              ),
+            ],
+          ),
+      notFoundMessage: '정산 요약을 불러올 수 없어요.',
+      errorMessage: '정산 요약을 불러오지 못했어요.',
+    );
+  }
+}
+
 class _NotificationsTabIcon extends StatelessWidget {
   const _NotificationsTabIcon({required this.icon});
 
@@ -216,9 +449,6 @@ class _NotificationsTabIcon extends StatelessWidget {
   }
 }
 
-/// 원형 배경 + 프로필 실루엣 아이콘(우측 상단 마이페이지 진입 버튼).
-/// ★ 사진 placeholder 를 쓰지 않고 중립 원형 + person 아이콘으로 통일
-///   (InitialAvatar 규약과 동일한 '깨진 이미지 금지' 원칙).
 class _ProfileCircleButton extends StatelessWidget {
   const _ProfileCircleButton({required this.onTap});
 
@@ -243,30 +473,6 @@ class _ProfileCircleButton extends StatelessWidget {
           ),
           child: Icon(Icons.person_rounded, size: 22, color: scheme.primary),
         ),
-      ),
-    );
-  }
-}
-
-/// 마이페이지 push 라우트 래퍼.
-/// MyPageScreen 은 본문만 그리므로(자체 Scaffold 없음) 여기서 AppBar 를 씌운다.
-/// 탭 이동 액션(알림·받은 질문 보기·질문하러 가기)은 이 route 를 **pop 하면서
-/// 목적지 탭 index 를 반환**한다 — HomeShell 이 받아 실제 보이는 탭을 전환한다.
-class _MyPagePage extends StatelessWidget {
-  const _MyPagePage({this.loaderOverride});
-
-  final Future<MyPageData> Function()? loaderOverride;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text(AppConstants.myPageTitle)),
-      body: MyPageScreen(
-        loaderOverride: loaderOverride,
-        onOpenQuestionsTab: () =>
-            Navigator.of(context).pop(AppTab.questionRoom),
-        onOpenNotifications: () =>
-            Navigator.of(context).pop(AppTab.notifications),
       ),
     );
   }

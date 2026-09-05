@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/design/theme.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// vc11 정본 UX 계약 — 개별질문 상세는 '화면 전체가 대화방'이다.
 ///
@@ -50,7 +51,6 @@ IqMessage _msg(String id, String authorId, String body) => IqMessage(
       createdAt: DateTime(2026, 7, 2),
     );
 
-
 Future<void> _pump(
   WidgetTester tester, {
   required AppRole role,
@@ -64,8 +64,8 @@ Future<void> _pump(
 }) async {
   // pumpWidget 은 위젯 타입이 같으면 State 를 재사용해 loader 재주입이
   // 무시된다 — 시나리오마다 완전히 새로 마운트한다.
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(const SizedBox.shrink());
+  await tester.pumpScopedWidget(MaterialApp(
     theme: AppTheme.build(role),
     home: IqDetailScreen(
       questionId: 'q1',
@@ -86,8 +86,6 @@ Future<void> _pump(
   ));
   await tester.pumpAndSettle();
 }
-
-
 
 /// 타임라인(대화 스크롤 영역) 파인더 — 화면의 유일한 ListView 여야 한다.
 Finder get _timeline => find.byType(ListView);
@@ -134,8 +132,7 @@ void main() {
     );
   });
 
-  testWidgets('짧은 타임라인(스크롤 불가)에서도 예외 없이 동작한다',
-      (WidgetTester tester) async {
+  testWidgets('짧은 타임라인(스크롤 불가)에서도 예외 없이 동작한다', (WidgetTester tester) async {
     _setView(tester, const Size(400, 900));
     await _pump(
       tester,

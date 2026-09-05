@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
+import '../../../app/app_scope.dart';
 import '../../../design/spacing_tokens.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../../../design/tokens/typography.dart';
@@ -28,6 +31,7 @@ class MentorIqListScreen extends StatefulWidget {
     super.key,
     this.loaderOverride,
     this.onClaim,
+    this.repositoryOverride,
     this.embedded = false,
   });
 
@@ -41,15 +45,16 @@ class MentorIqListScreen extends StatefulWidget {
   /// 테스트용 수락 동작 주입. null 이면 실제 RPC.
   final Future<IqEscrowResult> Function(String questionId)? onClaim;
 
+  /// 테스트용 레포 주입. null 이면 AppScope의 개별질문 레포를 사용.
+  final IndividualQuestionRepository? repositoryOverride;
+
   @override
   State<MentorIqListScreen> createState() => _MentorIqListScreenState();
 }
 
 class _MentorIqListScreenState extends State<MentorIqListScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
-
-  final IndividualQuestionRepository _repo =
-      const IndividualQuestionRepository();
+  late final IndividualQuestionRepository _repo;
   late Future<MentorIqListData> _future;
   bool _claiming = false;
 
@@ -59,6 +64,8 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
   @override
   void initState() {
     super.initState();
+    _repo =
+        widget.repositoryOverride ?? AppScope.of(context).individualQuestions;
     _future = _load();
     // N34: 공개 질문 등록이 웹에서 일어나므로 앱 복귀 시 수락 대기 목록이
     // 낡은 채였다 — resume 재조회 추가(질문방 탭과 동일 패턴).
@@ -133,10 +140,10 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
         const SnackBar(content: Text('질문을 수락했어요. 답변을 작성해 주세요.')),
       );
       _refresh();
-      await Navigator.of(context).push<bool>(
-        MaterialPageRoute<bool>(
-          builder: (_) => IqDetailScreen(questionId: q.id),
-        ),
+      await AppNavigation.push<bool>(
+        context,
+        AppRoutePaths.individualQuestion(q.id),
+        fallbackBuilder: (_) => IqDetailScreen(questionId: q.id),
       );
       if (mounted) _refresh();
     } catch (e) {
@@ -150,10 +157,10 @@ class _MentorIqListScreenState extends State<MentorIqListScreen>
   }
 
   Future<void> _openDetail(IndividualQuestion q) async {
-    final bool? changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqDetailScreen(questionId: q.id),
-      ),
+    final bool? changed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.individualQuestion(q.id),
+      fallbackBuilder: (_) => IqDetailScreen(questionId: q.id),
     );
     if (changed == true && mounted) _refresh();
   }

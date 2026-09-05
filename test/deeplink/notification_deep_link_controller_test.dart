@@ -6,13 +6,13 @@ import 'package:ssambership_app/features/notifications/data/notification_types.d
 
 /// 알림 딥링크 판정(순수 로직) — 허용 목적지·중복 제거·로그인 대기(TTL)·계정 전환.
 void main() {
-  late List<int> navigations;
+  late List<String> navigations;
   DateTime now = DateTime(2026, 7, 21, 12);
 
   NotificationDeepLinkController build({
     Duration ttl = const Duration(minutes: 15),
   }) {
-    navigations = <int>[];
+    navigations = <String>[];
     now = DateTime(2026, 7, 21, 12);
     return NotificationDeepLinkController(
       navigate: navigations.add,
@@ -41,13 +41,13 @@ void main() {
     test('question_answered + room_id → 질문방 탭', () {
       final c = build()..onSignedIn('u-1');
       c.handleTap(target(roomId: 'r-1'));
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
     });
 
     test('thread_id 만 있어도 질문방 탭(정밀 이동은 후속)', () {
       final c = build()..onSignedIn('u-1');
       c.handleTap(target(threadId: 't-1'));
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
     });
 
     test('개별질문(iq_*) + question_id → 개별질문 탭', () {
@@ -56,7 +56,7 @@ void main() {
         type: NotificationEventType.individualQuestionAnswered,
         questionId: 'q-1',
       ));
-      expect(navigations, <int>[AppTab.individualQuestion]);
+      expect(navigations, <String>[AppTab.individualQuestion]);
     });
 
     test('구독·멘토 공지류 → 마이페이지(가상 목적지, id 불필요)', () {
@@ -69,7 +69,7 @@ void main() {
         type: NotificationEventType.mentorTerminationNotice,
         eventId: 'n-2',
       ));
-      expect(navigations, <int>[AppTab.myPage, AppTab.myPage]);
+      expect(navigations, <String>[AppTab.myPage, AppTab.myPage]);
     });
 
     test('stay(맞춤의뢰류)·unknown → 절대 이동하지 않는다', () {
@@ -87,7 +87,7 @@ void main() {
         type: NotificationEventType.individualQuestionAssigned,
         eventId: 'n-2',
       )); // question_id 없음.
-      expect(navigations, <int>[AppTab.notifications, AppTab.notifications]);
+      expect(navigations, <String>[AppTab.notifications, AppTab.notifications]);
     });
   });
 
@@ -98,7 +98,7 @@ void main() {
       c.handleTap(t);
       c.handleTap(t);
       c.handleTap(t);
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
     });
 
     test('eventId 가 다르면 각각 이동한다', () {
@@ -124,7 +124,7 @@ void main() {
       expect(c.hasPendingForTest, isTrue);
 
       c.onSignedIn('u-1');
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
 
       c.onSignedIn('u-1'); // 재차 로그인 이벤트 — 추가 이동 없음.
       expect(navigations.length, 1);
@@ -152,7 +152,7 @@ void main() {
       c.handleTap(target(roomId: 'r-1', eventId: 'n-1'));
       now = now.add(const Duration(minutes: 14));
       c.onSignedIn('u-1');
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
     });
 
     test('로그아웃 → pending 폐기', () {
@@ -182,7 +182,7 @@ void main() {
       c.onSignedOut();
       c.handleTap(target(roomId: 'r-1', eventId: 'n-1'));
       c.onSignedIn('u-a');
-      expect(navigations, <int>[AppTab.questionRoom]);
+      expect(navigations, <String>[AppTab.questionRoom]);
     });
   });
 
@@ -208,7 +208,7 @@ void main() {
       expect(
         resolveNotificationDeepLink(target(roomId: 'r-1; drop table')),
         isA<NotificationTabRoute>()
-            .having((NotificationTabRoute t) => t.tabIndex, 'tab',
+            .having((NotificationTabRoute t) => t.location, 'location',
                 AppTab.questionRoom),
       );
     });
@@ -253,7 +253,7 @@ void main() {
         resolveNotificationDeepLink(target(
             type: NotificationEventType.subscriptionExpired, eventId: 'n-9')),
         isA<NotificationTabRoute>().having(
-            (NotificationTabRoute t) => t.tabIndex, 'tab', AppTab.myPage),
+            (NotificationTabRoute t) => t.location, 'location', AppTab.myPage),
       );
     });
 
@@ -273,7 +273,7 @@ void main() {
 
     test('openDetail 배선 시 상세 route 는 openDetail 로, 탭 route 는 navigate 로',
         () {
-      final List<int> tabs = <int>[];
+      final List<String> tabs = <String>[];
       final List<NotificationDeepLinkRoute> details =
           <NotificationDeepLinkRoute>[];
       final NotificationDeepLinkController c = NotificationDeepLinkController(
@@ -287,11 +287,11 @@ void main() {
 
       expect(details.length, 1);
       expect(details.single, isA<NotificationRoomRoute>());
-      expect(tabs, <int>[AppTab.myPage]);
+      expect(tabs, <String>[AppTab.myPage]);
     });
 
     test('openDetail 미배선이면 상세 route 도 탭 폴백(기존 계약 호환)', () {
-      final List<int> tabs = <int>[];
+      final List<String> tabs = <String>[];
       final NotificationDeepLinkController c =
           NotificationDeepLinkController(navigate: tabs.add)
             ..onSignedIn('u-1');
@@ -301,31 +301,31 @@ void main() {
         questionId: questionUuid,
         eventId: 'n-2',
       ));
-      expect(tabs, <int>[AppTab.questionRoom, AppTab.individualQuestion]);
+      expect(tabs, <String>[AppTab.questionRoom, AppTab.individualQuestion]);
     });
 
-    test('notificationRouteFallbackTab — route 종류별 탭', () {
+    test('notificationRouteFallbackLocation — route 종류별 URL', () {
       expect(
-        notificationRouteFallbackTab(
+        notificationRouteFallbackLocation(
             const NotificationRoomRoute(roomId: roomUuid)),
         AppTab.questionRoom,
       );
       expect(
-        notificationRouteFallbackTab(const NotificationIqRoute(questionUuid)),
+        notificationRouteFallbackLocation(const NotificationIqRoute(questionUuid)),
         AppTab.individualQuestion,
       );
       expect(
-        notificationRouteFallbackTab(
+        notificationRouteFallbackLocation(
             const NotificationBoardPostRoute(postUuid)),
         AppTab.community,
       );
       expect(
-        notificationRouteFallbackTab(
+        notificationRouteFallbackLocation(
             const NotificationShortformRoute(shortformUuid)),
         AppTab.community,
       );
       expect(
-        notificationRouteFallbackTab(const NotificationMentorRoute(mentorUuid)),
+        notificationRouteFallbackLocation(const NotificationMentorRoute(mentorUuid)),
         AppTab.mentors,
       );
     });
@@ -350,7 +350,7 @@ void main() {
         questionId: p.questionId,
         eventId: p.eventId,
       ));
-      expect(navigations, <int>[AppTab.questionRoom]); // 허용 탭 이동 1회가 전부.
+      expect(navigations, <String>[AppTab.questionRoom]); // 허용 URL 이동 1회가 전부.
     });
   });
 }

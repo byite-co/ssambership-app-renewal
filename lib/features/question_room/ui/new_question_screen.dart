@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_scope.dart';
 import '../../../core/entitlement/weekly_question_usage.dart';
 import '../../../data/mappings/subject_labels.dart';
 import '../../../design/tokens/color_tokens.dart';
@@ -19,23 +20,23 @@ class NewQuestionScreen extends StatefulWidget {
   const NewQuestionScreen({
     super.key,
     required this.room,
-    this.readRepository = const QuestionRoomReadRepository(),
-    this.writeRepository = const QuestionRoomWriteRepository(),
+    this.readRepository,
+    this.writeRepository,
   });
 
   final Room room;
 
-  /// 테스트 주입 지점(기본: 운영 레포).
-  final QuestionRoomReadRepository readRepository;
-  final QuestionRoomWriteRepository writeRepository;
+  /// 테스트 주입 지점. null 이면 AppScope의 운영 레포를 사용.
+  final QuestionRoomReadRepository? readRepository;
+  final QuestionRoomWriteRepository? writeRepository;
 
   @override
   State<NewQuestionScreen> createState() => _NewQuestionScreenState();
 }
 
 class _NewQuestionScreenState extends State<NewQuestionScreen> {
-  QuestionRoomWriteRepository get _write => widget.writeRepository;
-  QuestionRoomReadRepository get _read => widget.readRepository;
+  late final QuestionRoomWriteRepository _write;
+  late final QuestionRoomReadRepository _read;
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
 
@@ -48,6 +49,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
   @override
   void initState() {
     super.initState();
+    _read = widget.readRepository ?? AppScope.of(context).questionRoomRead;
+    _write = widget.writeRepository ?? AppScope.of(context).questionRoomWrite;
     _loadMentorSubjects();
   }
 
@@ -78,7 +81,8 @@ class _NewQuestionScreenState extends State<NewQuestionScreen> {
       // 최종 판정은 생성 RPC(서버 트랜잭션)가 한다.
       // ★ fail-closed(P2-13): 조회 실패(usage==null)=판정 불가면 제출을 막고
       //   재시도를 안내한다(과거 fail-open 제거).
-      final WeeklyQuestionUsage? usage = await _read.weeklyUsage(mentorId: widget.room.mentorId);
+      final WeeklyQuestionUsage? usage =
+          await _read.weeklyUsage(mentorId: widget.room.mentorId);
       if (usage == null) {
         if (mounted) {
           setState(() => _busy = false);

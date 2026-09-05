@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/features/individual_question/data/iq_attachment_url_resolver.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// P3-6 — 상세 화면의 첨부 서명 URL: 리빌드마다 재발급하던 per-build
 /// FutureBuilder 를 상태 메모 + 리졸버 캐시로 교체했는지 화면 단위로 검증.
@@ -60,14 +61,14 @@ void main() {
           ),
         );
 
-    await tester.pumpWidget(screen());
+    await tester.pumpScopedWidget(screen());
     await tester.pumpAndSettle();
     expect(backend.signCount, 1); // 최초 1회 발급.
 
     // 강제 리빌드(같은 위치·타입 → State 유지) 반복 — 재발급이 없어야 한다.
-    await tester.pumpWidget(screen());
+    await tester.pumpScopedWidget(screen());
     await tester.pumpAndSettle();
-    await tester.pumpWidget(screen());
+    await tester.pumpScopedWidget(screen());
     await tester.pumpAndSettle();
     expect(backend.signCount, 1); // per-build 재요청 없음.
   });

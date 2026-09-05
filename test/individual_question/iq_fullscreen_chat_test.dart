@@ -6,6 +6,7 @@ import 'package:ssambership_app/design/widgets/app_card.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/shared/conversation_ui/conversation_bubble.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// vc11 정본 UX 계약 — 개별질문 상세는 '화면 전체가 대화방'이다.
 ///
@@ -75,8 +76,8 @@ Future<void> _pump(
 }) async {
   // pumpWidget 은 위젯 타입이 같으면 State 를 재사용해 loader 재주입이
   // 무시된다 — 시나리오마다 완전히 새로 마운트한다.
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(const SizedBox.shrink());
+  await tester.pumpScopedWidget(MaterialApp(
     theme: AppTheme.build(role),
     home: IqDetailScreen(
       questionId: 'q1',

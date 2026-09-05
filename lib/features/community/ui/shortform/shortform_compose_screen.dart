@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import '../../../../app/app_scope.dart';
 import '../../../../core/web_bridge/shortform_compose_bridge.dart';
 import '../../../../core/web_bridge/web_bridge_config.dart';
 import '../../../../core/web_bridge/web_session_hygiene.dart';
@@ -22,7 +21,12 @@ import '../../../../design/typography_tokens.dart';
 ///   단일 정본 원칙).
 /// ★ 탐색 allowlist·완료 판정은 [ShortformComposeBridge](순수, 단위테스트됨).
 class ShortformComposeScreen extends StatefulWidget {
-  const ShortformComposeScreen({super.key});
+  const ShortformComposeScreen({
+    super.key,
+    required this.supabaseClient,
+  });
+
+  final SupabaseClient? supabaseClient;
 
   @override
   State<ShortformComposeScreen> createState() => _ShortformComposeScreenState();
@@ -53,9 +57,8 @@ class _ShortformComposeScreenState extends State<ShortformComposeScreen> {
   }
 
   Future<void> _start() async {
-    // A-2: 클라이언트는 AppScope 에서(세션 토큰이 필요해 auth 게터가 아니라 클라이언트를 쓴다).
-    final Session? session =
-        AppScope.of(context).supabaseClient?.auth.currentSession;
+    // 세션 토큰이 필요하므로 route가 AppDependencies의 좁은 client seam만 주입한다.
+    final Session? session = widget.supabaseClient?.auth.currentSession;
     final String? refreshToken = session?.refreshToken;
     if (session == null || refreshToken == null || refreshToken.isEmpty) {
       // currentSession 없음 → WebView 를 만들지 않고 로그인 유도.

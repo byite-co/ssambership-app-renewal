@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
+import '../../../app/routes/mentor_routes.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
 import '../../../core/deeplink/notification_deep_link_controller.dart';
 import '../../community/data/community_models.dart';
-import '../../community/data/community_read_repository.dart';
-import '../../community/data/community_write_repository.dart';
 import '../../community/ui/board/board_detail_screen.dart';
 import '../../community/ui/shortform/shortform_detail_screen.dart';
-import '../../individual_question/data/individual_question_repository.dart';
 import '../../individual_question/data/models/individual_question_models.dart';
 import '../../individual_question/ui/iq_detail_screen.dart';
-import '../../mentors/data/mentor_directory_repository.dart';
-import '../../mentors/data/mentor_models.dart';
-import '../../mentors/ui/mentor_detail_screen.dart';
-import '../../question_room/data/mentor_lookup_repository.dart';
 import '../../question_room/data/models/question_thread.dart';
 import '../../question_room/data/models/room.dart';
 import '../../question_room/data/question_room_read_repository.dart';
@@ -25,11 +21,10 @@ import '../../question_room/ui/mentor/student_room_home_screen.dart';
 import '../../question_room/ui/mentor_room_home_screen.dart';
 
 /// 알림 상세 목적지 열기 — 검증된 route([NotificationDeepLinkRoute])만 받아
-/// 기존 상세 화면 push 로 연다(새 라우팅 체계 없음 — 다른 화면과 같은
-/// Navigator.push 경로).
+/// A-3에서 등록된 상세 화면은 ID 기반 앱 URL로 연다.
 ///
-/// 반환 false = 대상 소실/권한 밖/역할 불일치 — 호출부(알림 화면)가 중립
-/// 폴백(스낵바 + 목록 유지)으로 안내한다. 조회 실패도 false(성공 위장 금지).
+/// 기존 선조회 목적지의 반환 false = 대상 소실/권한 밖/역할 불일치. URL 목적지는
+/// 조회 실패·소실을 route loader의 중립 상태로 안내한다.
 /// ★ 자유 link/url 필드는 route 모델에 존재하지 않는다 — 실행 경로 없음.
 class NotificationTargetOpener {
   const NotificationTargetOpener();
@@ -94,28 +89,29 @@ class NotificationTargetOpener {
       String studentName = '학생';
       try {
         final Map<String, StudentPublic> students =
-            await const StudentLookupRepository()
-                .fetchMany(<String>[targetRoom.studentId]);
-        studentName =
-            students[targetRoom.studentId]?.displayName ?? '학생';
+            await deps.studentLookup.fetchMany(<String>[targetRoom.studentId]);
+        studentName = students[targetRoom.studentId]?.displayName ?? '학생';
       } catch (_) {
         // 이름 조회 실패는 중립 표시로 계속 진행.
       }
       if (!context.mounted) return false;
       final String sName = studentName;
       if (targetThread != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => MentorAnswerScreen(
-                thread: targetThread, studentName: sName, room: targetRoom),
+        await AppNavigation.push<void>(
+          context,
+          AppRoutePaths.roomThread(targetRoom.id, targetThread.id),
+          fallbackBuilder: (_) => MentorAnswerScreen(
+            thread: targetThread,
+            studentName: sName,
+            room: targetRoom,
           ),
         );
       } else {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                StudentRoomHomeScreen(room: targetRoom, studentName: sName),
-          ),
+        await AppNavigation.push<void>(
+          context,
+          AppRoutePaths.room(targetRoom.id),
+          fallbackBuilder: (_) =>
+              StudentRoomHomeScreen(room: targetRoom, studentName: sName),
         );
       }
       return true;
@@ -124,9 +120,7 @@ class NotificationTargetOpener {
     String mentorName = '멘토';
     try {
       mentorName =
-          (await const MentorLookupRepository().fetch(room.mentorId))
-                  ?.displayName ??
-              '멘토';
+          (await deps.mentorLookup.fetch(room.mentorId))?.displayName ?? '멘토';
     } catch (_) {
       // 이름 조회 실패는 중립 표시로 계속 진행.
     }
@@ -134,18 +128,21 @@ class NotificationTargetOpener {
     if (!context.mounted) return false;
     final String name = mentorName;
     if (targetThread != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => ChatScreen(
-              thread: targetThread, mentorName: name, room: targetRoom),
+      await AppNavigation.push<void>(
+        context,
+        AppRoutePaths.roomThread(targetRoom.id, targetThread.id),
+        fallbackBuilder: (_) => ChatScreen(
+          thread: targetThread,
+          mentorName: name,
+          room: targetRoom,
         ),
       );
     } else {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              MentorRoomHomeScreen(room: targetRoom, mentorName: name),
-        ),
+      await AppNavigation.push<void>(
+        context,
+        AppRoutePaths.room(targetRoom.id),
+        fallbackBuilder: (_) =>
+            MentorRoomHomeScreen(room: targetRoom, mentorName: name),
       );
     }
     return true;
@@ -154,56 +151,55 @@ class NotificationTargetOpener {
   Future<bool> _openIq(BuildContext context, String questionId) async {
     // 사전 조회(당사자 RLS) — 없거나 권한 밖이면 중립 폴백.
     final IndividualQuestion? q =
-        await const IndividualQuestionRepository().fetch(questionId);
+        await AppScope.of(context).individualQuestions.fetch(questionId);
     if (q == null || !context.mounted) return false;
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => IqDetailScreen(questionId: questionId),
-      ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.individualQuestion(questionId),
+      fallbackBuilder: (_) => IqDetailScreen(questionId: questionId),
     );
     return true;
   }
 
   Future<bool> _openBoardPost(BuildContext context, String postId) async {
-    const CommunityReadRepository read = CommunityReadRepository();
-    final BoardPost? post = await read.boardPostById(postId);
+    final AppDependencies deps = AppScope.of(context);
+    final BoardPost? post = await deps.communityRead.boardPostById(postId);
     if (post == null || !context.mounted) return false;
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => BoardDetailScreen(
-          post: post,
-          read: read,
-          write: const CommunityWriteRepository(),
-        ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.boardPost(postId),
+      fallbackBuilder: (_) => BoardDetailScreen(
+        post: post,
+        read: deps.communityRead,
+        write: deps.communityWrite,
       ),
     );
     return true;
   }
 
   Future<bool> _openShortform(BuildContext context, String shortformId) async {
-    const CommunityReadRepository read = CommunityReadRepository();
-    final ShortformPost? post = await read.shortformById(shortformId);
+    final AppDependencies dependencies = AppScope.of(context);
+    final ShortformPost? post = await dependencies.communityRead.shortformById(
+      shortformId,
+    );
     if (post == null || !context.mounted) return false;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => ShortformDetailScreen(
-          post: post,
-          read: read,
-          write: const CommunityWriteRepository(),
-        ),
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.shortform(shortformId),
+      fallbackBuilder: (_) => ShortformDetailScreen(
+        post: post,
+        read: dependencies.communityRead,
+        write: dependencies.communityWrite,
       ),
     );
     return true;
   }
 
   Future<bool> _openMentor(BuildContext context, String mentorId) async {
-    final MentorListItem? item =
-        await const MentorDirectoryRepository().fetchListItemById(mentorId);
-    if (item == null || !context.mounted) return false;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => MentorDetailScreen(item: item),
-      ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.mentor(mentorId),
+      fallbackBuilder: (_) => MentorDetailRoutePage(mentorId: mentorId),
     );
     return true;
   }

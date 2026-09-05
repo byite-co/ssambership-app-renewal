@@ -26,14 +26,14 @@ void main() {
   }
 
   setUp(() {
-    TabNavigator.request.value = -1;
+    TabNavigator.request.value = null;
     opened = StreamController<PushPayload>.broadcast();
   });
 
   tearDown(() async {
     await DeepLinkService.instance.dispose();
     await opened.close();
-    TabNavigator.request.value = -1;
+    TabNavigator.request.value = null;
   });
 
   test('알림 탭 payload → TabNavigator 로 탭 전환 요청', () async {
@@ -65,7 +65,7 @@ void main() {
 
     opened.add(payload());
     await pumpEventQueue();
-    expect(TabNavigator.request.value, -1); // 아직 이동 없음.
+    expect(TabNavigator.request.value, isNull); // 아직 이동 없음.
 
     DeepLinkService.instance.onSignedIn('u-1');
     expect(TabNavigator.request.value, AppTab.questionRoom);
@@ -79,7 +79,7 @@ void main() {
     opened.add(payload());
     await pumpEventQueue();
 
-    expect(TabNavigator.request.value, -1);
+    expect(TabNavigator.request.value, isNull);
     DeepLinkService.instance.onSignedOut();
   });
 }

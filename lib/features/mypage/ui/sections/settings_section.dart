@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
+import '../../../../app/app_scope.dart';
 import '../../../../core/push/push_ports.dart';
 import '../../../../core/web_bridge/web_bridge_actions.dart';
 import '../../../../design/role_accent.dart';
@@ -24,7 +27,7 @@ class SettingsSection extends StatefulWidget {
     super.key,
     required this.onLogout,
     this.showLogout = true,
-    this.settingsRepository = const NotificationSettingsRepository(),
+    this.settingsRepository,
     this.permissionPort = const DisabledPushPermission(),
   });
 
@@ -35,7 +38,7 @@ class SettingsSection extends StatefulWidget {
   final bool showLogout;
 
   /// 알림 설정 저장소(테스트: 페이크 주입).
-  final NotificationSettingsPort settingsRepository;
+  final NotificationSettingsPort? settingsRepository;
 
   /// OS 알림 권한 조회 포트(기본: 미연결 Disabled — 요청은 하지 않는다).
   final PushPermissionPort permissionPort;
@@ -45,6 +48,8 @@ class SettingsSection extends StatefulWidget {
 }
 
 class _SettingsSectionState extends State<SettingsSection> {
+  late final NotificationSettingsPort _settingsRepository;
+
   /// 로드 결과 3상태: 로딩(null·에러 null) / 성공(settings) / 실패(error).
   NotificationSettings? _settings;
   Object? _loadError;
@@ -58,6 +63,8 @@ class _SettingsSectionState extends State<SettingsSection> {
   @override
   void initState() {
     super.initState();
+    _settingsRepository =
+        widget.settingsRepository ?? AppScope.of(context).notificationSettings;
     _load();
   }
 
@@ -72,7 +79,7 @@ class _SettingsSectionState extends State<SettingsSection> {
       if (mounted) setState(() => _permission = p);
     } catch (_) {}
     try {
-      final NotificationSettings s = await widget.settingsRepository.load();
+      final NotificationSettings s = await _settingsRepository.load();
       if (!mounted) return;
       setState(() {
         _settings = s;
@@ -96,7 +103,7 @@ class _SettingsSectionState extends State<SettingsSection> {
       _saving = true;
     });
     try {
-      await widget.settingsRepository.save(next);
+      await _settingsRepository.save(next);
       if (mounted) setState(() => _saving = false);
     } catch (e) {
       if (!mounted) return;
@@ -113,10 +120,10 @@ class _SettingsSectionState extends State<SettingsSection> {
   /// 회원 탈퇴 — 인앱 탈퇴 화면(P1-10)으로 진입한다.
   /// 위험 고지·재확인·서버 RPC 요청·취소·웹 폴백은 전부 AccountDeleteScreen 담당.
   Future<void> _confirmAccountDelete() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const AccountDeleteScreen(),
-      ),
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.accountDeletion,
+      fallbackBuilder: (_) => const AccountDeleteScreen(),
     );
   }
 
@@ -250,10 +257,10 @@ class _SettingsSectionState extends State<SettingsSection> {
             MyPageRow(
               icon: Icons.block_rounded,
               label: '차단 관리',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const BlockedUsersScreen(),
-                ),
+              onTap: () => AppNavigation.push<void>(
+                context,
+                AppRoutePaths.blockedUsers,
+                fallbackBuilder: (_) => const BlockedUsersScreen(),
               ),
             ),
             MyPageRow(

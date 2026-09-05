@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../app/app_scope.dart';
 import '../../../design/tokens/color_tokens.dart';
 import '../data/attachments/attachment_upload.dart';
@@ -45,11 +47,12 @@ class ChatScreen extends StatefulWidget {
     this.imagePicker = const DeviceImagePicker(),
     this.scanPicker = const DeviceScanSourcePicker(),
     this.pdfRasterizer = const PdfxRasterizer(),
-    this.uploader = const SupabaseAttachmentUploader(),
+    this.uploader,
     this.realtimeFactory = _defaultRealtime,
-    this.safety = const SupabaseRoomSafetyRepository(),
+    this.safety,
     this.currentUserIdOverride,
-    this.readRepository = const QuestionRoomReadRepository(),
+    this.readRepository,
+    this.writeRepository,
   });
 
   final QuestionThread thread;
@@ -67,21 +70,24 @@ class ChatScreen extends StatefulWidget {
   /// PDF 래스터라이저 포트(S19: 파일 소스 PDF → 페이지 선택). fake 주입 지점.
   final PdfRasterizerPort pdfRasterizer;
 
-  /// 첨부 업로드 포트(기본: 저장소 미준비 — 인수인계).
-  final AttachmentUploaderPort uploader;
+  /// 첨부 업로드 포트. null이면 AppScope 의 운영 의존성을 사용한다.
+  final AttachmentUploaderPort? uploader;
 
   /// 스레드 실시간 포트 팩토리(기본: Supabase). 테스트에서 fake 주입.
   final ThreadRealtimePort Function(String threadId) realtimeFactory;
 
-  /// 신고·차단 포트(기본: Supabase). 테스트에서 fake 주입.
-  final RoomSafetyPort safety;
+  /// 신고·차단 포트. null이면 AppScope 의 운영 의존성을 사용한다.
+  final RoomSafetyPort? safety;
 
   /// 현재 사용자 id 주입 seam(테스트 전용). null 이면 세션에서 읽는다.
   /// ★ 상대 도출은 이 값과 [room] 참여자 데이터로만 한다 — 화면 문자열/메시지 추정 금지.
   final String? currentUserIdOverride;
 
   /// 읽기 레포 주입 seam(테스트 전용 — N21 페이지 계약 검증).
-  final QuestionRoomReadRepository readRepository;
+  final QuestionRoomReadRepository? readRepository;
+
+  /// 쓰기 레포 주입 seam. null이면 AppScope 의 운영 의존성을 사용한다.
+  final QuestionRoomWriteRepository? writeRepository;
 
   static ThreadRealtimePort _defaultRealtime(String threadId) =>
       SupabaseThreadRealtime(threadId);
@@ -95,9 +101,10 @@ const String _blockedNotice = '차단한 사용자예요. 새 메시지·첨부�
     ' 지난 대화는 그대로 볼 수 있고, 해제는 설정 > 차단 사용자 관리에서 할 수 있어요.';
 
 class _ChatScreenState extends State<ChatScreen> {
-  QuestionRoomReadRepository get _read => widget.readRepository;
-  final QuestionRoomWriteRepository _write =
-      const QuestionRoomWriteRepository();
+  late final QuestionRoomReadRepository _read;
+  late final QuestionRoomWriteRepository _write;
+  late final AttachmentUploaderPort _uploader;
+  late final RoomSafetyPort _safety;
   final TextEditingController _input = TextEditingController();
 
   late final ThreadRealtimePort _realtime;
@@ -109,7 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
   PickedImage? _pending;
 
   /// 첨부 이미지 서명 URL 리졸버(만료 전 캐시 재사용).
-  final AttachmentUrlResolver _resolver = AttachmentUrlResolver.supabase();
+  late final AttachmentUrlResolver _resolver;
   List<QuestionAttachment> _attachments = <QuestionAttachment>[];
 
   // A-2: 사용자 id 는 AppScope 의 auth 에서(클라이언트 직접 참조 0).
@@ -125,6 +132,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    final AppDependencies dependencies = AppScope.of(context);
+    _read = widget.readRepository ?? dependencies.questionRoomRead;
+    _write = widget.writeRepository ?? dependencies.questionRoomWrite;
+    _uploader = widget.uploader ?? dependencies.attachmentUploader;
+    _safety = widget.safety ?? dependencies.roomSafety;
+    _resolver = dependencies.attachmentUrlResolver;
     _status = widget.thread.status;
     _counterparty = RoomCounterparty.of(
       widget.room,
@@ -143,7 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (cp == null) return;
     bool blocked = false;
     try {
-      blocked = await widget.safety.isBlockedByMe(cp.userId);
+      blocked = await _safety.isBlockedByMe(cp.userId);
     } catch (_) {
       blocked = false;
     }
@@ -156,10 +169,10 @@ class _ChatScreenState extends State<ChatScreen> {
     switch (action) {
       case RoomSafetyAction.report:
         await reportRoomCounterparty(context,
-            counterparty: cp, safety: widget.safety);
+            counterparty: cp, safety: _safety);
       case RoomSafetyAction.block:
         final bool ok = await confirmAndBlockRoomCounterparty(context,
-            counterparty: cp, safety: widget.safety);
+            counterparty: cp, safety: _safety);
         if (ok && mounted) {
           setState(() => _blocked = true); // composer 비활성 — 기존 대화는 유지.
           await _refresh(); // 차단 후 room state 새로고침.
@@ -291,14 +304,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// 이미지 첨부 탭 → 전체화면 뷰어. 주석이 전송되면 목록 새로고침.
   Future<void> _openImage(QuestionAttachment a) async {
-    final bool? refreshed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (BuildContext context) => AttachmentViewerScreen(
-          attachment: a,
-          roomId: widget.thread.roomId,
-          threadId: widget.thread.id,
-          resolver: _resolver,
-        ),
+    final bool? refreshed = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.roomAttachment(
+        widget.thread.roomId,
+        widget.thread.id,
+        a.id,
+      ),
+      fallbackBuilder: (BuildContext context) => AttachmentViewerScreen(
+        attachment: a,
+        roomId: widget.thread.roomId,
+        threadId: widget.thread.id,
+        resolver: _resolver,
       ),
     );
     if (refreshed == true && mounted) await _refresh();
@@ -344,13 +361,13 @@ class _ChatScreenState extends State<ChatScreen> {
   /// 오류를 삼키지 않는다 — 실패 사유를 표시하고 false 를 돌려준다(P2-19).
   Future<bool> _uploadPending(PickedImage image, {String? messageId}) async {
     if (_blocked) return false; // 업로드 호출 0회(방어 — 진입은 이미 막힌다).
-    if (!widget.uploader.isReady) {
+    if (!_uploader.isReady) {
       // 저장소 미준비(버킷 없음) → 안내만(골격). 텍스트는 이미 전송됨.
       _showError('이미지 첨부는 준비 중이에요. (저장소 설정 인수인계)');
       return false;
     }
     try {
-      await widget.uploader.upload(
+      await _uploader.upload(
         roomId: widget.thread.roomId,
         threadId: widget.thread.id,
         messageId: messageId,

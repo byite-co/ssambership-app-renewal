@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/refresh/data_refresh_bus.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
 import 'package:ssambership_app/features/mentors/ui/mentor_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// §4-1·§4-2 — 구독 상태 세대(DataRefreshBus.subscriptionGeneration)와
 /// 멘토 상세의 최신성 수렴(앱 복귀 resume · 세대 신호 · 늦은 응답 폐기).
@@ -53,7 +54,7 @@ void main() {
       _bigSurface(tester);
       int calls = 0;
       bool subscribed = false;
-      await tester.pumpWidget(_app(() async {
+      await tester.pumpScopedWidget(_app(() async {
         calls++;
         return MentorDetailExtras(alreadySubscribed: subscribed);
       }));
@@ -75,7 +76,7 @@ void main() {
       _bigSurface(tester);
       int calls = 0;
       bool subscribed = false;
-      await tester.pumpWidget(_app(() async {
+      await tester.pumpScopedWidget(_app(() async {
         calls++;
         return MentorDetailExtras(alreadySubscribed: subscribed);
       }));
@@ -95,7 +96,7 @@ void main() {
       final Completer<MentorDetailExtras> slow =
           Completer<MentorDetailExtras>();
       int calls = 0;
-      await tester.pumpWidget(_app(() {
+      await tester.pumpScopedWidget(_app(() {
         calls++;
         // 1회차(구독 '전' 스냅샷)는 늦게 도착, 2회차(구독 후)는 즉시 완료.
         if (calls == 1) return slow.future;
@@ -120,7 +121,7 @@ void main() {
       final Completer<MentorDetailExtras> pending =
           Completer<MentorDetailExtras>();
       int calls = 0;
-      await tester.pumpWidget(_app(() {
+      await tester.pumpScopedWidget(_app(() {
         calls++;
         if (calls == 1) {
           return Future<MentorDetailExtras>.value(
@@ -143,7 +144,7 @@ void main() {
     testWidgets('재조회 실패 → 마지막 정상 구독 상태를 지우지 않는다', (WidgetTester tester) async {
       _bigSurface(tester);
       int calls = 0;
-      await tester.pumpWidget(_app(() {
+      await tester.pumpScopedWidget(_app(() {
         calls++;
         if (calls == 1) {
           return Future<MentorDetailExtras>.value(
@@ -164,13 +165,13 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       int calls = 0;
-      await tester.pumpWidget(_app(() async {
+      await tester.pumpScopedWidget(_app(() async {
         calls++;
         return const MentorDetailExtras();
       }));
       await tester.pumpAndSettle();
 
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpScopedWidget(const MaterialApp(home: SizedBox()));
       final int before = calls;
       DataRefreshBus.bumpSubscription();
       await tester.pump();

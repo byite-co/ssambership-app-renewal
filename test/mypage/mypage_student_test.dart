@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/core/commerce/commerce_policy.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 학생 마이페이지 — mock MyPageData 주입(실제 DB·네트워크 미사용)으로 섹션 렌더 검증.
 MyPageData _studentData() => MyPageData(
@@ -44,10 +45,9 @@ void _bigSurface(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('프로필·구독현황·캐시·설정 섹션이 렌더된다',
-      (WidgetTester tester) async {
+  testWidgets('프로필·구독현황·캐시·설정 섹션이 렌더된다', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(
+    await tester.pumpScopedWidget(
         _wrap(MyPageScreen(loaderOverride: () async => _studentData())));
     await tester.pump(); // FutureBuilder 해소
 
@@ -62,7 +62,7 @@ void main() {
   testWidgets('구독 카드가 멘토별로 렌더(상태칩·갱신일), 잔여수 미확정은 숫자 날조 없이 상태 표기',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(
+    await tester.pumpScopedWidget(
         _wrap(MyPageScreen(loaderOverride: () async => _studentData())));
     await tester.pump();
 
@@ -79,7 +79,7 @@ void main() {
   testWidgets('캐시 잔액 조회 표기 + 충전 유도 없음(안내 카드) + 구독 관리는 플래그 연동',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(
+    await tester.pumpScopedWidget(
         _wrap(MyPageScreen(loaderOverride: () async => _studentData())));
     await tester.pump();
 

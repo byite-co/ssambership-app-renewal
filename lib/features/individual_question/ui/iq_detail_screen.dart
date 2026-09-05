@@ -94,6 +94,7 @@ class IqDetailScreen extends StatefulWidget {
     this.urlResolverOverride,
     this.repositoryOverride,
     this.attachmentsOverride,
+    this.mentorLookupOverride,
     this.sourcePickerOverride,
     this.fileSaverOverride,
     this.currentUserId,
@@ -128,11 +129,14 @@ class IqDetailScreen extends StatefulWidget {
   /// 테스트용 서명 URL 리졸버 주입(P3-6). null 이면 Supabase 기본.
   final IqAttachmentUrlResolver? urlResolverOverride;
 
-  /// 테스트용 레포 주입(환불/정산/메시지 계약 검증). null 이면 Supabase 기본.
+  /// 테스트용 레포 주입. null 이면 AppScope 의 운영 의존성을 사용한다.
   final IndividualQuestionRepository? repositoryOverride;
 
-  /// 테스트용 첨부 업로드 포트 주입(§6). null 이면 Supabase 기본.
+  /// 테스트용 첨부 업로드 포트 주입(§6). null 이면 AppScope 의 운영 의존성을 사용한다.
   final IqAttachmentsPort? attachmentsOverride;
+
+  /// 테스트용 멘토 이름 조회 레포. null 이면 AppScope 의 운영 의존성을 사용한다.
+  final MentorLookupRepository? mentorLookupOverride;
 
   /// 테스트용 첨부 선택 소스 주입(§6 — 카메라/갤러리/파일). null 이면 실기기.
   final ScanSourcePort? sourcePickerOverride;
@@ -172,14 +176,15 @@ class IqAnnotateRequest {
 class _IqDetailScreenState extends State<IqDetailScreen>
     with WidgetsBindingObserver, ResumeVisibilityGate {
   IndividualQuestionRepository get _repo =>
-      widget.repositoryOverride ?? const IndividualQuestionRepository();
+      widget.repositoryOverride ?? _deps.individualQuestions;
   IqAttachmentsPort get _attachments =>
-      widget.attachmentsOverride ?? const SupabaseIqAttachmentsRepository();
+      widget.attachmentsOverride ?? _deps.iqAttachments;
   ScanSourcePort get _sourcePicker =>
       widget.sourcePickerOverride ?? const DeviceScanSourcePicker();
   IqAttachmentSaverPort get _fileSaver =>
       widget.fileSaverOverride ?? const SafIqAttachmentSaver();
-  final MentorLookupRepository _mentorLookup = const MentorLookupRepository();
+  MentorLookupRepository get _mentorLookup =>
+      widget.mentorLookupOverride ?? _deps.mentorLookup;
   final TextEditingController _answerController = TextEditingController();
 
   /// 당사자 공용 대화 컴포저(iq_append_message — 학생 후속·멘토 추가 답글).

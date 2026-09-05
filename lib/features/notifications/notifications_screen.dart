@@ -58,8 +58,8 @@ class NotificationsScreen extends StatefulWidget {
   /// 데이터 소스(기본: Supabase). 테스트에서 fake 주입.
   final NotificationsRepository? repository;
 
-  /// 딥링크 탭 이동 훅(기본: TabNavigator.go). 테스트에서 대상 검증용 주입.
-  final void Function(int tabIndex)? onDeepLinkTab;
+  /// 딥링크 경로 이동 훅(기본: TabNavigator.go). 테스트에서 대상 검증용 주입.
+  final void Function(String location)? onDeepLinkTab;
 
   /// 배지 컨트롤러(기본: 앱 전역 인스턴스). 테스트에서 fake 레포 주입용.
   final NotificationBadgeController? badge;
@@ -112,7 +112,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void initState() {
     super.initState();
-    _repo = widget.repository ?? const SupabaseNotificationsRepository();
+    _repo = widget.repository ?? AppScope.of(context).notifications;
     _load();
     _badge.refresh();
     _startRealtime();
@@ -159,8 +159,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void _startRealtime() {
     final String? uid = AppScope.of(context).auth.currentUserId;
     if (uid == null) return; // 게스트/미연결 — 구독 없음(폴백 재조회만).
-    final NotificationsRealtimePort rt = (widget.realtimeFactory ??
-        SupabaseNotificationsRealtime.new)(uid);
+    final NotificationsRealtimePort rt =
+        (widget.realtimeFactory ?? SupabaseNotificationsRealtime.new)(uid);
     _realtime = rt;
     rt.start(
       onInsert: _onRealtimeInsert,
@@ -177,8 +177,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   void _onRealtimeInsert(Map<String, dynamic> row) {
     if (!mounted) return;
     _badge.refresh();
-    final String rawType =
-        (row['type'] as String?)?.trim().toLowerCase() ?? '';
+    final String rawType = (row['type'] as String?)?.trim().toLowerCase() ?? '';
     if (kGatedNotificationTypeCodes.contains(rawType)) return; // CR 게이트 OFF.
     final AppNotification n;
     try {
@@ -319,7 +318,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
     if (route == null) return; // 이동 없음(맞춤의뢰·unknown 등) — 목록에 머문다.
     if (route is NotificationTabRoute) {
-      (widget.onDeepLinkTab ?? TabNavigator.go)(route.tabIndex);
+      (widget.onDeepLinkTab ?? TabNavigator.go)(route.location);
       return;
     }
     _openDetail(route);
@@ -376,8 +375,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                   ),
                   if (unread > 0)
-                    TextButton(
-                        onPressed: _markAll, child: const Text('모두 읽음')),
+                    TextButton(onPressed: _markAll, child: const Text('모두 읽음')),
                 ],
               );
             },

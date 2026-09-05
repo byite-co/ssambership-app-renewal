@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 개별질문 상세의 상태별 액션 노출. IndividualQuestionStatus 10개 값을 전부 덮는다.
 const String kRelease = '해결 완료 (멘토에게 정산)';
@@ -37,8 +38,8 @@ Future<void> _pump(
   required AppRole role,
   List<IqAttachment> attachments = const <IqAttachment>[],
 }) async {
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pumpWidget(MaterialApp(
+  await tester.pumpScopedWidget(const SizedBox.shrink());
+  await tester.pumpScopedWidget(MaterialApp(
     home: IqDetailScreen(
       questionId: 'q1',
       roleOverride: role,

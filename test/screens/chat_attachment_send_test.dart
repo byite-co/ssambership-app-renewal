@@ -9,6 +9,7 @@ import 'package:ssambership_app/features/question_room/data/models/question_thre
 import 'package:ssambership_app/features/question_room/ui/chat_screen.dart';
 import 'package:ssambership_app/features/question_room/ui/mentor/mentor_answer_screen.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// P2-19 첨부 전송 UX: 성공 시에만 pending 정리, 실패는 삼키지 않고 노출.
 /// 첨부만 보내는 경로(본문 없음)라 appendMessage(RPC)는 타지 않는다 — fake 업로더로 검증.
@@ -91,7 +92,7 @@ void main() {
       (WidgetTester tester) async {
     final _FakeUploader uploader =
         _FakeUploader(error: const AppError('첨부 파일을 등록하지 못했어요. 다시 시도해 주세요.'));
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: ChatScreen(
         thread: _thread(),
@@ -111,7 +112,7 @@ void main() {
 
   testWidgets('학생 채팅: 첨부 업로드 성공 → pending 정리', (WidgetTester tester) async {
     final _FakeUploader uploader = _FakeUploader();
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: ChatScreen(
         thread: _thread(),
@@ -130,7 +131,7 @@ void main() {
   testWidgets('멘토 답변: 첫 첨부 answered 전이 신호 → 상태칩 "진행 중"(별도 UPDATE 없음)',
       (WidgetTester tester) async {
     final _FakeUploader uploader = _FakeUploader(answeredTransition: true);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: MentorAnswerScreen(
         thread: _thread(),
@@ -152,7 +153,7 @@ void main() {
   testWidgets('멘토 답변: 첨부 실패 → 상태 전이 없음 + pending 유지',
       (WidgetTester tester) async {
     final _FakeUploader uploader = _FakeUploader(error: const AppError('실패'));
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       theme: ThemeData(splashFactory: NoSplash.splashFactory),
       home: MentorAnswerScreen(
         thread: _thread(),

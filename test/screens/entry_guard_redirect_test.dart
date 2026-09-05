@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ssambership_app/app/app_tabs.dart';
 import 'package:ssambership_app/app/entry_guard.dart';
 import 'package:ssambership_app/core/auth/auth_service.dart';
 
@@ -19,9 +20,15 @@ void main() {
     expect(go(AccessState.loggedOut, EntryGuard.login), isNull);
   });
 
-  test('guest → 홈·로그인만 허용, 그 외는 홈으로', () {
+  test('guest → 홈 alias·로그인·멘토/커뮤니티 URL만 허용', () {
     expect(go(AccessState.guest, EntryGuard.home), isNull);
     expect(go(AccessState.guest, EntryGuard.login), isNull);
+    expect(go(AccessState.guest, '/mentors'), isNull);
+    expect(go(AccessState.guest, '/mentors/mentor-1'), isNull);
+    expect(go(AccessState.guest, '/mentors-copy/mentor-1'), EntryGuard.home);
+    expect(go(AccessState.guest, '/community'), isNull);
+    expect(go(AccessState.guest, '/community/boards/post-1'), isNull);
+    expect(go(AccessState.guest, '/community-copy'), EntryGuard.home);
     expect(go(AccessState.guest, '/blocked'), EntryGuard.home);
     expect(go(AccessState.guest, EntryGuard.splash), EntryGuard.home);
   });
@@ -43,12 +50,12 @@ void main() {
     expect(go(AccessState.blocked, '/dev/s3'), isNull);
   });
 
-  test('게스트 허용 탭은 커뮤니티(1)·멘토찾기(2)뿐', () {
-    expect(EntryGuard.isTabAllowedForGuest(0), isFalse); // 질문방
-    expect(EntryGuard.isTabAllowedForGuest(1), isTrue); // 커뮤니티
-    expect(EntryGuard.isTabAllowedForGuest(2), isTrue); // 멘토찾기
-    expect(EntryGuard.isTabAllowedForGuest(3), isFalse); // 알림
-    expect(EntryGuard.isTabAllowedForGuest(4), isFalse); // 개별질문
-    expect(EntryGuard.isTabAllowedForGuest(100), isFalse); // 마이페이지(가상)
+  test('게스트 허용 탭은 URL 순서와 무관하게 멘토·커뮤니티뿐', () {
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.questionRoom), isFalse);
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.individualQuestion), isFalse);
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.mentors), isTrue);
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.community), isTrue);
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.notifications), isFalse);
+    expect(EntryGuard.isTabAllowedForGuest(AppTab.myPage), isFalse);
   });
 }

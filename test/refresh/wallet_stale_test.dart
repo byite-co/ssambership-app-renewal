@@ -11,6 +11,7 @@ import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
 import 'package:ssambership_app/features/mypage/ui/sections/cash_section.dart';
 import 'package:ssambership_app/shared/errors/app_error.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 세션1.5 보정3 — 환불 성공·재조회 실패 시 stale generation UI.
 /// 마지막 정상 캐시는 삭제하지 않되, 환불 이전 잔액을 최신 확정값처럼
@@ -44,7 +45,7 @@ void main() {
       (WidgetTester tester) async {
     _bigSurface(tester);
     int calls = 0;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: Scaffold(body: MyPageScreen(loaderOverride: () async {
         calls++;
         if (calls == 2) return _data(balanceCents: null); // 재조회 실패 상태
@@ -85,7 +86,7 @@ void main() {
         StateError('timeout'), // 실제 Future 예외
         _data(balanceCents: 6000000),
       ]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
       await tester.pumpAndSettle();
       expect(find.text('50,000원'), findsOneWidget);
@@ -121,7 +122,7 @@ void main() {
       );
       final _SeqLoader loader =
           _SeqLoader(<Object>[_data(balanceCents: 5000000), noCash]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
       await tester.pumpAndSettle();
 
@@ -139,7 +140,7 @@ void main() {
         StateError('e1'),
         StateError('e2'), // 재시도도 실패
       ]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
       await tester.pumpAndSettle();
       DataRefreshBus.bumpWallet();
@@ -158,7 +159,7 @@ void main() {
       _bigSurface(tester);
       final _SeqLoader loader = _SeqLoader(
           <Object>[_data(balanceCents: 5000000), StateError('offline')]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
       await tester.pumpAndSettle();
 
@@ -181,7 +182,7 @@ void main() {
     testWidgets('초기 로드부터 Future.error·정상 스냅샷 없음 → 기존 전체 오류 UI',
         (WidgetTester tester) async {
       _bigSurface(tester);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
         home: Scaffold(
             body: MyPageScreen(
                 loaderOverride: () =>
@@ -196,7 +197,7 @@ void main() {
       _bigSurface(tester);
       final _SeqLoader loader =
           _SeqLoader(<Object>[_data(balanceCents: 5000000)]);
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: loader.call))));
       await tester.pumpAndSettle();
       final int callsAfterFirst = loader.calls;
@@ -215,7 +216,7 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       gate.completers[0].complete(_data(balanceCents: 5000000));
       await tester.pumpAndSettle();
@@ -247,7 +248,7 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       gate.completers[0].complete(_data(balanceCents: 5000000));
       await tester.pumpAndSettle();
@@ -277,7 +278,7 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       gate.completers[0].complete(_data(balanceCents: 5000000));
       await tester.pumpAndSettle();
@@ -326,7 +327,7 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       gate.completers[0].complete(_data(balanceCents: 5000000));
       await tester.pumpAndSettle();
@@ -356,7 +357,7 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       gate.completers[0].complete(_data(balanceCents: 5000000));
       await tester.pumpAndSettle();
@@ -381,11 +382,11 @@ void main() {
         (WidgetTester tester) async {
       _bigSurface(tester);
       final _GateLoader gate = _GateLoader();
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpScopedWidget(MaterialApp(
           home: Scaffold(body: MyPageScreen(loaderOverride: gate.call))));
       expect(gate.calls, 1); // 초기 로드 in-flight
 
-      await tester.pumpWidget(const SizedBox.shrink()); // dispose
+      await tester.pumpScopedWidget(const SizedBox.shrink()); // dispose
       DataRefreshBus.bumpWallet(); // listener 해제 확인
       await tester.pump();
       expect(gate.calls, 1, reason: 'dispose 후 외부 신호로 loader 추가 호출 0');
@@ -398,7 +399,7 @@ void main() {
   testWidgets('변경 신호 없는 초기 실패 → 기존 - 표기 유지(배너 없음·회귀 0)',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: Scaffold(
           body: MyPageScreen(
               loaderOverride: () async => _data(balanceCents: null))),
@@ -413,7 +414,7 @@ void main() {
       (WidgetTester tester) async {
     _bigSurface(tester);
     final int genBefore = DataRefreshBus.walletGeneration.value;
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpScopedWidget(MaterialApp(
       home: IqDetailScreen(
         questionId: 'q-1',
         roleOverride: AppRole.student,

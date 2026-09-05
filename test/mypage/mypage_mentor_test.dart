@@ -4,6 +4,7 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/commerce/commerce_policy.dart';
 import 'package:ssambership_app/features/mypage/data/mypage_models.dart';
 import 'package:ssambership_app/features/mypage/mypage_screen.dart';
+import '../support/app_scope_test_harness.dart';
 
 /// 멘토 마이페이지 — role=mentor 분기로 멘토 전용 내용이 뜨고 학생 섹션은 안 뜬다.
 MyPageData _mentorData() => const MyPageData(
@@ -29,7 +30,7 @@ void main() {
   testWidgets('role=mentor → 답변·정산 요약(조회) 렌더, 학생 섹션은 비표시',
       (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(
+    await tester.pumpScopedWidget(
         _wrap(MyPageScreen(loaderOverride: () async => _mentorData())));
     await tester.pump();
 
@@ -63,7 +64,7 @@ void main() {
 
   testWidgets('정산 데이터 없으면 숫자 날조 없이 "-" 표기', (WidgetTester tester) async {
     _bigSurface(tester);
-    await tester.pumpWidget(_wrap(MyPageScreen(
+    await tester.pumpScopedWidget(_wrap(MyPageScreen(
       loaderOverride: () async => const MyPageData(
         role: AppRole.mentor,
         profile: MyProfile(name: '멘토', roleLabel: '멘토'),
