@@ -8,6 +8,7 @@ import '../../features/mypage/data/mypage_models.dart';
 import '../../features/mypage/mypage_screen.dart';
 import '../../features/mypage/ui/account_delete_screen.dart';
 import '../../features/mypage/ui/profile_edit_screen.dart';
+import '../../features/subscription/ui/refund_request_screen.dart';
 import '../../shared/constants/app_constants.dart';
 import '../app_navigation.dart';
 import '../app_route_completion.dart';
@@ -55,6 +56,23 @@ List<RouteBase> buildMyPageRoutes() => <RouteBase>[
             errorMessage: '프로필을 불러오지 못했어요.',
           ),
         ),
+      ),
+      GoRoute(
+        path: AppRoutePaths.subscriptionRefundPattern,
+        builder: (BuildContext context, GoRouterState state) {
+          final String subscriptionId = state.pathParameters['subscriptionId']!;
+          final String mentor = state.uri.queryParameters['mentor'] ?? '멘토';
+          final String? plan = state.uri.queryParameters['plan'];
+          return AppRouteCompletionBoundary(
+            fallbackLocation: AppRoutePaths.myPage,
+            child: RefundRequestScreen(
+              key: ValueKey<String>('refund:$subscriptionId'),
+              subscriptionId: subscriptionId,
+              mentorName: mentor,
+              planLabel: plan,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutePaths.blockedUsers,

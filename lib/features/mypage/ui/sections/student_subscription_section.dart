@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/app_navigation.dart';
+import '../../../../app/app_route_paths.dart';
 import '../../../../app/app_scope.dart';
 import '../../../../app/app_tabs.dart';
 import '../../../../core/refresh/data_refresh_bus.dart';
@@ -16,12 +18,13 @@ import '../../../../shared/errors/friendly_error.dart';
 import '../../../../shared/format/formatters.dart';
 import '../../../subscription/data/subscription_commerce_models.dart';
 import '../../../subscription/data/subscription_commerce_repository.dart';
+import '../../../subscription/ui/refund_request_screen.dart';
 import '../../../subscription/ui/subscription_cancel_sheet.dart';
 import '../../data/mypage_models.dart';
 import '../widgets/mypage_section.dart';
 
-/// 학생 구독 현황 섹션 — 멘토별 카드(요금제·갱신일·상태) + 해지 예약·취소
-/// (A-4b ② — `api_app_v1` 래퍼). "질문하러 가기".
+/// 학생 구독 현황 섹션 — 멘토별 카드(요금제·갱신일·상태) + 해지 예약·취소·환불 신청
+/// (A-4b ②③ — `api_app_v1` 래퍼). "질문하러 가기".
 /// ★ 잔여 질문수 미확정이면 숫자 대신 구독 상태로만 표기(S4와 동일, 날조 금지).
 class StudentSubscriptionSection extends StatelessWidget {
   const StudentSubscriptionSection({
@@ -40,7 +43,7 @@ class StudentSubscriptionSection extends StatelessWidget {
   /// 테스트 주입(기본: [AppScope] 의 subscriptionCommerce).
   final SubscriptionCommercePort? port;
 
-  /// 해지 예약·취소가 서버에 반영된 뒤 — 호출부가 마이페이지를 재조회.
+  /// 해지 예약·취소·환불 신청이 서버에 반영된 뒤 — 호출부가 마이페이지를 재조회.
   final VoidCallback? onChanged;
 
   @override
@@ -176,6 +179,26 @@ class _SubCardState extends State<_SubCard> {
     }
   }
 
+  Future<void> _openRefund() async {
+    if (_busy) return;
+    final String id = info.subscriptionId!;
+    final bool? requested = await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.subscriptionRefund(
+        id,
+        mentorName: info.mentorName,
+        planLabel: info.planLabel,
+      ),
+      fallbackBuilder: (_) => RefundRequestScreen(
+        subscriptionId: id,
+        mentorName: info.mentorName,
+        planLabel: info.planLabel,
+        port: widget.port,
+      ),
+    );
+    if (requested == true && mounted) widget.onChanged?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool scheduled = info.isCancelScheduled;
@@ -232,7 +255,7 @@ class _SubCardState extends State<_SubCard> {
           const SizedBox(height: 8),
           QuotaBar(used: info.usage!.used, limit: info.usage!.limit),
         ],
-        // A-4b ②: 해지 예약 / 해지 취소 — 자격이 살아 있는 카드만.
+        // A-4b ②③: 해지 예약 / 해지 취소 · 환불 신청 — 자격이 살아 있는 카드만.
         if (_actionable) ...<Widget>[
           const SizedBox(height: 10),
           Row(
@@ -250,6 +273,11 @@ class _SubCardState extends State<_SubCard> {
                   expand: false,
                   onPressed: _busy ? null : _scheduleCancel,
                 ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: _busy ? null : _openRefund,
+                child: const Text('환불 신청'),
+              ),
             ],
           ),
         ],
