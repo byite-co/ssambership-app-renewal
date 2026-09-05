@@ -16,6 +16,7 @@ import '../data/mentor_console_repository.dart';
 import 'academic_record_change_screen.dart';
 import 'education_verification_screen.dart';
 import 'mentor_plans_screen.dart';
+import 'mentor_profile_edit_screen.dart';
 import 'payout_account_screen.dart';
 import 'settlement_format.dart';
 import 'settlement_lines_screen.dart';
@@ -86,6 +87,15 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
       AppRoutePaths.mentorAcademicRecordChange,
       fallbackBuilder: (_) =>
           AcademicRecordChangeScreen(portOverride: widget.portOverride),
+    );
+  }
+
+  Future<void> _openProfileEdit() async {
+    await AppNavigation.push<bool>(
+      context,
+      AppRoutePaths.mentorProfileEdit,
+      fallbackBuilder: (_) =>
+          MentorProfileEditScreen(portOverride: widget.portOverride),
     );
   }
 
@@ -251,6 +261,12 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
                   icon: Icons.swap_horiz_rounded,
                   label: '학적 변경 요청',
                   onTap: _openAcademicRecordChange,
+                ),
+                V3EntryRow(
+                  icon: Icons.badge_outlined,
+                  label: '프로필 편집',
+                  caption: '소개 · 담당 과목 · 사진 · 구독 열림',
+                  onTap: _openProfileEdit,
                 ),
               ],
             ),

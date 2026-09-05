@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/mentor_console/ui/academic_record_change_screen.dart';
 import '../../features/mentor_console/ui/education_verification_screen.dart';
 import '../../features/mentor_console/ui/mentor_plans_screen.dart';
+import '../../features/mentor_console/ui/mentor_profile_edit_screen.dart';
 import '../../features/mentor_console/ui/mentor_settlement_screen.dart';
 import '../../features/mentor_console/ui/payout_account_screen.dart';
 import '../../features/mentor_console/ui/settlement_lines_screen.dart';
@@ -54,5 +55,11 @@ List<RouteBase> buildMentorConsoleRoutes() => <RouteBase>[
           child: AcademicRecordChangeScreen(),
         ),
       ),
-          ),
+          GoRoute(
+        path: AppRoutePaths.mentorProfileEdit,
+        builder: (context, state) => const AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.settlements,
+          child: MentorProfileEditScreen(),
+        ),
+      ),
     ];

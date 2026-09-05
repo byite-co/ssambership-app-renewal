@@ -90,6 +90,28 @@ const Map<String, String> _legacyLabelToCode = <String, String>{
   '화학': 'science',
 };
 
+/// 화면용 카탈로그 항목(코드·라벨·대분류 코드). 정본 정렬 순서 그대로.
+/// 멘토 담당 과목 선택기(A-4a 프로필 편집)처럼 계층을 그려야 하는 곳이 쓴다.
+class SubjectCatalogEntry {
+  const SubjectCatalogEntry({
+    required this.code,
+    required this.label,
+    this.parent,
+  });
+
+  final String code;
+  final String label;
+
+  /// 대분류면 null, 소분류면 대분류 code.
+  final String? parent;
+}
+
+final List<SubjectCatalogEntry> subjectCatalogEntries =
+    List<SubjectCatalogEntry>.unmodifiable(<SubjectCatalogEntry>[
+  for (final _Subject s in _catalog)
+    SubjectCatalogEntry(code: s.code, label: s.label, parent: s.parent),
+]);
+
 /// code → 한글 라벨 맵(정본). 외부 호환용(코드 집합 열람).
 final Map<String, String> subjectLabels = <String, String>{
   for (final _Subject s in _catalog) s.code: s.label,
