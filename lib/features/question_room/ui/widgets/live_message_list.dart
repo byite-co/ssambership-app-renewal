@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../design/spacing_tokens.dart';
-import '../../../../design/typography_tokens.dart';
+import '../../../../design/tokens/app_spacing.dart';
+import '../../../../design/tokens/app_typography.dart';
 import '../../data/attachments/attachment_url_resolver.dart';
 import '../../data/models/question_attachment.dart';
 import '../../data/models/question_message.dart';
@@ -162,27 +162,41 @@ class _LiveMessageListState extends State<LiveMessageList> {
     final List<_Row> rows = _buildRows();
     if (rows.isEmpty) {
       return Center(
-        child: Text(widget.emptyHint, style: AppType.caption),
+        child: Text(widget.emptyHint, style: AppTypography.captionSecondary),
       );
     }
     // N21: 상단 '이전 대화 불러오기'(이전 페이지가 있을 수 있을 때만).
     final bool showEarlier = widget.hasEarlier && widget.onLoadEarlier != null;
-    return ListView.builder(
+    // ★ 버튼 행은 메시지 슬리버와 **분리**한다. 한 SliverList 에 섞으면 미배치
+    //   구간 extent 추정(배치된 자식 평균)에 버튼 높이가 섞여 prepend 보정
+    //   (extent 델타)이 말풍선 높이만큼 어긋난다 — v3 말풍선(gap 14)에서 실측
+    //   35px. 슬리버를 나누면 균일 말풍선의 추정이 정확해진다.
+    return CustomScrollView(
       controller: _scroll,
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
-      itemCount: rows.length + (showEarlier ? 1 : 0),
-      itemBuilder: (BuildContext context, int i) {
-        if (showEarlier && i == 0) {
-          return Center(
-            child: TextButton(
-              onPressed: _loadingEarlier ? null : _loadEarlier,
-              child: Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+      clipBehavior: Clip.none,
+      slivers: <Widget>[
+        if (showEarlier)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s16),
+              child: Center(
+                child: TextButton(
+                  onPressed: _loadingEarlier ? null : _loadEarlier,
+                  child:
+                      Text(_loadingEarlier ? '불러오는 중…' : '이전 대화 불러오기'),
+                ),
+              ),
             ),
-          );
-        }
-        return rows[i - (showEarlier ? 1 : 0)].child;
-      },
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenH, vertical: AppSpacing.s16),
+          sliver: SliverList.builder(
+            itemCount: rows.length,
+            itemBuilder: (BuildContext context, int i) => rows[i].child,
+          ),
+        ),
+      ],
     );
   }
 
