@@ -13,6 +13,7 @@ import '../../../shared/errors/friendly_error.dart';
 import '../../../shared/widgets/v3_page.dart';
 import '../data/mentor_console_models.dart';
 import '../data/mentor_console_repository.dart';
+import 'academic_record_change_screen.dart';
 import 'education_verification_screen.dart';
 import 'mentor_plans_screen.dart';
 import 'payout_account_screen.dart';
@@ -76,6 +77,15 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
       AppRoutePaths.mentorEducationVerification,
       fallbackBuilder: (_) =>
           EducationVerificationScreen(portOverride: widget.portOverride),
+    );
+  }
+
+  Future<void> _openAcademicRecordChange() async {
+    await AppNavigation.push<void>(
+      context,
+      AppRoutePaths.mentorAcademicRecordChange,
+      fallbackBuilder: (_) =>
+          AcademicRecordChangeScreen(portOverride: widget.portOverride),
     );
   }
 
@@ -236,6 +246,11 @@ class _MentorSettlementScreenState extends State<MentorSettlementScreen> {
                   icon: Icons.school_outlined,
                   label: '학력 인증',
                   onTap: _openEducationVerification,
+                ),
+                V3EntryRow(
+                  icon: Icons.swap_horiz_rounded,
+                  label: '학적 변경 요청',
+                  onTap: _openAcademicRecordChange,
                 ),
               ],
             ),
