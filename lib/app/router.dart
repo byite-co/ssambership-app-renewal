@@ -20,6 +20,7 @@ import 'entry_guard.dart';
 import 'home_shell.dart';
 import 'routes/community_routes.dart';
 import 'routes/individual_question_routes.dart';
+import 'routes/mentor_console_routes.dart';
 import 'routes/mentor_routes.dart';
 import 'routes/mypage_routes.dart';
 import 'routes/question_room_routes.dart';
@@ -134,6 +135,7 @@ class AppRouter {
         ...buildQuestionRoomRoutes(),
         ...buildIndividualQuestionRoutes(),
         ...buildMentorRoutes(),
+        ...buildMentorConsoleRoutes(),
         ...buildCommunityRoutes(),
         ...buildMyPageRoutes(),
         // ★ 개발 전용 — 출시(release) 빌드에서는 등록되지 않는다(kDevToolsEnabled=false).

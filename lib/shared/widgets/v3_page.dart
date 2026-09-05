@@ -111,7 +111,11 @@ Future<T?> showV3BottomSheet<T>(
   bool isDismissible = true,
   bool enableDrag = true,
 }) {
-  final AppRole role = RoleTheme.of(context).role;
+  // 호출 컨텍스트가 [V3Page] 의 State 처럼 RoleTheme 위에 있을 수 있다 —
+  // 그때는 AppScope 의 현재 역할로 정한다.
+  final AppRole role =
+      context.getInheritedWidgetOfExactType<RoleTheme>()?.role ??
+          V3Page.roleOf(context);
   return GlassBottomSheet.show<T>(
     context,
     isDismissible: isDismissible,
