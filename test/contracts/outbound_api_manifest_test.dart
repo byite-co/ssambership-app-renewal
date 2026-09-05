@@ -33,6 +33,13 @@ const Set<String> kExpectedRpcNames = <String>{
   'get_mentor_student_nicknames',
   // 멘토 찾기
   'get_mentor_avg_response_hours',
+  // A-4a 멘토 콘솔(판정표 docs/renewal/a4a-triage-2026-09-05.md)
+  'mentor_payout_account_update_self', // api_web_v1 F13 — 정산 계좌
+  'mentor_plan_prices_set_self', // api_web_v1 F8 — 요금제(밴드 DB 강제)
+  'mentor_profile_update_self', // api_web_v1 F7 — 프로필 9필드·구독 열림
+  'set_individual_question_price', // 개별질문 답변 단가
+  'mentor_settlement_summary', // 정산 월 요약
+  'mentor_settlement_lines', // 정산 건별 내역
   // 개별질문
   'add_individual_question_attachment',
   'claim_individual_question_as_mentor',
@@ -90,6 +97,9 @@ const Set<String> kExpectedTables = <String>{
   'question_attachments',
   'connection_notes',
   'mentor_profiles',
+  // A-4a 멘토 콘솔 — 본인 pending 행 직접 INSERT(RLS msv/macc_insert_own_pending)
+  'mentor_school_verifications',
+  'mentor_academic_record_change_requests',
   // 멘토 찾기(계약 수렴: 디렉터리는 뷰)
   'mentor_directory_v1',
   'mentor_plans',
@@ -124,6 +134,9 @@ const Set<String> kExpectedBucketIdentifiers = <String>{
   'InkStoragePaths.annotationBucket',
   'ShortformMediaUrlResolver.videoBucket',
   'kCommunityPostImagesBucket',
+  // A-4a 멘토 콘솔
+  'kStudentIdImagesBucket', // 학력 인증·학적 변경 서류(비공개)
+  'kProfileAvatarsBucket', // 멘토 아바타(public)
 };
 
 /// 버킷 상수 정의값(이름 뒤에 숨는 버킷 차단).
@@ -134,6 +147,8 @@ const Set<String> kExpectedBucketNames = <String>{
   'scan-annotations',
   'shortform-videos',
   'community-post-images',
+  'student-id-images',
+  'profile-avatars',
 };
 
 /// REVOKE/금지 표면 — 주석 제외 코드에서 0건(word boundary — v2 는 무관).
@@ -253,7 +268,7 @@ void main() {
         reason: '버킷은 상수 경유만 — 리터럴이 생기면 매니페스트를 확장할 것');
   });
 
-  test('식별자 from — DB 는 {_table,_reportsTable,table}, 버킷은 상수 7종', () {
+  test('식별자 from — DB 는 {_table,_reportsTable,table}, 버킷은 상수 9종', () {
     final Set<String> tableIds = <String>{};
     final Set<String> bucketIds = <String>{};
     final RegExp fromId =

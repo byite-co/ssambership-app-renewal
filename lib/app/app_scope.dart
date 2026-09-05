@@ -12,6 +12,7 @@ import '../features/community/data/community_write_repository.dart';
 import '../features/community/data/user_blocks_repository.dart';
 import '../features/individual_question/data/individual_question_repository.dart';
 import '../features/individual_question/data/iq_attachments_repository.dart';
+import '../features/mentor_console/data/mentor_console_repository.dart';
 import '../features/mentors/data/free_question_entry.dart';
 import '../features/mentors/data/mentor_directory_repository.dart';
 import '../features/mentors/data/mentor_favorites_repository.dart';
@@ -55,6 +56,7 @@ class AppDependencies {
     this.iqAttachments = const SupabaseIqAttachmentsRepository(),
     this.mentorDirectory = const MentorDirectoryRepository(),
     this.mentorFavorites = const MentorFavoritesRepository(),
+    this.mentorConsole = const SupabaseMentorConsoleRepository(),
     this.notificationSettings = const NotificationSettingsRepository(),
     this.profileEdit = const ProfileEditRepository(),
     this.accountDeletion = const SupabaseAccountDeletionRepository(),
@@ -118,6 +120,9 @@ class AppDependencies {
   final IqAttachmentsPort iqAttachments;
   final MentorDirectoryRepository mentorDirectory;
   final MentorFavoritesRepository mentorFavorites;
+
+  /// A-4a 멘토 콘솔(정산 계좌·요금제·정산 조회·학력 인증·학적 변경·프로필).
+  final MentorConsolePort mentorConsole;
   final NotificationSettingsPort notificationSettings;
   final ProfileEditRepository profileEdit;
   final AccountDeletionPort accountDeletion;

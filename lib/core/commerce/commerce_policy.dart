@@ -29,8 +29,9 @@ const String kSubscriptionManageNoticeText = '구독 변경·해지는 웹 계�
 const bool kPayoutManageLinkEnabled =
     bool.fromEnvironment('PAYOUT_MANAGE_LINK_ENABLED', defaultValue: false);
 
-/// 정산 관리 링크 off 시 대체 안내(웹 언급 없이 — 죽은 버튼·빈 공백 방지).
-const String kPayoutManageNoticeText = '정산·출금은 웹 계정에서 관리돼요';
+/// 정산 관리 링크 off 시 대체 안내 — 사실 안내만(A-4a 이후 정산 계좌·요금제·내역은
+/// 앱 정산 탭에 있다). 마이페이지 요약에서만 쓰고 정산 탭 본문에서는 표시하지 않는다.
+const String kPayoutManageNoticeText = '정산 계좌·요금제·정산 내역은 정산 탭에서 볼 수 있어요';
 
 /// 구독 유도 대체 안내(웹 언급 없이).
 const String kSubscribeNoticeText = '구독 사용자 전용이에요';

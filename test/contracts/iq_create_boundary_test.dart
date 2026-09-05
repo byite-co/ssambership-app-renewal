@@ -2,76 +2,87 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ssambership_app/core/web_bridge/web_bridge.dart';
-import 'package:ssambership_app/core/web_bridge/web_bridge_actions.dart';
-import 'package:ssambership_app/core/web_bridge/web_bridge_config.dart';
+import 'package:ssambership_app/app/app_route_paths.dart';
 import 'package:ssambership_app/features/individual_question/data/models/individual_question_models.dart';
+import 'package:ssambership_app/features/individual_question/iq_flags.dart';
 import 'package:ssambership_app/features/individual_question/ui/iq_create_screen.dart';
+import 'package:ssambership_app/features/individual_question/ui/iq_detail_screen.dart';
 import 'package:ssambership_app/features/individual_question/ui/student_iq_list_screen.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_models.dart';
 import 'package:ssambership_app/features/mentors/ui/mentor_detail_screen.dart';
 import '../support/app_scope_test_harness.dart';
 
-/// 제품 경계 계약(2026-08-05): 신규 개별질문 등록은 **웹 전용**이다.
+/// 제품 경계 계약(A-4a, 2026-09-05 — 오너 결정 ②로 2026-08-05 "웹 전용" 경계를 대체):
+/// 신규 개별질문 등록은 **앱 네이티브**(`/iq/new`)에서 한다.
 ///
-/// - production 코드에는 네이티브 등록 화면(IqCreateScreen) 진입이 0개여야 한다.
-/// - 두 CTA(멘토 상세·학생 목록)는 웹 등록 브릿지만 호출한다.
+/// - 등록 화면은 잔액을 먼저 보여주고, 부족하면 "잔액이 부족해요" 사실 안내 +
+///   등록 버튼 비활성까지만 한다.
+/// - **충전 유도 0**: '충전' 문구·버튼·링크·인앱 브라우저가 등록 경로 어디에도 없다.
+/// - 두 CTA(학생 목록·멘토 상세)는 웹 브릿지가 아니라 네이티브 등록 화면을 연다.
 /// - 조회·상세·답변·첨부·첨삭은 이 경계와 무관하게 유지된다(별도 스위트가 보증).
 ///
-/// 정적 검색 + 화면 탭(브릿지 mock) 양쪽으로 고정한다 — 한쪽만으로는
-/// 재배선(정적)이나 죽은 배선(동적)을 놓칠 수 있다.
+/// 정적 검색 + 화면 탭 양쪽으로 고정한다 — 한쪽만으로는 재배선(정적)이나
+/// 죽은 배선(동적)을 놓칠 수 있다.
 void main() {
-  // ───────────────────────── 정적: production 진입점 0 ─────────────────────────
-  group('정적 경계: 네이티브 등록 진입 0', () {
-    List<File> productionDartFiles() => Directory('lib')
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((File f) => f.path.endsWith('.dart'))
-        .toList(growable: false);
+  List<File> productionDartFiles() => Directory('lib')
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((File f) => f.path.endsWith('.dart'))
+      .toList(growable: false);
 
-    test('lib/ 에서 iq_create_screen import 는 자기 자신뿐이다', () {
-      final List<String> importers = <String>[];
-      for (final File f in productionDartFiles()) {
-        if (f.path.endsWith('iq_create_screen.dart')) continue;
-        if (f.readAsStringSync().contains('iq_create_screen.dart')) {
-          // 주석 언급은 허용 — import/uri 표기만 잡는다.
-          for (final String line in f.readAsLinesSync()) {
-            final String t = line.trim();
-            if (t.startsWith('import') && t.contains('iq_create_screen.dart')) {
-              importers.add(f.path);
-            }
-          }
-        }
-      }
-      expect(importers, isEmpty,
-          reason: '신규 등록은 웹 전용 — production 에서 네이티브 등록 화면을 '
-              'import 하면 경계 위반이다: $importers');
+  // ───────────────────────── 정적: 네이티브 등록 개방 ─────────────────────────
+  group('정적 경계: 네이티브 등록 개방 · 충전 유도 0', () {
+    test('등록 CTA 플래그는 기본 on 이다(릴리즈 워크플로는 dart-define 을 쓰지 않는다)', () {
+      expect(kIndividualQuestionCreateEnabled, isTrue);
     });
 
-    test('lib/ 에서 IqCreateScreen 생성자 호출은 0이다(자기 파일 제외)', () {
-      final List<String> callers = <String>[];
+    test('route table 에 /iq/new 가 있고 :questionId 보다 먼저 온다', () {
+      final String routes =
+          File('lib/app/routes/individual_question_routes.dart')
+              .readAsStringSync();
+      final int newAt = routes.indexOf('AppRoutePaths.newIndividualQuestion');
+      final int detailAt = routes.indexOf(':questionId');
+      expect(newAt, greaterThanOrEqualTo(0));
+      expect(newAt, lessThan(detailAt),
+          reason: "'new' 가 질문 id 로 매칭되지 않도록 먼저 등록한다");
+      expect(AppRoutePaths.newIndividualQuestion, '/iq/new');
+      expect(AppRoutePaths.newIndividualQuestionFor('m1'), '/iq/new?mentor=m1');
+    });
+
+    test('등록 경로(화면·CTA·라우트)에 충전 문구·웹 브릿지 호출이 없다', () {
+      const List<String> paths = <String>[
+        'lib/features/individual_question/ui/iq_create_screen.dart',
+        'lib/features/individual_question/ui/student_iq_list_screen.dart',
+        'lib/features/mentors/ui/mentor_detail_screen.dart',
+        'lib/app/routes/individual_question_routes.dart',
+      ];
+      for (final String p in paths) {
+        final String src = File(p).readAsStringSync();
+        // 주석은 정책 설명에 '충전' 을 쓸 수 있다 — 코드(문자열·식별자)만 검사.
+        final String code = src
+            .split('\n')
+            .where((String l) => !l.trimLeft().startsWith('//'))
+            .join('\n');
+        expect(code.contains('충전'), isFalse, reason: '충전 유도 문구 금지: $p');
+        expect(src.contains('openIqCreateWeb'), isFalse,
+            reason: '등록 CTA 는 웹 브릿지를 쓰지 않는다: $p');
+        expect(src.contains('web_bridge'), isFalse,
+            reason: '등록 경로에서 web_bridge import 0: $p');
+      }
+    });
+
+    test('production 에서 IqCreateScreen 을 여는 곳은 라우트·두 CTA 뿐이다', () {
       final RegExp ctor = RegExp(r'\bIqCreateScreen\s*\(');
+      final Set<String> callers = <String>{};
       for (final File f in productionDartFiles()) {
         if (f.path.endsWith('iq_create_screen.dart')) continue;
         if (ctor.hasMatch(f.readAsStringSync())) callers.add(f.path);
       }
-      expect(callers, isEmpty,
-          reason: 'production 그래프에서 네이티브 등록 화면 생성 0 이어야 한다: $callers');
-    });
-
-    test('route table·deep link 에 네이티브 등록 경로가 없다', () {
-      final String router = File('lib/app/router.dart').readAsStringSync();
-      expect(router.contains('IqCreate'), isFalse,
-          reason: 'named route 로 네이티브 등록 화면을 열 수 없어야 한다');
-      final Directory deeplink = Directory('lib/core/deeplink');
-      for (final File f in deeplink
-          .listSync(recursive: true)
-          .whereType<File>()
-          .where((File f) => f.path.endsWith('.dart'))) {
-        expect(f.readAsStringSync().contains('IqCreate'), isFalse,
-            reason: 'deep link/알림 라우팅으로 네이티브 등록 화면에 도달할 수 '
-                '없어야 한다: ${f.path}');
-      }
+      expect(callers, <String>{
+        'lib/app/routes/individual_question_routes.dart',
+        'lib/features/individual_question/ui/student_iq_list_screen.dart',
+        'lib/features/mentors/ui/mentor_detail_screen.dart',
+      });
     });
 
     test('목록→상세(조회) 배선은 유지된다', () {
@@ -79,60 +90,13 @@ void main() {
               'lib/features/individual_question/ui/student_iq_list_screen.dart')
           .readAsStringSync();
       expect(list.contains('IqDetailScreen('), isTrue,
-          reason: '경계 작업은 등록만 제거한다 — 기존 질문 상세 진입은 보존');
+          reason: '개방 작업은 등록만 연다 — 기존 질문 상세 진입은 보존');
     });
   });
 
-  // ───────────────────────── 브릿지: URL 정본 ─────────────────────────
-  group('웹 등록 브릿지 URL 정본', () {
-    test('일반 등록 → /individual-questions/new (https·허용 호스트)', () async {
-      final List<Uri> opened = <Uri>[];
-      final WebBridge bridge = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
-      final WebOpenResult r = await bridge.openIqCreate();
-      expect(r, WebOpenResult.opened);
-      expect(opened, hasLength(1));
-      expect(opened.single.path, WebBridgeConfig.iqCreatePath);
-      expect(opened.single.scheme, 'https');
-      expect(bridge.isAllowedUri(opened.single), isTrue);
-    });
-
-    test('멘토 지정 등록 → /mentors/{id}/individual-question/new', () async {
-      final List<Uri> opened = <Uri>[];
-      final WebBridge bridge = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
-      await bridge.openIqCreate(mentorId: 'm1');
-      expect(opened.single.path, '/mentors/m1/individual-question/new');
-    });
-
-    test('mentorId 는 경로 성분으로 인코딩된다(경로 위조 차단)', () async {
-      final List<Uri> opened = <Uri>[];
-      final WebBridge bridge = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
-      await bridge.openIqCreate(mentorId: 'a/b?c');
-      // 인코딩되어 path segment 하나로 남는다 — 상위 경로 이탈 불가.
-      expect(opened.single.pathSegments[1], 'a/b?c');
-      expect(opened.single.pathSegments.length, 4);
-    });
-
-    test('baseUrl 미확정이면 열지 않고 안내 폴백(notConfigured)', () async {
-      final WebBridge bridge = WebBridge(
-        baseUrl: '',
-        launcher: (Uri u) async => fail('미확정이면 launcher 호출 금지'),
-      );
-      expect(await bridge.openIqCreate(), WebOpenResult.notConfigured);
-    });
-  });
-
-  // ───────────────────────── 화면: CTA → 브릿지(mock) ─────────────────────────
-  IndividualQuestion question() => IndividualQuestion(
-        id: 'q1',
+  // ───────────────────────── 화면: 잔액 검사 · 충전 유도 0 ─────────────────────────
+  IndividualQuestion question({String id = 'q1'}) => IndividualQuestion(
+        id: id,
         studentId: 's1',
         type: IndividualQuestionType.open,
         status: IndividualQuestionStatus.open,
@@ -149,18 +113,81 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  group('학생 목록 CTA', () {
-    testWidgets('"새 개별질문 (공개형)" 탭 → 웹 브릿지 호출, 네이티브 화면 미진입',
+  group('등록 화면: 잔액 검사', () {
+    testWidgets('지정형 · 잔액 부족 → "잔액이 부족해요" + 등록 비활성 + 충전 문구 0',
         (WidgetTester tester) async {
-      final List<Uri> opened = <Uri>[];
-      final WebBridge fake = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
+      bigSurface(tester);
+      int submits = 0;
+      await tester.pumpScopedWidget(MaterialApp(
+        home: IqCreateScreen(
+          mentorId: 'm1',
+          mentorName: '멘토A',
+          prefillOverride: () async => const IqCreatePrefill(
+            balanceCents: 100000, // 1,000캐시
+            pricing: IqPricing(mentorId: 'm1', amountCents: 250000), // 2,500캐시
+          ),
+          submitOverride: ({
+            required IndividualQuestionType type,
+            required String title,
+            required String body,
+            int? amountCents,
+            String? designatedMentorId,
+            String? idempotencyKey,
+          }) async {
+            submits++;
+            return question();
+          },
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1,000캐시'), findsOneWidget); // 잔액 먼저.
+      expect(find.text('2,500캐시'), findsOneWidget); // 결제될 금액.
+      expect(find.text('잔액이 부족해요'), findsOneWidget);
+      expect(find.textContaining('충전'), findsNothing);
+      expect(find.textContaining('웹'), findsNothing);
+
+      await tester.enterText(find.widgetWithText(TextField, '제목'), '제목');
+      await tester.enterText(find.widgetWithText(TextField, '질문 내용'), '내용');
+      await tester.tap(find.text('질문 등록'));
+      await tester.pumpAndSettle();
+      expect(find.text('질문을 등록할까요?'), findsNothing);
+      expect(submits, 0);
+    });
+
+    testWidgets('공개형 · 금액 입력이 잔액을 넘으면 즉시 부족 안내, 줄이면 다시 활성',
+        (WidgetTester tester) async {
+      bigSurface(tester);
+      await tester.pumpScopedWidget(MaterialApp(
+        home: IqCreateScreen(
+          prefillOverride: () async =>
+              const IqCreatePrefill(balanceCents: 300000), // 3,000캐시
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('충전'), findsNothing);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, '질문 금액 (캐시)'), '5000');
+      await tester.pumpAndSettle();
+      expect(find.text('잔액이 부족해요'), findsOneWidget);
+      expect(find.textContaining('충전'), findsNothing);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, '질문 금액 (캐시)'), '2000');
+      await tester.pumpAndSettle();
+      expect(find.text('잔액이 부족해요'), findsNothing);
+      expect(find.text('1,000캐시'), findsOneWidget); // 등록 후 남는 캐시.
+    });
+  });
+
+  // ───────────────────────── CTA → 네이티브 등록 화면 ─────────────────────────
+  group('학생 목록 CTA', () {
+    testWidgets('"새 개별질문 (공개형)" 탭 → 네이티브 등록 화면(공개형)',
+        (WidgetTester tester) async {
       await tester.pumpScopedWidget(MaterialApp(
         home: StudentIqListScreen(
           loaderOverride: () async => <IndividualQuestion>[question()],
-          webBridgeOverride: fake,
           createCtaOverride: true,
         ),
       ));
@@ -169,21 +196,16 @@ void main() {
       await tester.tap(find.text('새 개별질문 (공개형)'));
       await tester.pumpAndSettle();
 
-      expect(opened.single.path, WebBridgeConfig.iqCreatePath);
-      expect(find.byType(IqCreateScreen), findsNothing,
-          reason: '신규 등록은 웹 전용 — 네이티브 등록 화면을 열면 안 된다');
+      final IqCreateScreen screen =
+          tester.widget(find.byType(IqCreateScreen));
+      expect(screen.mentorId, isNull);
+      expect(find.text('새 개별질문 (공개형)'), findsOneWidget); // 등록 화면 제목.
     });
 
-    testWidgets('빈 상태 "새 개별질문" 탭 → 웹 브릿지 호출', (WidgetTester tester) async {
-      final List<Uri> opened = <Uri>[];
-      final WebBridge fake = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
+    testWidgets('빈 상태 "새 개별질문" 탭 → 네이티브 등록 화면', (WidgetTester tester) async {
       await tester.pumpScopedWidget(MaterialApp(
         home: StudentIqListScreen(
           loaderOverride: () async => <IndividualQuestion>[],
-          webBridgeOverride: fake,
           createCtaOverride: true,
         ),
       ));
@@ -191,28 +213,76 @@ void main() {
 
       await tester.tap(find.text('새 개별질문'));
       await tester.pumpAndSettle();
+      expect(find.byType(IqCreateScreen), findsOneWidget);
+    });
 
-      expect(opened.single.path, WebBridgeConfig.iqCreatePath);
+    testWidgets('등록 성공 → 목록이 새로고침되고 새 질문 상세로 이어진다',
+        (WidgetTester tester) async {
+      bigSurface(tester);
+      int loads = 0;
+      await tester.pumpScopedWidget(MaterialApp(
+        home: StudentIqListScreen(
+          loaderOverride: () async {
+            loads++;
+            return <IndividualQuestion>[];
+          },
+          createCtaOverride: true,
+          createScreenOverride: (BuildContext _, String? mentorId) =>
+              IqCreateScreen(
+            prefillOverride: () async =>
+                const IqCreatePrefill(balanceCents: 1000000),
+            submitOverride: ({
+              required IndividualQuestionType type,
+              required String title,
+              required String body,
+              int? amountCents,
+              String? designatedMentorId,
+              String? idempotencyKey,
+            }) async =>
+                question(id: 'q-new'),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(loads, 1);
+
+      await tester.tap(find.text('새 개별질문'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextField, '질문 금액 (캐시)'), '5000');
+      await tester.enterText(find.widgetWithText(TextField, '제목'), '제목');
+      await tester.enterText(find.widgetWithText(TextField, '질문 내용'), '내용');
+      await tester.tap(find.text('질문 등록'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('등록'));
+      await tester.pumpAndSettle();
+
       expect(find.byType(IqCreateScreen), findsNothing);
+      expect(loads, 2, reason: '등록 결과가 돌아오면 목록을 다시 읽는다');
+      final IqDetailScreen detail = tester.widget(find.byType(IqDetailScreen));
+      expect(detail.questionId, 'q-new');
     });
   });
 
   group('멘토 상세 CTA', () {
-    testWidgets('"개별질문 하기" 탭 → 멘토 지정 웹 등록 브릿지, 네이티브 화면 미진입',
+    testWidgets('"개별질문 하기" 탭 → 멘토 지정형 네이티브 등록 화면',
         (WidgetTester tester) async {
       bigSurface(tester);
-      final List<Uri> opened = <Uri>[];
-      final WebBridge fake = WebBridge(launcher: (Uri u) async {
-        opened.add(u);
-        return true;
-      });
       await tester.pumpScopedWidget(MaterialApp(
         home: MentorDetailScreen(
           item: const MentorListItem(id: 'm1', nickname: '멘토A'),
           extrasLoaderOverride: () async =>
               const MentorDetailExtras(alreadySubscribed: false),
-          webBridgeOverride: fake,
           createCtaOverride: true,
+          createScreenOverride: (BuildContext _, String mentorId) =>
+              IqCreateScreen(
+            mentorId: mentorId,
+            mentorName: '멘토A',
+            prefillOverride: () async => const IqCreatePrefill(
+              balanceCents: 1000000,
+              pricing: IqPricing(mentorId: 'm1', amountCents: 250000),
+            ),
+          ),
         ),
       ));
       await tester.pumpAndSettle();
@@ -221,48 +291,11 @@ void main() {
       await tester.tap(find.text('개별질문 하기'));
       await tester.pumpAndSettle();
 
-      expect(opened.single.path, '/mentors/m1/individual-question/new',
-          reason: '멘토 식별자는 웹 실측 라우트의 path param 계약으로 전달한다');
-      expect(find.byType(IqCreateScreen), findsNothing);
-    });
-  });
-
-  group('실패 UX', () {
-    testWidgets('웹 열기 실패 → 재시도 안내 스낵바', (WidgetTester tester) async {
-      final WebBridge failing = WebBridge(launcher: (Uri u) async => false);
-      await tester.pumpScopedWidget(MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (BuildContext context) => TextButton(
-              onPressed: () => openIqCreateWeb(context, bridge: failing),
-              child: const Text('열기'),
-            ),
-          ),
-        ),
-      ));
-      await tester.tap(find.text('열기'));
-      await tester.pumpAndSettle();
-      expect(find.text('웹 페이지를 열 수 없어요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
-    });
-
-    testWidgets('baseUrl 미확정 → 준비 중 안내 스낵바', (WidgetTester tester) async {
-      final WebBridge notConfigured = WebBridge(
-        baseUrl: '',
-        launcher: (Uri u) async => fail('미확정이면 launcher 호출 금지'),
-      );
-      await tester.pumpScopedWidget(MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (BuildContext context) => TextButton(
-              onPressed: () => openIqCreateWeb(context, bridge: notConfigured),
-              child: const Text('열기'),
-            ),
-          ),
-        ),
-      ));
-      await tester.tap(find.text('열기'));
-      await tester.pumpAndSettle();
-      expect(find.text('개별질문 등록은 웹에서 진행할 수 있어요. (준비 중)'), findsOneWidget);
+      final IqCreateScreen screen =
+          tester.widget(find.byType(IqCreateScreen));
+      expect(screen.mentorId, 'm1', reason: '멘토 식별자는 지정형 등록으로 전달된다');
+      expect(find.text('개별질문 하기 (지정형)'), findsOneWidget);
+      expect(find.textContaining('충전'), findsNothing);
     });
   });
 }

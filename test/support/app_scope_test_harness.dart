@@ -8,7 +8,9 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/auth/deletion_notice_controller.dart';
 import 'package:ssambership_app/core/version_gate/version_gate_controller.dart';
 import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
+import 'package:ssambership_app/features/mentor_console/data/mentor_console_repository.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
+import 'package:ssambership_app/features/mypage/data/mypage_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_favorites_repository.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
@@ -17,6 +19,7 @@ import 'package:ssambership_app/features/notifications/data/notifications_reposi
 import 'package:ssambership_app/features/question_room/data/attachments/attachment_url_resolver.dart';
 import 'package:ssambership_app/features/question_room/data/mentor_lookup_repository.dart';
 import 'package:ssambership_app/features/question_room/data/question_room_read_repository.dart';
+import 'package:ssambership_app/features/question_room/data/question_room_write_repository.dart';
 
 /// Wraps a directly pumped test app in an explicit, backend-free [AppScope].
 Widget withTestAppScope(
@@ -41,16 +44,23 @@ AppDependencies testAppDependencies({
   required AppAuth auth,
   QuestionRoomReadRepository questionRoomRead =
       const QuestionRoomReadRepository(),
+  QuestionRoomWriteRepository questionRoomWrite =
+      const QuestionRoomWriteRepository(),
   MentorLookupRepository mentorLookup = const MentorLookupRepository(),
   MentorDirectoryRepository mentorDirectory = const MentorDirectoryRepository(),
   MentorFavoritesRepository mentorFavorites = const MentorFavoritesRepository(),
   IndividualQuestionRepository individualQuestions =
       const IndividualQuestionRepository(),
+  MentorConsolePort mentorConsole = const SupabaseMentorConsoleRepository(),
+  MyPageRepository myPage = const MyPageRepository(),
 }) =>
     AppDependencies(
       auth: auth,
       supabaseClient: () => null,
+      mentorConsole: mentorConsole,
+      myPage: myPage,
       questionRoomRead: questionRoomRead,
+      questionRoomWrite: questionRoomWrite,
       mentorLookup: mentorLookup,
       mentorDirectory: mentorDirectory,
       mentorFavorites: mentorFavorites,

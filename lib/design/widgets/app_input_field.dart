@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../role_theme.dart';
 import '../tokens/app_typography.dart';
@@ -22,6 +23,7 @@ class AppInputField extends StatefulWidget {
     this.minLines = 1,
     this.maxLines = 1,
     this.showCursor,
+    this.inputFormatters,
   })  : assert(minLines > 0),
         assert(maxLines == null || maxLines >= minLines);
 
@@ -39,6 +41,9 @@ class AppInputField extends StatefulWidget {
   final int minLines;
   final int? maxLines;
   final bool? showCursor;
+
+  /// 입력 필터(숫자만 등). null 이면 없음.
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<AppInputField> createState() => _AppInputFieldState();
@@ -108,6 +113,7 @@ class _AppInputFieldState extends State<AppInputField> {
         minLines: widget.minLines,
         maxLines: widget.maxLines,
         showCursor: widget.showCursor,
+        inputFormatters: widget.inputFormatters,
         cursorColor: roleTheme.color,
         style: AppTypography.body,
         decoration: InputDecoration(
