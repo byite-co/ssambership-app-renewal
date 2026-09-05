@@ -438,6 +438,8 @@ class MentorSettlementsTabBody extends StatelessWidget {
               MentorDashboardSection(
                 data: dashboard,
                 onGoToQuestions: () => TabNavigator.go(AppTab.questionRoom),
+                // 정산 화면 자체 — 정산 안내 카드는 띄우지 않는다(정산 허브 아이콘이 위에 있다).
+                showPayoutNotice: false,
               ),
             ],
           ),

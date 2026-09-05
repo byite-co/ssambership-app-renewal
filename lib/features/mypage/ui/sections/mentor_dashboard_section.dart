@@ -17,9 +17,14 @@ class MentorDashboardSection extends StatelessWidget {
     super.key,
     required this.data,
     required this.onGoToQuestions,
+    this.showPayoutNotice = true,
   });
 
   final MentorDashboard data;
+
+  /// 정산 안내 카드 표시 여부. 정산 탭 본문(정산 화면)에서는 끈다 — 정산 계좌·
+  /// 요금제·내역이 앱에 있어 안내가 불필요하다(A-4a 정리 ③).
+  final bool showPayoutNotice;
 
   /// 질문방(받은 학생) 탭으로 이동.
   final VoidCallback onGoToQuestions;
@@ -81,7 +86,7 @@ class MentorDashboardSection extends StatelessWidget {
               neutral: true,
               onPressed: () => openPayoutManageWeb(context),
             )
-          else
+          else if (showPayoutNotice)
             const CommerceNoticeCard(text: kPayoutManageNoticeText),
         ],
       ),
