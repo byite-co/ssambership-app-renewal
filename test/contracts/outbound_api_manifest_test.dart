@@ -53,7 +53,7 @@ const Set<String> kExpectedRpcNames = <String>{
   // 개별질문
   'add_individual_question_attachment',
   'claim_individual_question_as_mentor',
-  'create_individual_question_as_student',
+  'create_individual_question_as_student_v2', // A-4b ⑧ api_app_v1(DB-4 204) — v1 호출 제거(지시서 §2-6)
   'iq_append_message',
   'list_open_individual_questions_for_mentor',
   'refund_individual_question',

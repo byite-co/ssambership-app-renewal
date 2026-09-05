@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../design/widgets/glass_inner.dart';
+import '../../../design/role_theme.dart';
+import '../../../data/mappings/subject_labels.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/app_scope.dart';
@@ -57,6 +60,7 @@ class IqCreateScreen extends StatefulWidget {
     this.pdfRasterizer = const PdfxRasterizer(),
     this.attachments,
     this.annotateOverride,
+    this.submitWithSubjectOverride,
   });
 
   final String? mentorId;
@@ -74,6 +78,18 @@ class IqCreateScreen extends StatefulWidget {
     String? designatedMentorId,
     String? idempotencyKey,
   })? submitOverride;
+
+  /// A-4b ⑧ 테스트용 등록 함수(과목 포함) — 있으면 [submitOverride] 보다 우선.
+  /// 기존 테스트의 6인자 [submitOverride] 는 그대로 둔다(동작 테스트 무수정).
+  final Future<IndividualQuestion> Function({
+    required IndividualQuestionType type,
+    required String title,
+    required String body,
+    int? amountCents,
+    String? designatedMentorId,
+    String? idempotencyKey,
+    String? subject,
+  })? submitWithSubjectOverride;
 
   /// 스캔 소스 포트(S16 시트의 촬영·파일). 테스트에서 fake 주입.
   final ScanSourcePort scanPicker;
@@ -97,11 +113,19 @@ class IqCreateScreen extends StatefulWidget {
 
   bool get isDirect => mentorId != null;
 
+  /// A-4b ⑧ 과목 후보 — `subjects.code` 정본과 같은 앱 상수 집합(대분류 순).
+  static List<String> get subjectCodes => subjectCatalogEntries
+      .map((SubjectCatalogEntry e) => e.code)
+      .toList(growable: false);
+
   @override
   State<IqCreateScreen> createState() => _IqCreateScreenState();
 }
 
 class _IqCreateScreenState extends State<IqCreateScreen> {
+  /// A-4b ⑧ 선택한 과목 코드(null = 미선택). 공개형은 필수, 지정형은 선택.
+  String? _subjectCode;
+
   IndividualQuestionRepository get _repo =>
       AppScope.of(context).individualQuestions;
   IqAttachmentsPort get _attachments =>
@@ -358,25 +382,46 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
 
     setState(() => _submitting = true);
     try {
-      final Future<IndividualQuestion> Function({
-        required IndividualQuestionType type,
-        required String title,
-        required String body,
-        int? amountCents,
-        String? designatedMentorId,
-        String? idempotencyKey,
-      }) submit = widget.submitOverride ?? _repo.createAsStudent;
-      final IndividualQuestion created = await submit(
-        type: widget.isDirect
-            ? IndividualQuestionType.direct
-            : IndividualQuestionType.open,
-        title: title,
-        body: body,
-        // 지정형 가격은 서버가 가격표에서 결정(클라이언트 금액 미신뢰).
-        amountCents: widget.isDirect ? null : _openAmountCents,
-        designatedMentorId: widget.mentorId,
-        idempotencyKey: 'iqapp-${DateTime.now().microsecondsSinceEpoch}',
-      );
+      final IndividualQuestionType type = widget.isDirect
+          ? IndividualQuestionType.direct
+          : IndividualQuestionType.open;
+      // 지정형 가격은 서버가 가격표에서 결정(클라이언트 금액 미신뢰).
+      final int? amountCents = widget.isDirect ? null : _openAmountCents;
+      final String idempotencyKey =
+          'iqapp-${DateTime.now().microsecondsSinceEpoch}';
+      // A-4b ⑧: 과목은 코드 정본(subjects.code) — v2 래퍼로. 공개형 미선택은
+      // 서버가 SUBJECT_REQUIRED 로 거부하고 문구 사전이 안내한다.
+      final IndividualQuestion created;
+      if (widget.submitWithSubjectOverride != null) {
+        created = await widget.submitWithSubjectOverride!(
+          type: type,
+          title: title,
+          body: body,
+          amountCents: amountCents,
+          designatedMentorId: widget.mentorId,
+          idempotencyKey: idempotencyKey,
+          subject: _subjectCode,
+        );
+      } else if (widget.submitOverride != null) {
+        created = await widget.submitOverride!(
+          type: type,
+          title: title,
+          body: body,
+          amountCents: amountCents,
+          designatedMentorId: widget.mentorId,
+          idempotencyKey: idempotencyKey,
+        );
+      } else {
+        created = await _repo.createAsStudent(
+          type: type,
+          title: title,
+          body: body,
+          amountCents: amountCents,
+          designatedMentorId: widget.mentorId,
+          idempotencyKey: idempotencyKey,
+          subject: _subjectCode,
+        );
+      }
       _created = created;
       // §4: 생성(캐시 예치)은 잔액·원장에 영향 — 지갑 표면 무효화 신호.
       DataRefreshBus.bumpWallet();
@@ -406,10 +451,40 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  /// A-4b ⑧ 과목 시트 — 정본 코드(`subjects.code`) 목록에서 하나 고른다.
+  /// 공개형은 필수(서버 `SUBJECT_REQUIRED`), 지정형은 '선택 안 함' 가능.
+  Future<void> _openSubjectSheet() async {
+    final String? picked = await showAppBottomSheet<String>(
+      context,
+      builder: (BuildContext sheet) => _SubjectSheet(
+        isDirect: widget.isDirect,
+        selected: _subjectCode,
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _subjectCode = picked == _SubjectSheet.none ? null : picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppPage(
       title: widget.isDirect ? '개별질문 하기 (지정형)' : '새 개별질문 (공개형)',
+      // A-4b ⑧: 과목 선택은 앱바 액션 + 시트 — 본문 목록 높이를 늘리지 않는다(레이아웃 예산).
+      actions: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: TextButton.icon(
+            key: const ValueKey<String>('iq-subject-action'),
+            onPressed: _submitting ? null : _openSubjectSheet,
+            icon: const Icon(Icons.category_outlined, size: 18),
+            label: Text(
+              _subjectCode == null
+                  ? (widget.isDirect ? '과목 (선택)' : '과목 선택')
+                  : subjectLabel(_subjectCode),
+            ),
+          ),
+        ),
+      ],
       body: FutureBuilder<IqCreatePrefill>(
         future: _future,
         builder: (BuildContext context, AsyncSnapshot<IqCreatePrefill> snap) {
@@ -456,7 +531,9 @@ class _IqCreateScreenState extends State<IqCreateScreen> {
               Text(
                 widget.isDirect
                     ? '${widget.mentorName ?? '멘토'}에게 지정 · 멘토가 수락하면 시작돼요'
-                    : '공개 · 먼저 수락한 멘토가 답변해요',
+                    : (_subjectCode == null
+                        ? '공개 · 과목을 고르면 그 과목 멘토에게 먼저 보여요'
+                        : '공개 · ${subjectLabel(_subjectCode)} 멘토에게 먼저 보여요'),
                 style: AppTypography.body,
               ),
               const SizedBox(height: 6),
@@ -731,3 +808,95 @@ class _DraftInk {
 /// 공개형 금액 placeholder(웹 정본 `OPEN_INDIVIDUAL_QUESTION_PRICE_PLACEHOLDER_CASH`
 /// 미러 — 예시일 뿐 최소/최대 강제 아님).
 const int kIqOpenPricePlaceholderCash = 5000;
+
+/// 과목 선택 시트(A-4b ⑧). 코드값은 화면에 노출하지 않고 한글 라벨만.
+class _SubjectSheet extends StatelessWidget {
+  const _SubjectSheet({required this.isDirect, required this.selected});
+
+  final bool isDirect;
+  final String? selected;
+
+  /// '선택 안 함' 반환값(지정형 전용).
+  static const String none = '__none__';
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent = RoleTheme.of(context).color;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 4),
+        const Text('과목을 골라 주세요', style: AppTypography.section),
+        const SizedBox(height: 4),
+        Text(
+          isDirect
+              ? '선택 사항이에요. 골라 두면 멘토가 질문을 더 빨리 파악해요.'
+              : '공개 질문은 과목을 골라야 그 과목 멘토에게 배정돼요.',
+          style: AppTypography.captionSecondary,
+        ),
+        const SizedBox(height: 12),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+          ),
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                if (isDirect)
+                  _SubjectPill(
+                    label: '선택 안 함',
+                    active: selected == null,
+                    accent: accent,
+                    onTap: () => Navigator.of(context).pop(none),
+                  ),
+                for (final String code in IqCreateScreen.subjectCodes)
+                  _SubjectPill(
+                    label: subjectLabel(code),
+                    active: selected == code,
+                    accent: accent,
+                    onTap: () => Navigator.of(context).pop(code),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubjectPill extends StatelessWidget {
+  const _SubjectPill({
+    required this.label,
+    required this.active,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: GlassInner(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ringColor: active ? accent : null,
+        child: Text(
+          label,
+          style: AppTypography.caption.copyWith(
+            fontWeight: FontWeight.w600,
+            color: active ? accent : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
