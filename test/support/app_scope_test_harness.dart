@@ -8,7 +8,9 @@ import 'package:ssambership_app/core/auth/auth_service.dart' show AppRole;
 import 'package:ssambership_app/core/auth/deletion_notice_controller.dart';
 import 'package:ssambership_app/core/version_gate/version_gate_controller.dart';
 import 'package:ssambership_app/features/individual_question/data/individual_question_repository.dart';
+import 'package:ssambership_app/features/mentor_console/data/mentor_console_repository.dart';
 import 'package:ssambership_app/features/mypage/data/account_deletion_repository.dart';
+import 'package:ssambership_app/features/mypage/data/mypage_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_directory_repository.dart';
 import 'package:ssambership_app/features/mentors/data/mentor_favorites_repository.dart';
 import 'package:ssambership_app/features/notifications/data/app_notification.dart';
@@ -46,10 +48,14 @@ AppDependencies testAppDependencies({
   MentorFavoritesRepository mentorFavorites = const MentorFavoritesRepository(),
   IndividualQuestionRepository individualQuestions =
       const IndividualQuestionRepository(),
+  MentorConsolePort mentorConsole = const SupabaseMentorConsoleRepository(),
+  MyPageRepository myPage = const MyPageRepository(),
 }) =>
     AppDependencies(
       auth: auth,
       supabaseClient: () => null,
+      mentorConsole: mentorConsole,
+      myPage: myPage,
       questionRoomRead: questionRoomRead,
       mentorLookup: mentorLookup,
       mentorDirectory: mentorDirectory,

@@ -6,6 +6,7 @@ import '../core/refresh/data_refresh_bus.dart';
 import '../design/spacing_tokens.dart';
 import '../features/community/community_screen.dart';
 import '../features/individual_question/individual_question_tab_screen.dart';
+import '../features/mentor_console/ui/mentor_settlement_screen.dart';
 import '../features/mentors/mentors_screen.dart';
 import '../features/mypage/data/mypage_models.dart';
 import '../features/mypage/ui/sections/mentor_dashboard_section.dart';
@@ -200,6 +201,12 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  Future<void> _openSettlementHub() => AppNavigation.push<void>(
+        context,
+        AppRoutePaths.settlementHistory,
+        fallbackBuilder: (_) => const MentorSettlementScreen(),
+      );
+
   Future<void> _openMyPage() async {
     if (_deps.auth.isGuest) {
       context.go(AppRoutePaths.loginWithNotice('login_required'));
@@ -224,10 +231,22 @@ class _HomeShellState extends State<HomeShell> {
         widget.location ?? tabs[selectedIndex].location;
     final bool shellRouteVisible = ModalRoute.of(context)?.isCurrent ?? true;
 
+    final bool showSettlementHub =
+        _deps.auth.currentRole == AppRole.mentor &&
+            activeLocation == AppTab.settlements;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titleFor(activeLocation, tabs[selectedIndex].label)),
         actions: <Widget>[
+          // A-4a: 정산 탭(멘토)에서만 정산 허브(/settlements/history) 진입.
+          // 탭 본문(MentorSettlementsTabBody)은 골든 고정이라 손대지 않는다.
+          if (showSettlementHub)
+            IconButton(
+              tooltip: MentorSettlementScreen.entryTooltip,
+              icon: const Icon(Icons.receipt_long_rounded),
+              onPressed: _openSettlementHub,
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: _ProfileCircleButton(onTap: _openMyPage),
