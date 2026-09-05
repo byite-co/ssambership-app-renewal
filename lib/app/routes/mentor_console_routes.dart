@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../../features/mentor_console/ui/mentor_plans_screen.dart';
 import '../../features/mentor_console/ui/payout_account_screen.dart';
 import '../app_route_completion.dart';
 import '../app_route_paths.dart';
@@ -12,6 +13,13 @@ List<RouteBase> buildMentorConsoleRoutes() => <RouteBase>[
         builder: (context, state) => const AppRouteCompletionBoundary(
           fallbackLocation: AppRoutePaths.settlements,
           child: PayoutAccountScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutePaths.mentorPlans,
+        builder: (context, state) => const AppRouteCompletionBoundary(
+          fallbackLocation: AppRoutePaths.settlements,
+          child: MentorPlansScreen(),
         ),
       ),
     ];
