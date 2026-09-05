@@ -152,6 +152,7 @@ const List<String> kForbiddenWords = <String>[
 String stripComments(String src) {
   final RegExp lineComment = RegExp(r'(?<!:)//.*$');
   return src
+      .replaceAll('\r\n', '\n')
       .split('\n')
       .map((String line) => line.replaceFirst(lineComment, ''))
       .join('\n');
@@ -371,6 +372,18 @@ void main() {
             .contains('https://x.example/path'),
         isTrue,
       );
+    });
+
+    test('주석 제거 — CRLF 소스에서도 설명 주석의 금지어를 제거한다', () {
+      const String crlfFixture = '// increment_shortform_post_view 는 폐기\r\n'
+          '// Firebase-free crash reporting\r\n'
+          "final u = 'https://x.example/path';\r\n";
+      final String stripped = stripComments(crlfFixture);
+
+      expect(stripped.contains('increment_shortform_post_view'), isFalse);
+      expect(stripped.toLowerCase().contains('firebase'), isFalse);
+      expect(stripped.contains('https://x.example/path'), isTrue);
+      expect(stripped.contains('\r'), isFalse);
     });
   });
 }
