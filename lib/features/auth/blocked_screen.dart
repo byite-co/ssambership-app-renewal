@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/auth/app_auth.dart';
-import '../../design/tokens/color_tokens.dart';
-import '../../design/typography_tokens.dart';
-import '../../design/widgets/primary_button.dart';
-import '../../design/widgets/secondary_button.dart';
+import '../../design/role_theme.dart' show RoleTheme;
+import '../../design/tokens/app_spacing.dart';
+import '../../design/tokens/app_typography.dart';
+import '../../design/widgets/app_background.dart';
+import '../../design/widgets/app_primary_button.dart';
+import '../../design/widgets/app_secondary_button.dart';
 
 /// 차단 화면: 계정 정지/제한(banned·suspended), 탈퇴 진행·완료, 조회 실패(일시 오류),
 /// 관리자 계정 등으로 앱 이용 불가일 때. 사유 안내는 상태별 문구(blockedMessage)로
@@ -18,45 +20,64 @@ class BlockedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppAuth auth = AppScope.of(context).auth; // A-2: 싱글턴 직접 참조 0.
     final bool retryable = auth.isRecoverableBlock;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  retryable ? Icons.wifi_off_outlined : Icons.lock_outline,
-                  size: 44,
-                  color: ColorTokens.muted,
+    final RoleTheme roleTheme = RoleTheme.of(context);
+    return AppBackground(
+      child: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.s24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: roleTheme.tint,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          retryable
+                              ? Icons.wifi_off_outlined
+                              : Icons.lock_outline,
+                          size: 36,
+                          color: roleTheme.color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s16),
+                    Text(
+                      // 일시 오류는 '이용 불가'처럼 보이지 않게 제목부터 구분한다.
+                      retryable ? '잠시 확인이 필요해요' : '앱을 이용할 수 없어요',
+                      style: AppTypography.title,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
+                    Text(
+                      auth.blockedMessage,
+                      style: AppTypography.captionSecondary,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.s24),
+                    if (retryable) ...<Widget>[
+                      AppSecondaryButton(
+                        label: '다시 시도',
+                        onPressed: () => auth.reloadProfile(),
+                      ),
+                      const SizedBox(height: AppSpacing.s8),
+                    ],
+                    AppPrimaryButton(
+                      label: '로그아웃',
+                      onPressed: () => auth.signOut(),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  // 일시 오류는 '이용 불가'처럼 보이지 않게 제목부터 구분한다.
-                  retryable ? '잠시 확인이 필요해요' : '앱을 이용할 수 없어요',
-                  style: AppType.title,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  auth.blockedMessage,
-                  style: AppType.caption,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                if (retryable) ...<Widget>[
-                  SecondaryButton(
-                    label: '다시 시도',
-                    onPressed: () => auth.reloadProfile(),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                PrimaryButton(
-                  label: '로그아웃',
-                  onPressed: () => auth.signOut(),
-                ),
-              ],
+              ),
             ),
           ),
         ),
