@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+body{margin:0;background:#E9EEF4;font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28}
+a{color:#1A56DB;text-decoration:none}a:hover{color:#123f9e}
+</style>
+</helmet>
+
+<section style="padding:48px 52px 40px;border-bottom:1px solid rgba(0,0,0,.08)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#191F28;color:#fff;border-radius:5px">§0</span><span style="font-size:15px;font-weight:700">마스터 — 디자인 시스템</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:28px;max-width:720px">390×844 기준, 한국어 존댓말 평서문. <b style="color:#191F28">바탕은 밝은 회청색 그라디언트, 내용은 반투명 유리 블록</b>입니다. 유리는 blur 15 + 위·왼쪽 스페큘러 1px 라인 + 안쪽 하이라이트 링으로 만들고, 그림자는 0 8px 32px 중성 한 겹만 씁니다.</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+<div style="width:420px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="font-size:17px;font-weight:700;margin-bottom:16px">색</div>
+<div style="display:flex;gap:12px;margin-bottom:20px">
+<div style="flex:1"><div style="height:72px;border-radius:12px;background:#1A56DB"></div><div style="font-size:13px;font-weight:600;margin-top:8px">학생 파랑</div><div style="font-size:12px;color:#8B95A1">#1A56DB · 학생 주요 행동</div></div>
+<div style="flex:1"><div style="height:72px;border-radius:12px;background:#0B6B4E"></div><div style="font-size:13px;font-weight:600;margin-top:8px">멘토 초록</div><div style="font-size:12px;color:#8B95A1">#0B6B4E · 멘토 주요 행동</div></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+<div><div style="height:44px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">유리 패널 · 흰색 48% + blur 15 + 1px 하이라이트</div></div>
+<div><div style="height:44px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">유리 안쪽 채움 · 흰색 58% + blur 12</div></div>
+<div><div style="height:44px;border-radius:10px;background:#191F28"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">본문 191F28</div></div>
+<div><div style="height:44px;border-radius:10px;background:#8B95A1"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">보조 8B95A1</div></div>
+<div><div style="height:44px;border-radius:10px;background:rgba(28,42,74,.07)"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">경계 · 남색 7%</div></div>
+<div><div style="height:44px;border-radius:10px;background:#0B6B4E"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">성공 · 멘토 초록과 같은 값</div></div>
+<div><div style="height:44px;border-radius:10px;background:#FF9500"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">주의</div></div>
+<div><div style="height:44px;border-radius:10px;background:#F04452"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">위험</div></div>
+</div>
+</div>
+
+<div style="width:420px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="font-size:17px;font-weight:700;margin-bottom:16px">타이포그래피 · Pretendard</div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">24 Bold</div><div style="font-size:24px;font-weight:700;letter-spacing:-0.6px">이번 주 질문을 다 썼어요</div></div>
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">32 Bold</div><div style="font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1px">148,665원</div></div>
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">17 SemiBold</div><div style="font-size:17px;font-weight:600">구독 중인 멘토 2명</div></div>
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">15 Regular</div><div style="font-size:15px">분모가 0이 되는 조건을 놓치는 패턴</div></div>
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">13 Regular</div><div style="font-size:13px;color:#8B95A1">9월 23일에 입금돼요</div></div>
+<div style="display:flex;align-items:baseline;gap:14px"><div style="width:88px;font-size:11px;color:#8B95A1">16 SemiBold</div><div style="font-size:16px;font-weight:600">질문 보내기</div></div>
+</div>
+<div style="margin-top:20px;padding-top:16px;box-shadow:inset 0 1px 0 #F2F4F6;font-size:12px;color:#8B95A1;line-height:1.7">모서리 카드 16 · 버튼 12 · 입력창 12 · 배지 6<br>간격 4의 배수, 기본 16 · 섹션 24 · 화면 좌우 20</div>
+</div>
+
+<div style="width:420px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="font-size:17px;font-weight:700;margin-bottom:16px">문장으로 말하기</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:12px;align-items:center"><div style="flex:1;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:14px;color:#8B95A1;text-decoration:line-through">잔액: 45,700</div><div style="flex:1;padding:12px 14px;border-radius:12px;background:rgba(26,86,219,.07);font-size:14px;font-weight:600;color:#1A56DB">45,700원이 있어요</div></div>
+<div style="display:flex;gap:12px;align-items:center"><div style="flex:1;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:14px;color:#8B95A1;text-decoration:line-through">주간 질문 9/9 사용</div><div style="flex:1;padding:12px 14px;border-radius:12px;background:rgba(26,86,219,.07);font-size:14px;font-weight:600;color:#1A56DB">이번 주 질문을 다 썼어요</div></div>
+<div style="display:flex;gap:12px;align-items:center"><div style="flex:1;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:14px;color:#8B95A1;text-decoration:line-through">구독 상태: 이용중</div><div style="flex:1;padding:12px 14px;border-radius:12px;background:rgba(26,86,219,.07);font-size:14px;font-weight:600;color:#1A56DB">9월 9일에 갱신돼요</div></div>
+<div style="display:flex;gap:12px;align-items:center"><div style="flex:1;padding:12px 14px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:14px;color:#8B95A1;text-decoration:line-through">math_calculus</div><div style="flex:1;padding:12px 14px;border-radius:12px;background:rgba(26,86,219,.07);font-size:14px;font-weight:600;color:#1A56DB">미적분</div></div>
+</div>
+</div>
+
+<div style="width:864px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="font-size:17px;font-weight:700;margin-bottom:18px">공통 요소</div>
+<div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+
+<div style="width:250px">
+<div style="font-size:12px;color:#8B95A1;margin-bottom:10px">하단 고정 주요 버튼 · 56px</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">질문 보내기</div>
+<div style="height:56px;border-radius:12px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">답변 보내기</div>
+<div style="height:56px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#8B95A1;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">질문 보내기</div>
+<div style="height:56px;border-radius:12px;background:rgba(240,68,82,.08);color:#F04452;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">구독 해지하기</div>
+</div>
+</div>
+
+<div style="width:250px">
+<div style="font-size:12px;color:#8B95A1;margin-bottom:10px">상태 배지</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(255,149,0,.10);color:#C2700A;font-size:12px;font-weight:600">답변 대기</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">답변 완료</span>
+<span style="padding:5px 9px;border-radius:6px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#8B95A1;font-size:12px;font-weight:600">확인함</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">진행중</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">이용중</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(240,68,82,.08);color:#F04452;font-size:12px;font-weight:600">해지 예정</span>
+</div>
+<div style="font-size:12px;color:#8B95A1;margin:18px 0 10px">목록 행 · 최소 56px</div>
+<div style="border-radius:12px;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="height:60px;display:flex;align-items:center;gap:12px;padding:0 4px"><div style="width:40px;height:40px;border-radius:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="flex:1"><div style="font-size:15px;font-weight:600">김민서</div><div style="font-size:13px;color:#8B95A1">프리미엄 · 질문 무제한</div></div><div style="font-size:13px;color:#B0B8C1">1일 전</div></div>
+<div style="height:60px;display:flex;align-items:center;gap:12px;padding:0 4px;box-shadow:inset 0 1px 0 #F2F4F6"><div style="width:40px;height:40px;border-radius:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="flex:1"><div style="font-size:15px;font-weight:600">박서연</div><div style="font-size:13px;color:#8B95A1">스탠다드 · 9개 남음</div></div><div style="font-size:13px;color:#B0B8C1">3일 전</div></div>
+</div>
+</div>
+
+<div style="width:250px">
+<div style="font-size:12px;color:#8B95A1;margin-bottom:10px">토스트 · 빈 상태 · 스켈레톤</div>
+<div style="padding:14px 16px;border-radius:12px;background:rgba(25,31,40,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(28,42,74,.14),inset 0 0 0 1px rgba(255,255,255,.16);color:#fff;font-size:14px;font-weight:500">노트를 저장했어요</div>
+<div style="margin-top:12px;padding:28px 16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);text-align:center"><div style="font-size:15px;font-weight:600">아직 노트가 없어요</div><div style="font-size:13px;color:#8B95A1;margin-top:4px">답변을 주고받으면 여기에 쌓여요</div></div>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px"><div style="height:14px;width:60%;border-radius:7px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="height:14px;width:90%;border-radius:7px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="height:14px;width:75%;border-radius:7px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div></div>
+</div>
+
+<div style="width:250px">
+<div style="font-size:12px;color:#8B95A1;margin-bottom:10px">하단 탭바 · 학생 / 멘토</div>
+<div style="border-radius:12px;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);box-shadow:0 0 0 1px #F2F4F6"><dc-import name="TabBarGlass" role="student" active="질문방" badges="{{ tabBadgeStudent }}" hint-size="250px,90px"></dc-import></div>
+<div style="border-radius:12px;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);box-shadow:0 0 0 1px #F2F4F6;margin-top:10px"><dc-import name="TabBarGlass" role="mentor" active="정산" badges="{{ tabBadgeMentor }}" hint-size="250px,90px"></dc-import></div>
+<div style="font-size:12px;color:#8B95A1;margin:18px 0 8px">상단 앱바 · 왼쪽 정렬</div>
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font-size:17px;font-weight:600">최하원 · 수학 모고</span></div>
+</div>
+
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="padding:48px 52px 40px;border-bottom:1px solid rgba(0,0,0,.08)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#191F28;color:#fff;border-radius:5px">§1</span><span style="font-size:15px;font-weight:700">앱 전체 구조 지도</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:24px;max-width:760px">같은 코드베이스, 로그인 역할에 따라 탭이 갈립니다. 멘토는 <b style="color:#191F28">멘토 찾기 대신 정산</b>. ★는 이번 개편의 중심인 연결노트, <span style="padding:2px 6px;border-radius:5px;background:#191F28;color:#fff;font-size:11px;font-weight:600">웹</span>은 앱에서 못 하는 것 — 캐시 충전 하나뿐입니다.</div>
+
+<div style="display:flex;gap:24px;align-items:flex-start">
+
+<div style="width:560px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span style="width:10px;height:10px;border-radius:5px;background:#1A56DB"></span><span style="font-size:17px;font-weight:700">학생 앱</span></div>
+<div style="display:flex;gap:6px;margin-bottom:20px">
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#1A56DB;color:#fff;font-size:12px;font-weight:700">질문방</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">개별질문</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">멘토 찾기</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">커뮤니티</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">알림</span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">질문방</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">질문방 목록 <span style="color:#8B95A1;font-size:12px">구독 중인 멘토 · 최근 노트 미리보기</span></div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">질문 카드 목록 → 질문 대화</div>
+<div style="font-size:14px">새 질문 작성 <span style="color:#8B95A1;font-size:12px">사진 + 필기 주석</span></div>
+<div style="font-size:14px;font-weight:700;color:#1A56DB;background:rgba(26,86,219,.07);border-radius:8px;padding:8px 12px;box-shadow:0 0 0 1.5px #1A56DB inset">★ 연결노트 — 내 멘토가 본 나</div>
+</div>
+</div>
+</div>
+
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">개별질문</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">내 개별질문 목록</div>
+<div style="font-size:14px">공개형 등록 / 지정형 등록</div>
+<div style="font-size:14px">상세 <span style="color:#8B95A1;font-size:12px">안전결제 · 해결 완료</span></div>
+</div>
+</div>
+
+<div style="display:flex;gap:28px">
+<div style="flex:1">
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">멘토 찾기</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">멘토 목록 · 검색/필터</div>
+<div style="font-size:14px">멘토 상세 → 구독 / 무료 질문</div>
+</div>
+</div>
+<div style="flex:1">
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">커뮤니티 · 알림</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">숏폼 / 게시판 → 글 상세</div>
+<div style="font-size:14px">알림 목록 · 종류별 필터</div>
+</div>
+</div>
+</div>
+
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">마이페이지 <span style="font-weight:500;color:#8B95A1;font-size:12px">앱바 우측</span></div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">구독 현황 → 구독 해지</div>
+<div style="font-size:14px;display:flex;align-items:center;gap:8px">캐시 잔액 · 내역<span style="padding:2px 6px;border-radius:5px;background:#191F28;color:#fff;font-size:11px;font-weight:600">충전은 웹</span></div>
+<div style="font-size:14px">환불 신청 · 문제 해결 요청</div>
+<div style="font-size:14px">프로필 편집 · 설정</div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="width:560px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span style="width:10px;height:10px;border-radius:5px;background:#0B6B4E"></span><span style="font-size:17px;font-weight:700">멘토 앱</span></div>
+<div style="display:flex;gap:6px;margin-bottom:20px">
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#0B6B4E;color:#fff;font-size:12px;font-weight:700">질문방</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">개별질문</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:700;box-shadow:0 0 0 1.5px #0B6B4E inset">정산 <span style="font-size:10px">NEW</span></span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">커뮤니티</span>
+<span style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">알림</span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">질문방</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">학생별 질문방 목록 <span style="color:#8B95A1;font-size:12px">답변 대기 우선 정렬</span></div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px;font-weight:700;color:#0B6B4E;background:rgba(11,107,78,.08);border-radius:8px;padding:8px 12px;box-shadow:0 0 0 1.5px #0B6B4E inset">★ 답변 화면 — 상단 최근 노트 배너</div>
+<div style="font-size:14px;font-weight:700;color:#0B6B4E;background:rgba(11,107,78,.08);border-radius:8px;padding:8px 12px;box-shadow:0 0 0 1.5px #0B6B4E inset">★ 답변 전송 직후 노트 작성 시트</div>
+<div style="font-size:14px;font-weight:700;color:#0B6B4E;background:rgba(11,107,78,.08);border-radius:8px;padding:8px 12px;box-shadow:0 0 0 1.5px #0B6B4E inset">★ 연결노트 타임라인 — 누적</div>
+</div>
+</div>
+</div>
+
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">개별질문</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">나에게 온 지정형 / 맡을 수 있는 공개형</div>
+<div style="font-size:14px">상세 → 답변</div>
+</div>
+</div>
+
+<div>
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">정산 <span style="font-weight:600;color:#0B6B4E;font-size:12px">신규 탭 · 마이페이지에서 꺼냄</span></div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">이번 달 예상 지급액 · 지급 예정일</div>
+<div style="font-size:14px">정산 계좌 등록 · 변경</div>
+<div style="font-size:14px">건별 내역 <span style="color:#8B95A1;font-size:12px">수수료 · 원천징수</span></div>
+</div>
+</div>
+
+<div style="display:flex;gap:28px">
+<div style="flex:1">
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">커뮤니티 · 알림</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">숏폼 · 게시글 작성</div>
+<div style="font-size:14px">내 활동 · 알림 목록</div>
+</div>
+</div>
+<div style="flex:1">
+<div style="font-size:14px;font-weight:700;margin-bottom:8px">마이페이지</div>
+<div style="border-left:1.5px solid rgba(28,42,74,.1);padding-left:16px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:14px">요금제 · 개별질문 단가</div>
+<div style="font-size:14px">학력 인증 · 학적 변경</div>
+<div style="font-size:14px">활동 일시중지 / 종료 · 설정</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<div style="margin-top:22px;padding:18px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;max-width:1144px;font-size:13px;line-height:1.75;color:#4E5968">
+<b style="color:#191F28">덧붙인 판단</b> — ① 학생 탭에는 마이페이지를 넣지 않고 앱바 우측 아이콘으로 뒀습니다. 학생이 하루에 마이페이지를 열 일은 거의 없고, 탭 하나를 쓰면 커뮤니티/알림이 밀립니다. ② 멘토 질문방 목록은 <b style="color:#191F28">답변 대기 우선 정렬</b>을 기본으로 두고 정렬 옵션을 주지 않았습니다. 정렬 선택지는 결정 비용만 늘립니다. ③ <b style="color:#191F28">주의할 점</b> — 커뮤니티 숏폼은 학습 흐름과 목적이 다릅니다. 탭에 두면 질문하러 들어온 학생이 새어 나갑니다. 유지하되 알림 배지는 주지 않기를 권합니다.
+</div>
+</section>
+
+<section style="padding:48px 52px 44px;border-bottom:1px solid rgba(0,0,0,.08)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#FF9500;color:#fff;border-radius:5px">§2 ★</span><span style="font-size:15px;font-weight:700">연결노트 — 이번 개편의 중심</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:28px;max-width:780px">쌓인다 · 고쳐 쓰지 않는다 / 답변 직후 그 자리에서 쓴다 / 진도가 아니라 약점을 쓰도록 화면이 유도한다.</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-1 · 멘토 답변 화면 — 노트 배너 접힘</div><div style="font-size:12px;color:#8B95A1;max-width:390px">답변을 쓰는 동안 이 학생의 맥락이 눈앞에 있습니다. 1줄로 접혀 있고 탭하면 펼쳐집니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600;flex:1">최하원 · 수학 모고</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(255,149,0,.10);color:#C2700A;font-size:12px;font-weight:600">답변 대기</span>
+</div>
+<div style="margin:4px 20px 8px;padding:12px 14px;border-radius:12px;background:rgba(11,107,78,.08);display:flex;align-items:center;gap:8px;flex:none">
+<span style="font-size:13px">📌</span>
+<div style="flex:1;min-width:0"><div style="font-size:12px;color:#0B6B4E;font-weight:600;margin-bottom:2px">3일 전에 남긴 노트</div><div style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">분모가 0이 되는 조건을 놓치는 패턴</div></div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#0B6B4E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)">
+<div style="text-align:center;font-size:12px;color:#8B95A1;padding-top:6px">오늘</div>
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<div style="max-width:300px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px 16px 16px 4px;padding:12px 14px">
+<div style="font-size:15px;line-height:1.5">여기서 왜 x=2를 빼야 하는지 모르겠어요. 분모가 0이면 안 된다는 건 아는데 어디까지 확인해야 하나요?</div>
+<div style="margin-top:10px;height:150px;border-radius:10px;background:rgba(28,42,74,.07);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+<span style="font-size:12px;color:#8B95A1">문제 사진</span>
+<svg width="120" height="70" viewBox="0 0 120 70" style="position:absolute;left:24px;top:30px"><path d="M6 44c14-22 26 10 40-8s24 16 40-6" stroke="#F04452" stroke-width="3.5" fill="none" stroke-linecap="round"></path></svg>
+</div>
+</div>
+<span style="font-size:11px;color:#8B95A1;padding-left:4px">오전 11:02</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+<div style="max-width:280px;background:rgba(11,107,78,.11);border-radius:16px 16px 4px 16px;padding:12px 14px;font-size:15px;line-height:1.5">사진에 표시해 준 부분부터 볼게요. 분모가 0이 되는 값을 먼저 전부 찾아 두는 게 순서예요.</div>
+<span style="font-size:11px;color:#8B95A1;padding-right:4px">오전 11:20 · 확인함</span>
+</div>
+</div>
+<div style="flex:none;padding:10px 16px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5);display:flex;align-items:center;gap:10px;box-shadow:0 -1px 0 #F2F4F6">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 8.5l-7.6 7.6a2.8 2.8 0 0 1-4-4l8-8a4.2 4.2 0 0 1 6 6l-8 8" stroke="#8B95A1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<div style="flex:1;height:44px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;padding:0 14px;font-size:15px;color:#8B95A1">답변을 입력하세요</div>
+<div style="width:44px;height:44px;border-radius:22px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-1b · 배너 펼침</div><div style="font-size:12px;color:#8B95A1;max-width:390px">약점과 다음에 풀 유형이 함께 보입니다. 전체 이력은 타임라인으로.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600;flex:1">최하원 · 수학 모고</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(255,149,0,.10);color:#C2700A;font-size:12px;font-weight:600">답변 대기</span>
+</div>
+<div style="margin:4px 20px 8px;padding:16px;border-radius:12px;background:rgba(11,107,78,.08);flex:none">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:13px">📌</span><span style="font-size:12px;color:#0B6B4E;font-weight:600;flex:1">3일 전에 남긴 노트</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="#0B6B4E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="font-size:12px;color:#0B6B4E;font-weight:600;margin-bottom:4px">약점</div>
+<div style="font-size:15px;line-height:1.5;margin-bottom:12px">분모가 0이 되는 조건을 놓치는 패턴이 반복돼요</div>
+<div style="font-size:12px;color:#0B6B4E;font-weight:600;margin-bottom:4px">다음에 풀 유형</div>
+<div style="font-size:15px;line-height:1.5;margin-bottom:14px">좌·우극한이 다른 그래프 문제</div>
+<div style="height:44px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#0B6B4E">노트 6개 전체 보기</div>
+</div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)">
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<div style="max-width:300px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:15px;line-height:1.5">여기서 왜 x=2를 빼야 하는지 모르겠어요.</div>
+<span style="font-size:11px;color:#8B95A1;padding-left:4px">오전 11:02</span>
+</div>
+</div>
+<div style="flex:none;padding:10px 16px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5);display:flex;align-items:center;gap:10px;box-shadow:0 -1px 0 #F2F4F6">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M18 8.5l-7.6 7.6a2.8 2.8 0 0 1-4-4l8-8a4.2 4.2 0 0 1 6 6l-8 8" stroke="#8B95A1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<div style="flex:1;height:44px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;padding:0 14px;font-size:15px;color:#8B95A1">답변을 입력하세요</div>
+<div style="width:44px;height:44px;border-radius:22px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-2 · 답변 전송 직후 <span style="color:#FF9500">가장 중요</span></div><div style="font-size:12px;color:#8B95A1;max-width:390px">화면 이동 없이 시트가 올라옵니다. 빈 칸이 아니라 두 개의 질문을 던지고, &ldquo;나중에&rdquo;를 반드시 둡니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;position:relative;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28;overflow:hidden">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600;flex:1">최하원 · 수학 모고</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">답변 완료</span>
+</div>
+<div style="flex:1;padding:8px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div>
+<div style="position:absolute;inset:0;background:rgba(24,32,48,.34);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,linear-gradient(180deg,rgba(236,246,241,.7) 0%,rgba(255,255,255,.66) 20%);backdrop-filter:blur(15px) saturate(180%);-webkit-backdrop-filter:blur(15px) saturate(180%);box-shadow:0 -8px 32px rgba(28,42,74,.1),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12);border-radius:20px 20px 0 0;padding:10px 20px 26px">
+<div style="width:38px;height:4px;border-radius:2px;background:rgba(28,42,74,.16);margin:0 auto 22px"></div>
+<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:7px"><span style="font-size:17px;font-weight:700;letter-spacing:-0.4px">답변을 보냈어요</span><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4.5 12.8l5 5L19.5 6.6" stroke="#0B6B4E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="font-size:14px;color:#8B95A1;text-align:center;margin-bottom:26px">최하원 학생 노트에 한 줄 남길까요?</div>
+<div style="font-size:14px;font-weight:600;margin-bottom:8px">오늘 무엇이 약했나요?</div>
+<div style="height:76px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 1px rgba(255,255,255,.3);padding:13px 15px;font-size:15px;color:#AEB6C0;box-sizing:border-box;margin-bottom:20px">예: 분모 조건을 확인하지 않고 대입해요</div>
+<div style="font-size:14px;font-weight:600;margin-bottom:8px">다음에 어떤 유형을 풀면 좋을까요?</div>
+<div style="height:76px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 0 0 1px rgba(255,255,255,.3);padding:13px 15px;font-size:15px;color:#AEB6C0;box-sizing:border-box;margin-bottom:18px">예: 좌·우극한이 다른 그래프 문제</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.5L15.5 5a2.5 2.5 0 0 1 3.5 3.5L8.5 19z" stroke="#0B6B4E" stroke-width="1.8" stroke-linejoin="round"></path></svg><span style="font-size:14px;font-weight:600;color:#0B6B4E">손글씨로 남기기</span></div>
+<div style="height:56px;border-radius:12px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">저장하기</div>
+<div style="text-align:center;font-size:15px;font-weight:500;color:#8B95A1;padding:18px 0 0">나중에</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-3 · 멘토 연결노트 타임라인</div><div style="font-size:12px;color:#8B95A1;max-width:390px">시간순 누적. 최신이 위, 과거는 접힘. 지난 노트는 고치지 않습니다 — 이력입니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600">연결노트 · 최하원</span>
+</div>
+<div style="padding:0 20px 14px;flex:none"><div style="font-size:13px;color:#8B95A1">함께한 지 13일 · 질문 6개 · 노트 6개</div></div>
+<div style="flex:1;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);padding:16px 20px;display:flex;flex-direction:column;gap:14px">
+<div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="padding:3px 7px;border-radius:6px;background:#0B6B4E;color:#fff;font-size:11px;font-weight:700">멘토</span><span style="font-size:12px;color:#8B95A1">8월 30일</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px">
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">약점</div>
+<div style="font-size:15px;line-height:1.5;margin-bottom:12px">분모 0 조건을 놓치는 패턴</div>
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">다음에 풀 유형</div>
+<div style="font-size:15px;line-height:1.5;margin-bottom:12px">좌·우극한이 다른 그래프 문제</div>
+<div style="height:88px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+<svg width="200" height="52" viewBox="0 0 200 52"><path d="M10 34c18-26 30 8 46-6s26 18 42 2 30-14 44 6" stroke="#191F28" stroke-width="2.4" fill="none" stroke-linecap="round"></path><path d="M120 44h60" stroke="#F04452" stroke-width="2.4" stroke-linecap="round"></path></svg>
+<span style="position:absolute;right:10px;bottom:8px;font-size:11px;color:#8B95A1">손글씨</span>
+</div>
+</div>
+</div>
+<div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="padding:3px 7px;border-radius:6px;background:#1A56DB;color:#fff;font-size:11px;font-weight:700">학생</span><span style="font-size:12px;color:#8B95A1">8월 20일</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.5">공식은 외웠는데 조건을 안 봤다</div>
+</div>
+<div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="padding:3px 7px;border-radius:6px;background:#0B6B4E;color:#fff;font-size:11px;font-weight:700">멘토</span><span style="font-size:12px;color:#8B95A1">8월 18일</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px">
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">약점</div>
+<div style="font-size:15px;line-height:1.5">그래프를 그리지 않고 식만 보고 판단해요</div>
+</div>
+</div>
+<div style="text-align:center;padding:6px 0"><span style="font-size:14px;font-weight:600;color:#8B95A1">▾ 이전 노트 3개 더 보기</span></div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">노트 추가하기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-4 · 학생 연결노트</div><div style="font-size:12px;color:#8B95A1;max-width:390px">학생에게 노트는 작성 도구가 아니라 &ldquo;내 멘토가 나를 안다&rdquo;는 증거입니다. 최신 멘토 노트를 요약으로 맨 위에.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600">연결노트</span>
+</div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+<div style="padding:8px 20px 20px;flex:none">
+<div style="font-size:24px;font-weight:700;letter-spacing:-0.7px;margin-bottom:6px">김민서 멘토가 본 나</div>
+<div style="font-size:13px;color:#8B95A1">함께한 지 13일 · 질문 6개</div>
+</div>
+<div style="margin:0 20px;padding:20px;border-radius:16px;background:rgba(26,86,219,.07);flex:none">
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:14px">💡</span><span style="font-size:13px;font-weight:700;color:#1A56DB">지금 약한 것</span></div>
+<div style="font-size:19px;font-weight:600;line-height:1.45;letter-spacing:-0.4px;margin-bottom:20px">분모가 0이 되는 조건을<br>놓치는 패턴이 반복돼요</div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span style="font-size:13px;color:#1A56DB">▶</span><span style="font-size:13px;font-weight:700;color:#1A56DB">다음에 풀어볼 유형</span></div>
+<div style="font-size:17px;font-weight:600;line-height:1.45">좌·우극한이 다른 그래프 문제</div>
+<div style="font-size:12px;color:#8B95A1;margin-top:16px">3일 전 · 김민서 멘토</div>
+</div>
+<div style="padding:14px 20px;flex:none;text-align:center"><span style="font-size:14px;font-weight:600;color:#8B95A1">▾ 지난 노트 5개 보기</span></div>
+<div style="margin:0 20px;padding:20px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);flex:none">
+<div style="display:flex;align-items:center;margin-bottom:12px"><span style="font-size:17px;font-weight:600;flex:1">내가 정리한 것</span><span style="padding:7px 12px;border-radius:8px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:13px;font-weight:600">추가</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.5;margin-bottom:8px">공식은 외웠는데 조건을 안 봤다<div style="font-size:12px;color:#8B95A1;margin-top:6px">8월 20일</div></div>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-5 · 노트가 하나도 없을 때 (멘토)</div><div style="font-size:12px;color:#8B95A1;max-width:390px">빈 화면에 입력창만 두지 않고, 첫 노트에 무엇을 쓰는지 예시로 보여줍니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600">연결노트 · 정유진</span>
+</div>
+<div style="flex:1;padding:0 20px;display:flex;flex-direction:column;justify-content:center;gap:20px">
+<div style="text-align:center">
+<div style="font-size:22px;font-weight:700;letter-spacing:-0.6px;margin-bottom:8px">아직 노트가 없어요</div>
+<div style="font-size:15px;color:#8B95A1;line-height:1.6">답변을 보낸 뒤 한 줄만 남겨도<br>다음 달 재구독이 달라져요</div>
+</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:18px">
+<div style="font-size:12px;font-weight:700;color:#8B95A1;margin-bottom:10px">이렇게 씁니다</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:12px;padding:14px">
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">약점</div>
+<div style="font-size:15px;margin-bottom:10px">조건 확인 없이 공식부터 대입해요</div>
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">다음에 풀 유형</div>
+<div style="font-size:15px">정의역이 제한된 유리함수</div>
+</div>
+<div style="font-size:13px;color:#8B95A1;margin-top:12px;line-height:1.6">&ldquo;극한 3문제 풀었음&rdquo; 같은 진도는 학생에게 도움이 되지 않아요.</div>
+</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">첫 노트 남기기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">2-5b · 노트가 10개 넘게 쌓였을 때</div><div style="font-size:12px;color:#8B95A1;max-width:390px">월 단위로 묶고, 상단에 &ldquo;변화&rdquo; 한 줄을 둡니다. 쌓인 노트의 값은 비교에서 나옵니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600;flex:1">연결노트 · 최하원</span>
+<span style="font-size:13px;color:#8B95A1">노트 14</span>
+</div>
+<div style="margin:0 20px 14px;padding:14px 16px;border-radius:12px;background:rgba(11,107,78,.08);flex:none">
+<div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:4px">4개월 동안의 변화</div>
+<div style="font-size:15px;line-height:1.5">분모 조건 실수는 줄었고, 요즘은 <b>그래프 해석</b>에서 막혀요</div>
+</div>
+<div style="flex:1;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);padding:14px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:13px;font-weight:700;color:#8B95A1">8월</div>
+<div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="padding:3px 7px;border-radius:6px;background:#0B6B4E;color:#fff;font-size:11px;font-weight:700">멘토</span><span style="font-size:12px;color:#8B95A1">8월 30일</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px"><div style="font-size:12px;font-weight:700;color:#0B6B4E;margin-bottom:3px">약점</div><div style="font-size:15px;line-height:1.5">좌·우극한을 나눠 보지 않아요</div></div>
+</div>
+<div>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="padding:3px 7px;border-radius:6px;background:#1A56DB;color:#fff;font-size:11px;font-weight:700">학생</span><span style="font-size:12px;color:#8B95A1">8월 20일</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.5">공식은 외웠는데 조건을 안 봤다</div>
+</div>
+<div style="font-size:13px;font-weight:700;color:#8B95A1;margin-top:4px">7월 <span style="font-weight:500">· 노트 5개</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px;display:flex;align-items:center"><div style="flex:1;font-size:15px;color:#8B95A1">분모 0 조건 · 인수분해 실수 …</div><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<div style="font-size:13px;font-weight:700;color:#8B95A1;margin-top:4px">6월 <span style="font-weight:500">· 노트 4개</span></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px;display:flex;align-items:center"><div style="flex:1;font-size:15px;color:#8B95A1">삼각함수 그래프 · 주기 …</div><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(11,107,78,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">노트 추가하기</div></div>
+</div>
+</x-import>
+</div>
+
+</div>
+
+<div style="margin-top:26px;padding:18px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;max-width:1144px;font-size:13px;line-height:1.75;color:#4E5968">
+<b style="color:#191F28">덧붙인 판단</b> — ① 빈 상태에 <b style="color:#191F28">작성 예시 카드</b>를 넣었습니다. 무엇을 쓸지 모르는 게 현재 가장 큰 문제인데, 도움말 문구 한 줄로는 진도 기록을 막지 못합니다. ② 노트가 10개를 넘으면 상단에 <b style="color:#191F28">&ldquo;변화&rdquo; 한 줄</b>을 둡니다. 누적의 값은 비교에서 나오고, 이 문장이 재구독 시점에 학부모에게 전달되는 말이 됩니다. ③ <b style="color:#191F28">주의할 점</b> — 노트 작성 시트를 답변마다 띄우면 3~4회 만에 무시됩니다. <b style="color:#191F28">같은 학생에게 하루 1회</b>로 제한하고, 두 번 연속 &ldquo;나중에&rdquo;를 누르면 그 주에는 다시 띄우지 않기를 권합니다.
+</div>
+</section>
+
+<section style="padding:48px 52px 44px;border-bottom:1px solid rgba(0,0,0,.08)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#1A56DB;color:#fff;border-radius:5px">§3</span><span style="font-size:15px;font-weight:700">학생 앱 핵심 흐름</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:28px;max-width:780px">목록은 밀도를 높이고, 진입·결정 화면은 여백을 씁니다.</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">3-1 · 질문방 목록</div><div style="font-size:12px;color:#8B95A1;max-width:390px">각 행에 이번 주 남은 질문 수와 최근 노트 한 줄. 노트가 목록에서 먼저 보입니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;padding:0 20px;flex:none"><span style="font-size:24px;font-weight:700;flex:1;letter-spacing:-0.6px">질문방</span><div style="width:36px;height:36px;border-radius:18px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div></div>
+<div style="padding:6px 20px 12px;flex:none"><div style="height:44px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;gap:8px;padding:0 16px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M16.2 16.2l4.3 4.3" stroke="#8B95A1" stroke-width="1.8" stroke-linecap="round"></path></svg><span style="font-size:15px;color:#8B95A1">멘토 검색</span></div></div>
+<div style="flex:1;overflow:hidden;padding:0 20px"><div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:2px 16px">
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">김민서</span><span style="font-size:12px;color:#B0B8C1">1일 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">프리미엄 · 질문 무제한</div>
+<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(26,86,219,.07);font-size:13px;color:#1A56DB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 분모 0 조건을 놓치는 패턴</div>
+<div style="margin-top:8px"><span style="padding:4px 8px;border-radius:6px;background:#1A56DB;color:#fff;font-size:12px;font-weight:600">답변 1</span></div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">박서연</span><span style="font-size:12px;color:#B0B8C1">3일 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">스탠다드 · 이번 주 9개 중 9개 남음</div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">이도현</span><span style="font-size:12px;color:#B0B8C1">2주 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">라이트 · 이번 주 4개 중 1개 남음</div>
+<div style="margin-top:8px"><span style="padding:4px 8px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(240,68,82,.08);color:#F04452;font-size:12px;font-weight:600">해지 예정 · 9월 5일까지</span></div>
+</div>
+</div>
+<div style="margin:8px 0 16px;height:52px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#4E5968">+ 새 멘토 구독하기</div>
+</div>
+</div>
+<dc-import name="TabBarGlass" role="student" active="질문방" badges="{{ tabBadgeStudent }}" hint-size="390px,90px"></dc-import>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">3-2 · 질문 대화</div><div style="font-size:12px;color:#8B95A1;max-width:390px">수식과 사진이 섞이므로 말풍선 폭을 넓게. 답변이 오면 하단에 &ldquo;답변을 확인했어요&rdquo;.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span style="font-size:17px;font-weight:600;flex:1">미적분 · 극한</span>
+<span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(11,107,78,.08);color:#0B6B4E;font-size:12px;font-weight:600">답변 완료</span>
+</div>
+<div style="flex:1;overflow:hidden;padding:16px 16px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+<div style="max-width:310px;background:rgba(26,86,219,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);color:#fff;border-radius:16px 16px 4px 16px;padding:12px 14px">
+<div style="font-size:15px;line-height:1.5">x=2에서 극한값이 존재하는지 어떻게 확인해요? 분모를 인수분해까지는 했어요.</div>
+<div style="margin-top:10px;height:160px;border-radius:10px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.9)">문제 사진 · 탭하면 전체화면</div>
+</div>
+<span style="font-size:11px;color:#8B95A1">오전 11:02</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<div style="max-width:310px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px 16px 16px 4px;padding:12px 14px">
+<div style="font-size:15px;line-height:1.6">인수분해까지 잘했어요. 이제 좌극한과 우극한을 따로 구해서 값이 같은지 보면 됩니다.</div>
+<div style="margin-top:10px;padding:12px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:16px;text-align:center;font-family:ui-serif,Georgia,serif">lim<sub style="font-size:10px">x→2⁻</sub> f(x) = lim<sub style="font-size:10px">x→2⁺</sub> f(x)</div>
+</div>
+<span style="font-size:11px;color:#8B95A1">오전 11:20</span>
+</div>
+</div>
+<div style="flex:none;padding:12px 16px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">답변을 확인했어요</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">3-3 · 새 질문 작성 <span style="color:#8B95A1;font-weight:500">사진 첨부 직후</span></div><div style="font-size:12px;color:#8B95A1;max-width:390px">사진을 붙인 직후 한 번만 펜 안내를 띄웁니다. 앱의 강점인데 지금 아무도 모릅니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28;position:relative">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg>
+<span style="font-size:17px;font-weight:600">새 질문</span>
+</div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:22px">
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">어떤 과목인가요?</div>
+<div style="height:52px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;padding:0 16px"><span style="flex:1;font-size:15px;font-weight:600">미적분</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#8B95A1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">무엇이 궁금한가요?</div>
+<div style="height:130px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);padding:14px 16px;font-size:15px;line-height:1.55;color:#B0B8C1;box-sizing:border-box">어디까지 풀었는지 함께 적으면<br>답변이 훨씬 정확해져요</div>
+</div>
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">문제 사진</div>
+<div style="display:flex;gap:10px">
+<div style="width:96px;height:96px;border-radius:12px;background:rgba(28,42,74,.07);position:relative;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8B95A1">사진 1<div style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:11px;background:#191F28;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center">×</div></div>
+<div style="width:96px;height:96px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 6v12M6 12h12" stroke="#8B95A1" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:11px;color:#8B95A1">사진 추가</span></div>
+</div>
+</div>
+</div>
+<div style="position:absolute;left:20px;right:20px;bottom:112px;background:rgba(25,31,40,.85);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 8px 32px rgba(28,42,74,.16),inset 0 0 0 1px rgba(255,255,255,.16);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:10px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.5L15.5 5a2.5 2.5 0 0 1 3.5 3.5L8.5 19z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"></path></svg>
+<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#fff">펜으로 막힌 곳을 표시해 보세요</div><div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">사진을 탭하면 바로 그릴 수 있어요</div></div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">질문 보내기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">3-4 · 이번 주 질문을 다 썼을 때</div><div style="font-size:12px;color:#8B95A1;max-width:390px">막지 않고 그 자리에서 두 갈래를 줍니다. 주요 행동은 하나, 나머지는 물러납니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;position:relative;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28;overflow:hidden">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">박서연 · 스탠다드</span></div>
+<div style="flex:1;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div>
+<div style="position:absolute;inset:0;background:rgba(24,32,48,.34);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,linear-gradient(180deg,rgba(235,242,251,.7) 0%,rgba(255,255,255,.66) 20%);backdrop-filter:blur(15px) saturate(180%);-webkit-backdrop-filter:blur(15px) saturate(180%);box-shadow:0 -8px 32px rgba(28,42,74,.1),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12);border-radius:20px 20px 0 0;padding:10px 20px 26px">
+<div style="width:38px;height:4px;border-radius:2px;background:rgba(28,42,74,.16);margin:0 auto 26px"></div>
+<div style="font-size:20px;font-weight:700;text-align:center;letter-spacing:-0.5px;margin-bottom:7px">이번 주 질문을 다 썼어요</div>
+<div style="font-size:14px;color:#8B95A1;text-align:center;margin-bottom:20px">8월 27일 목요일에 다시 채워져요</div>
+<div style="display:flex;gap:6px;margin-bottom:24px"><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div><div style="flex:1;height:8px;border-radius:4px;background:#1A56DB"></div></div>
+<div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">개별질문으로 지금 물어보기</div>
+<div style="font-size:13px;color:#8B95A1;text-align:center;margin-top:10px">평균 2,500원 · 보통 3시간 안에 답변이 와요</div>
+<div style="text-align:center;font-size:15px;font-weight:600;color:#4E5968;padding:18px 0 0">상위 요금제로 바꾸기</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">3-5 · 마이페이지</div><div style="font-size:12px;color:#8B95A1;max-width:390px">숫자는 크게, 설명은 작게. 캐시 충전만 웹으로 넘깁니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">마이페이지</span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:4px 20px 0">
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:20px">
+<div style="font-size:13px;color:#8B95A1;margin-bottom:6px">지금 쓸 수 있는 캐시</div>
+<div style="font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1px">45,700원이 있어요</div>
+<div style="margin-top:14px;display:flex;align-items:center;gap:6px"><span style="font-size:14px;color:#1A56DB;font-weight:600">충전은 웹에서 할 수 있어요</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#1A56DB" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:20px">
+<div style="font-size:17px;font-weight:600;margin-bottom:14px">구독 중인 멘토 2명</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:12px"><div style="width:40px;height:40px;border-radius:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="flex:1"><div style="font-size:15px;font-weight:600">김민서 · 프리미엄</div><div style="font-size:13px;color:#8B95A1">9월 9일에 갱신돼요 · 174,900원</div></div><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="display:flex;align-items:center;gap:12px"><div style="width:40px;height:40px;border-radius:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div><div style="flex:1"><div style="font-size:15px;font-weight:600">박서연 · 스탠다드</div><div style="font-size:13px;color:#8B95A1">9월 13일에 갱신돼요 · 84,900원</div></div><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:4px 20px;margin-bottom:20px">
+<div style="height:56px;display:flex;align-items:center"><span style="flex:1;font-size:15px">진행 중인 질문</span><span style="font-size:15px;font-weight:600;color:#1A56DB">2개</span></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">캐시 사용 내역</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">환불 신청 · 문제 해결 요청</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">프로필 편집</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">설정</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+
+<div style="margin-top:26px;padding:18px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;max-width:1144px;font-size:13px;line-height:1.75;color:#4E5968">
+<b style="color:#191F28">덧붙인 판단</b> — ① 질문 소진 시트에 <b style="color:#191F28">예상 가격과 답변 소요 시간</b>을 붙였습니다. 개별질문을 처음 쓰는 학생은 얼마인지 몰라 이탈합니다. ② 질문방 목록에 <b style="color:#191F28">해지 예정 배지</b>를 노출했습니다. 학생이 해지 사실을 잊고 질문하려다 막히는 사고를 막습니다. ③ <b style="color:#191F28">주의할 점</b> — 캐시 충전을 웹으로 보내는 링크는 결제 정책상 유지하되, 문구를 &ldquo;웹에서&rdquo;로 담백하게 두고 버튼처럼 강조하지 않았습니다. 스토어 심사에서 유도 문구로 읽힐 여지를 줄이기 위해서입니다.
+</div>
+</section>
+
+<section style="padding:48px 52px 44px;border-bottom:1px solid rgba(0,0,0,.08)">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#0B6B4E;color:#fff;border-radius:5px">§4</span><span style="font-size:15px;font-weight:700">멘토 앱 핵심 흐름</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:28px;max-width:780px">멘토는 돈과 대기 건수를 확인하러 옵니다. 두 가지가 첫 화면에서 즉시 보여야 합니다.</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">4-1 · 질문방 목록</div><div style="font-size:12px;color:#8B95A1;max-width:390px">답변 대기가 있는 방이 항상 위로. 상단에 오늘 할 일 한 문장.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;padding:0 20px;flex:none"><span style="font-size:24px;font-weight:700;flex:1;letter-spacing:-0.6px">질문방</span><div style="width:36px;height:36px;border-radius:18px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div></div>
+<div style="padding:2px 20px 12px;flex:none"><div style="font-size:15px;color:#4E5968">오늘 <b style="color:#0B6B4E">답변할 질문 2개</b>가 있어요</div></div>
+<div style="padding:0 20px 12px;flex:none"><div style="height:44px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;gap:8px;padding:0 16px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M16.2 16.2l4.3 4.3" stroke="#8B95A1" stroke-width="1.8" stroke-linecap="round"></path></svg><span style="font-size:15px;color:#8B95A1">학생 검색</span></div></div>
+<div style="flex:1;overflow:hidden;padding:0 20px"><div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:2px 16px">
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">최하원</span><span style="font-size:12px;color:#B0B8C1">1일 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">프리미엄 · 이번 주 3개 사용</div>
+<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(11,107,78,.08);font-size:13px;color:#0B6B4E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 분모 0 조건을 놓치는 패턴</div>
+<div style="margin-top:8px"><span style="padding:4px 8px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(255,149,0,.10);color:#C2700A;font-size:12px;font-weight:600">답변 대기 1</span></div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">정유진</span><span style="font-size:12px;color:#B0B8C1">2일 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">스탠다드 · 이번 주 1개 사용</div>
+<div style="margin-top:8px;display:flex;gap:6px"><span style="padding:4px 8px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(255,149,0,.10);color:#C2700A;font-size:12px;font-weight:600">답변 대기 1</span><span style="padding:4px 8px;border-radius:6px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#8B95A1;font-size:12px;font-weight:600">노트 없음</span></div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:44px;height:44px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px;font-weight:700;flex:1">한지우</span><span style="font-size:12px;color:#B0B8C1">5일 전</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:2px">라이트 · 이번 주 0개 사용</div>
+<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(11,107,78,.08);font-size:13px;color:#0B6B4E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 도형 문제에서 보조선을 못 그어요</div>
+</div>
+</div>
+</div>
+</div><dc-import name="TabBarGlass" role="mentor" active="질문방" badges="{{ tabBadgeMentor }}" hint-size="390px,90px"></dc-import>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">4-2 · 정산 <span style="color:#0B6B4E">신규 탭</span></div><div style="font-size:12px;color:#8B95A1;max-width:390px">이번 달 금액을 가장 크게. 계좌 미등록 경고를 최상단에 — 지급 보류의 가장 흔한 원인입니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;padding:0 20px;flex:none"><span style="font-size:24px;font-weight:700;flex:1;letter-spacing:-0.6px">정산</span></div>
+<div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:12px;padding:4px 20px 0">
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:24px 20px">
+<div style="font-size:15px;color:#8B95A1;margin-bottom:8px">이번 달 받을 금액</div>
+<div style="font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1.2px">152,915원</div>
+<div style="font-size:15px;color:#8B95A1;margin-top:8px">9월 23일에 입금돼요</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:rgba(255,149,0,.10)">
+<div style="display:flex;gap:8px;margin-bottom:6px"><span style="font-size:14px">⚠️</span><span style="font-size:15px;font-weight:700;color:#C2700A">정산 계좌를 등록해 주세요</span></div>
+<div style="font-size:13px;color:#A0620A;line-height:1.6;margin-bottom:14px">등록하지 않으면 9월 23일 지급이 보류돼요</div>
+<div style="height:48px;border-radius:10px;background:rgba(25,31,40,.9);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center">계좌 등록하기</div>
+</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:20px">
+<div style="font-size:17px;font-weight:600;margin-bottom:14px">무엇으로 벌었나요</div>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:baseline"><span style="flex:1;font-size:15px">구독 3명</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">148,665원</span></div>
+<div style="display:flex;align-items:baseline"><span style="flex:1;font-size:15px">개별질문 2건</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">4,250원</span></div>
+<div style="display:flex;align-items:baseline"><span style="flex:1;font-size:15px;color:#8B95A1">맞춤의뢰</span><span style="font-size:16px;font-weight:600;color:#8B95A1;font-variant-numeric:tabular-nums">0원</span></div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="display:flex;align-items:baseline;font-size:13px;color:#8B95A1"><span style="flex:1">수수료 · 원천징수를 뺀 금액이에요</span></div>
+</div>
+</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:4px 20px;margin-bottom:16px">
+<div style="height:56px;display:flex;align-items:center"><span style="flex:1;font-size:15px">건별 내역 보기</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">지난 정산 내역</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+</div>
+<dc-import name="TabBarGlass" role="mentor" active="정산" badges="{{ tabBadgeMentor }}" hint-size="390px,90px"></dc-import>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">4-3 · 요금제 설정</div><div style="font-size:12px;color:#8B95A1;max-width:390px">슬라이더가 아니라 직접 입력 + 범위 안내. 범위를 벗어나면 저장되지 않고 그 자리에서 말해 줍니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">요금제</span></div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:16px">
+<div style="font-size:15px;color:#8B95A1;line-height:1.6">요금제마다 정할 수 있는 범위가 달라요</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="font-size:15px;font-weight:600;margin-bottom:12px">라이트 · 주 4문항</div>
+<div style="height:52px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;padding:0 14px"><span style="flex:1;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums">29,900</span><span style="font-size:15px;color:#8B95A1">원</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:8px">29,900 ~ 69,900원 사이</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:rgba(11,107,78,.08)">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px;font-weight:600;flex:1">스탠다드 · 주 9문항</span><span style="padding:4px 8px;border-radius:6px;background:#0B6B4E;color:#fff;font-size:11px;font-weight:700">추천</span></div>
+<div style="height:52px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;padding:0 14px;box-shadow:0 0 0 1.5px #0B6B4E inset"><span style="flex:1;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums">84,900</span><span style="font-size:15px;color:#8B95A1">원</span></div>
+<div style="font-size:13px;color:#0B6B4E;margin-top:8px">84,900 ~ 149,900원 사이</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="font-size:15px;font-weight:600;margin-bottom:12px">프리미엄 · 질문 무제한</div>
+<div style="height:52px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);display:flex;align-items:center;padding:0 14px;box-shadow:0 0 0 1.5px #F04452 inset"><span style="flex:1;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:#F04452">340,000</span><span style="font-size:15px;color:#8B95A1">원</span></div>
+<div style="font-size:13px;color:#F04452;margin-top:8px">174,900 ~ 329,900원 사이로 적어 주세요</div>
+</div>
+<div style="padding-top:4px">
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">지정 개별질문 답변 단가</div>
+<div style="height:52px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;padding:0 14px"><span style="flex:1;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums">2,500</span><span style="font-size:15px;color:#8B95A1">원</span></div>
+</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#B0B8C1;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">저장하기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">4-4 · 학력 인증 · 4개 상태</div><div style="font-size:12px;color:#8B95A1;max-width:390px">완료 / 승인 대기 / 반려 / 미제출. 반려는 이유를 반드시 문장으로 적습니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">학력 인증</span></div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="padding:18px;border-radius:16px;background:rgba(11,107,78,.08)">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:20px;height:20px;border-radius:10px;background:#0B6B4E;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7" stroke="#fff" stroke-width="3.4" stroke-linecap="round"></path></svg></div><span style="font-size:17px;font-weight:700;color:#0B6B4E">인증이 완료됐어요</span></div>
+<div style="font-size:15px">서울대학교 · 의예과</div>
+<div style="font-size:13px;color:#8B95A1;margin-top:4px">2025년 3월 12일에 승인됐어요</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="font-size:15px;font-weight:700;margin-bottom:4px">서류를 확인하고 있어요</div>
+<div style="font-size:13px;color:#8B95A1;line-height:1.6">보통 영업일 2일 안에 끝나요. 결과는 알림으로 알려드릴게요.</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:rgba(240,68,82,.08)">
+<div style="font-size:15px;font-weight:700;color:#F04452;margin-bottom:4px">서류를 다시 보내 주세요</div>
+<div style="font-size:13px;color:#C4303C;line-height:1.6;margin-bottom:14px">제출한 증명서의 발급일이 6개월을 넘었어요. 최근 3개월 안에 발급받은 서류가 필요해요.</div>
+<div style="height:48px;border-radius:10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09);color:#C4303C;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center">다시 제출하기</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="font-size:15px;font-weight:700;margin-bottom:6px">아직 인증하지 않았어요</div>
+<div style="font-size:13px;color:#8B95A1;line-height:1.6;margin-bottom:12px">인증한 멘토는 구독 전환율이 두 배 높아요</div>
+<div style="font-size:13px;color:#4E5968;line-height:1.7;margin-bottom:14px">재학증명서 · 졸업증명서 · 합격증<br>중 하나면 돼요</div>
+<div style="height:48px;border-radius:10px;background:rgba(11,107,78,.86);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center">서류 선택하기</div>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+
+<div style="margin-top:26px;padding:18px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;max-width:1144px;font-size:13px;line-height:1.75;color:#4E5968">
+<b style="color:#191F28">덧붙인 판단</b> — ① 정산 첫 화면을 <b style="color:#191F28">&ldquo;무엇으로 벌었나요&rdquo;</b>로 묶어 구독·개별질문·맞춤의뢰를 한 눈에 보게 했습니다. 멘토가 다음 달에 무엇을 늘릴지 결정하는 화면이기 때문입니다. ② 요금제 오류는 저장 후 토스트가 아니라 <b style="color:#191F28">입력 칸 바로 아래 문장</b>으로 즉시 보여주고, 그동안 저장 버튼은 비활성으로 둡니다. ③ <b style="color:#191F28">주의할 점</b> — 멘토가 스스로 가격을 올릴 수 있게 되면 기존 구독자 요금 변경 규칙이 필요합니다. 화면에는 &ldquo;이미 구독 중인 학생은 다음 결제부터 적용돼요&rdquo; 한 줄이 반드시 들어가야 합니다(현재 시안에는 미포함 — 정책 확인 필요).
+</div>
+</section>
+
+<section style="padding:48px 52px 60px">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px"><span style="font:700 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#191F28;color:#fff;border-radius:5px">§5</span><span style="font-size:15px;font-weight:700">나머지 화면</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-bottom:28px;max-width:780px">로그인 · 개별질문 · 멘토 찾기 · 커뮤니티 · 알림 · 구독 해지 · 환불 · 설정 · 빈 상태.</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-1 · 로그인 — 역할 선택</div><div style="font-size:12px;color:#8B95A1;max-width:390px">고른 역할에 따라 앱 전체 주색이 정해집니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28;padding-left:20px;padding-right:20px">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px">
+<div><div style="font-size:28px;font-weight:700;letter-spacing:-1px;line-height:1.3">어떻게 쓰실 건가요?</div><div style="font-size:15px;color:#8B95A1;margin-top:8px">나중에 마이페이지에서 바꿀 수 있어요</div></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="padding:22px;border-radius:16px;background:rgba(26,86,219,.07);box-shadow:0 0 0 2px #1A56DB inset"><div style="font-size:19px;font-weight:700;color:#1A56DB;margin-bottom:4px">질문할래요</div><div style="font-size:14px;color:#4E5968">중·고등학생 · 멘토를 구독해 질문해요</div></div>
+<div style="padding:22px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)"><div style="font-size:19px;font-weight:700;margin-bottom:4px">답변할래요</div><div style="font-size:14px;color:#8B95A1">대학생 멘토 · 학력 인증이 필요해요</div></div>
+</div>
+</div>
+<div style="flex:none;padding-bottom:26px;display:flex;flex-direction:column;gap:10px">
+<div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">카카오로 계속하기</div>
+<div style="height:56px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.8),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">Apple로 계속하기</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-2 · 멘토 찾기</div><div style="font-size:12px;color:#8B95A1;max-width:390px">인증 배지 · 답변률 · 최저 요금제. 비교에 필요한 것만.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;padding:0 20px;flex:none"><span style="font-size:24px;font-weight:700;letter-spacing:-0.6px">멘토 찾기</span></div>
+<div style="padding:6px 20px 12px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="height:44px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center;gap:8px;padding:0 16px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M16.2 16.2l4.3 4.3" stroke="#8B95A1" stroke-width="1.8" stroke-linecap="round"></path></svg><span style="font-size:15px;color:#8B95A1">과목 · 학교 · 이름</span></div>
+<div style="display:flex;gap:8px"><span style="padding:8px 12px;border-radius:8px;background:#1A56DB;color:#fff;font-size:13px;font-weight:600">수학</span><span style="padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:13px;font-weight:600">고등</span><span style="padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:13px;font-weight:600">10만원 이하</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:0 20px"><div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:2px 16px">
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:52px;height:52px;border-radius:18px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1">
+<div style="display:flex;align-items:center;gap:6px"><span style="font-size:16px;font-weight:700">김민서</span><span style="padding:3px 6px;border-radius:5px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:11px;font-weight:700">인증</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:3px">서울대 수학교육 · 미적분, 기하</div>
+<div style="font-size:13px;color:#4E5968;margin-top:6px">답변률 98% · 보통 2시간 안에 답변</div>
+<div style="font-size:15px;font-weight:700;margin-top:6px">29,900원부터</div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:52px;height:52px;border-radius:18px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1">
+<div style="display:flex;align-items:center;gap:6px"><span style="font-size:16px;font-weight:700">박서연</span><span style="padding:3px 6px;border-radius:5px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:11px;font-weight:700">인증</span></div>
+<div style="font-size:13px;color:#8B95A1;margin-top:3px">연세대 물리 · 물리학, 수학I</div>
+<div style="font-size:13px;color:#4E5968;margin-top:6px">답변률 92% · 보통 5시간 안에 답변</div>
+<div style="font-size:15px;font-weight:700;margin-top:6px">39,000원부터</div>
+</div>
+</div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:12px">
+<div style="width:52px;height:52px;border-radius:18px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);flex:none"></div>
+<div style="flex:1">
+<div style="font-size:16px;font-weight:700">이도현</div>
+<div style="font-size:13px;color:#8B95A1;margin-top:3px">고려대 화학 · 화학I, 생명과학</div>
+<div style="font-size:13px;color:#4E5968;margin-top:6px">답변률 89% · 보통 하루 안에 답변</div>
+<div style="font-size:15px;font-weight:700;margin-top:6px">34,900원부터</div>
+</div>
+</div>
+</div>
+</div><dc-import name="TabBarGlass" role="student" active="멘토 찾기" badges="{{ tabBadgeStudent }}" hint-size="390px,90px"></dc-import>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-3 · 멘토 상세 → 구독하기</div><div style="font-size:12px;color:#8B95A1;max-width:390px">주요 행동은 하나. &ldquo;무료 질문&rdquo;은 버튼이 아니라 그 아래 한 줄로 물러납니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="flex:1;overflow:hidden;padding:0 20px">
+<div style="display:flex;align-items:center;gap:14px;padding-bottom:20px">
+<div style="width:64px;height:64px;border-radius:22px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div>
+<div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:22px;font-weight:700">김민서</span><span style="padding:3px 6px;border-radius:5px;background:rgba(26,86,219,.07);color:#1A56DB;font-size:11px;font-weight:700">인증</span></div><div style="font-size:14px;color:#8B95A1;margin-top:4px">서울대 수학교육 21학번</div></div>
+</div>
+<div style="display:flex;gap:8px;padding:16px 0;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);margin-bottom:20px">
+<div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700">98%</div><div style="font-size:12px;color:#8B95A1;margin-top:2px">답변률</div></div>
+<div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700">2시간</div><div style="font-size:12px;color:#8B95A1;margin-top:2px">평균 답변</div></div>
+<div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700">14명</div><div style="font-size:12px;color:#8B95A1;margin-top:2px">구독 학생</div></div>
+</div>
+<div style="font-size:15px;line-height:1.65;margin-bottom:22px">개념을 먼저 묻고, 어디서 막혔는지 함께 찾아요. 풀이만 던지지 않습니다.</div>
+<div style="font-size:17px;font-weight:600;margin-bottom:12px">요금제를 골라 주세요</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="padding:16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center"><div style="flex:1"><div style="font-size:15px;font-weight:600">라이트</div><div style="font-size:13px;color:#8B95A1;margin-top:2px">주 4문항</div></div><div style="font-size:16px;font-weight:700">29,900원</div></div>
+<div style="padding:16px;border-radius:12px;background:rgba(26,86,219,.07);box-shadow:0 0 0 2px #1A56DB inset;display:flex;align-items:center"><div style="flex:1"><div style="font-size:15px;font-weight:700;color:#1A56DB">스탠다드</div><div style="font-size:13px;color:#1A56DB;margin-top:2px">주 9문항</div></div><div style="font-size:16px;font-weight:700;color:#1A56DB">84,900원</div></div>
+<div style="padding:16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;align-items:center"><div style="flex:1"><div style="font-size:15px;font-weight:600">프리미엄</div><div style="font-size:13px;color:#8B95A1;margin-top:2px">질문 무제한</div></div><div style="font-size:16px;font-weight:700">174,900원</div></div>
+</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">스탠다드로 구독하기</div><div style="text-align:center;font-size:14px;color:#8B95A1;padding-top:12px">먼저 무료로 한 번 물어볼래요</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-4 · 개별질문 등록</div><div style="font-size:12px;color:#8B95A1;max-width:390px">공개형·지정형은 탭이 아니라 한 문장 선택으로. 결제 금액을 등록 전에 확정해 보여줍니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">개별질문</span></div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:22px">
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">누구에게 물어볼까요?</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="padding:16px;border-radius:12px;background:rgba(26,86,219,.07);box-shadow:0 0 0 2px #1A56DB inset"><div style="font-size:15px;font-weight:700;color:#1A56DB">아무 멘토나 먼저 잡는 사람</div><div style="font-size:13px;color:#4E5968;margin-top:3px">보통 30분 안에 배정돼요 · 2,000원</div></div>
+<div style="padding:16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)"><div style="font-size:15px;font-weight:600">김민서 멘토에게 지정</div><div style="font-size:13px;color:#8B95A1;margin-top:3px">멘토가 수락하면 시작돼요 · 2,500원</div></div>
+</div>
+</div>
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">무엇이 궁금한가요?</div>
+<div style="height:120px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);padding:14px 16px;font-size:15px;color:#B0B8C1;box-sizing:border-box">어디까지 풀었는지 함께 적어 주세요</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="display:flex;align-items:center;margin-bottom:6px"><span style="flex:1;font-size:15px">결제될 금액</span><span style="font-size:20px;font-weight:700;font-variant-numeric:tabular-nums">2,000원</span></div>
+<div style="font-size:13px;color:#8B95A1;line-height:1.6">답변을 받고 해결 완료를 누르면 멘토에게 전달돼요. 답변이 없으면 전액 돌려드려요.</div>
+</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">2,000원 결제하고 등록하기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-5 · 개별질문 상세 · 안전결제</div><div style="font-size:12px;color:#8B95A1;max-width:390px">돈이 어디 있는지를 문장으로. 3단계 진행 표시.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600;flex:1">개별질문</span><span style="padding:5px 9px;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(26,86,219,.07);color:#1A56DB;font-size:12px;font-weight:600">진행중</span></div>
+<div style="padding:8px 20px 20px;flex:none">
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32)">
+<div style="font-size:15px;font-weight:600;margin-bottom:14px">2,000원을 안전하게 맡아두고 있어요</div>
+<div style="display:flex;align-items:center;gap:6px">
+<div style="flex:1"><div style="height:6px;border-radius:3px;background:#1A56DB"></div><div style="font-size:11px;color:#1A56DB;margin-top:6px;font-weight:600">결제 완료</div></div>
+<div style="flex:1"><div style="height:6px;border-radius:3px;background:#1A56DB"></div><div style="font-size:11px;color:#1A56DB;margin-top:6px;font-weight:600">답변 도착</div></div>
+<div style="flex:1"><div style="height:6px;border-radius:3px;background:rgba(28,42,74,.07)"></div><div style="font-size:11px;color:#8B95A1;margin-top:6px">해결 완료</div></div>
+</div>
+</div>
+</div>
+<div style="flex:1;overflow:hidden;padding:0 20px;display:flex;flex-direction:column;gap:14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);padding-top:16px">
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.55">확률에서 조건부확률로 넘어가는 부분을 못 따라가겠어요</div>
+<div style="background:rgba(26,86,219,.10);border-radius:14px;padding:14px 16px;font-size:15px;line-height:1.55">전체 경우의 수를 먼저 좁힌다고 생각하면 쉬워요. 사진의 2번 줄부터 다시 볼게요.</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">해결됐어요</div><div style="text-align:center;font-size:14px;color:#8B95A1;padding-top:12px">답변이 부족해요</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-6 · 커뮤니티 숏폼</div><div style="font-size:12px;color:#8B95A1;max-width:390px">세로 영상. 학습 흐름과 섞이지 않도록 이 탭에서만 어둡게 씁니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" dark="{{ yes }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#111417;font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#fff;position:relative">
+<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;color:rgba(255,255,255,.35)">세로 영상</div>
+<div style="position:absolute;top:60px;left:20px;right:20px;display:flex;gap:16px"><span style="font-size:16px;font-weight:700">추천</span><span style="font-size:16px;color:rgba(255,255,255,.5)">팔로잉</span><span style="font-size:16px;color:rgba(255,255,255,.5)">게시판</span></div>
+<div style="position:absolute;right:16px;bottom:150px;display:flex;flex-direction:column;gap:20px;align-items:center">
+<div style="text-align:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.5-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.5-7 9-7 9z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"></path></svg><div style="font-size:12px;margin-top:2px">312</div></div>
+<div style="text-align:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4h-13A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8v3.8L12.8 16h5.7a1.5 1.5 0 0 0 1.5-1.5z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"></path></svg><div style="font-size:12px;margin-top:2px">28</div></div>
+<div style="text-align:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M6 4h12v16l-6-4.5L6 20z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"></path></svg><div style="font-size:12px;margin-top:2px">17</div></div>
+</div>
+<div style="position:absolute;left:20px;right:80px;bottom:120px">
+<div style="font-size:15px;font-weight:700;margin-bottom:6px">김민서 멘토</div>
+<div style="font-size:14px;line-height:1.5;color:rgba(255,255,255,.85)">극한에서 분모 0 조건, 30초 만에 확인하는 법</div>
+</div>
+<div style="background:#111417"><dc-import name="TabBarGlass" role="student" active="커뮤니티" dark="{{ yes }}" badges="{{ tabBadgeStudent }}" hint-size="390px,90px"></dc-import></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-7 · 알림 목록</div><div style="font-size:12px;color:#8B95A1;max-width:390px">종류별 필터. 읽지 않은 것은 왼쪽 점 하나로만 표시합니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;padding:0 20px;flex:none"><span style="font-size:24px;font-weight:700;flex:1;letter-spacing:-0.6px">알림</span><span style="font-size:14px;color:#8B95A1">모두 읽음</span></div>
+<div style="padding:6px 20px 8px;flex:none;display:flex;gap:8px"><span style="padding:8px 12px;border-radius:8px;background:rgba(25,31,40,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:600">전체</span><span style="padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:13px;font-weight:600">질문방</span><span style="padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:13px;font-weight:600">구독·결제</span><span style="padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:13px;font-weight:600">개별질문</span></div>
+<div style="flex:1;overflow:hidden;padding:0 20px"><div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:2px 16px">
+<div style="padding:16px 0;display:flex;gap:10px"><div style="width:6px;height:6px;border-radius:3px;background:#1A56DB;margin-top:7px;flex:none"></div><div style="flex:1"><div style="font-size:15px;line-height:1.5">김민서 멘토가 답변을 보냈어요</div><div style="font-size:13px;color:#8B95A1;margin-top:3px">미적분 · 극한 · 20분 전</div></div></div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:10px"><div style="width:6px;height:6px;border-radius:3px;background:#1A56DB;margin-top:7px;flex:none"></div><div style="flex:1"><div style="font-size:15px;line-height:1.5">김민서 멘토가 연결노트에 한 줄 남겼어요</div><div style="font-size:13px;color:#8B95A1;margin-top:3px">3시간 전</div></div></div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:10px"><div style="width:6px;height:6px;margin-top:7px;flex:none"></div><div style="flex:1"><div style="font-size:15px;line-height:1.5;color:#4E5968">박서연 멘토 구독이 9월 13일에 갱신돼요</div><div style="font-size:13px;color:#8B95A1;margin-top:3px">어제</div></div></div>
+<div style="height:1px;background:rgba(28,42,74,.08);box-shadow:0 1px 0 rgba(255,255,255,.7)"></div>
+<div style="padding:16px 0;display:flex;gap:10px"><div style="width:6px;height:6px;margin-top:7px;flex:none"></div><div style="flex:1"><div style="font-size:15px;line-height:1.5;color:#4E5968">개별질문에 멘토가 배정됐어요</div><div style="font-size:13px;color:#8B95A1;margin-top:3px">8월 28일</div></div></div>
+</div>
+</div><dc-import name="TabBarGlass" role="student" active="알림" badges="{{ tabBadgeStudent }}" hint-size="390px,90px"></dc-import>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-8 · 구독 해지 확인 시트</div><div style="font-size:12px;color:#8B95A1;max-width:390px">위험색은 확인 버튼에만. 남은 기간과 노트를 잃는다는 사실을 먼저 알립니다.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;position:relative;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28;overflow:hidden">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">김민서 · 프리미엄</span></div>
+<div style="flex:1;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1)"></div>
+<div style="position:absolute;inset:0;background:rgba(24,32,48,.34);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.68);backdrop-filter:blur(15px) saturate(180%);-webkit-backdrop-filter:blur(15px) saturate(180%);box-shadow:0 -8px 32px rgba(28,42,74,.1),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12);border-radius:20px 20px 0 0;padding:10px 20px 26px">
+<div style="width:38px;height:4px;border-radius:2px;background:rgba(28,42,74,.16);margin:0 auto 26px"></div>
+<div style="font-size:20px;font-weight:700;text-align:center;letter-spacing:-0.5px;margin-bottom:12px">정말 해지할까요?</div>
+<div style="font-size:15px;line-height:1.7;color:#4E5968;margin-bottom:20px">9월 9일까지는 그대로 질문할 수 있어요. 그 뒤에는 김민서 멘토와의 <b style="color:#191F28">연결노트 6개</b>를 더 볼 수 없어요.</div>
+<div style="padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);font-size:14px;color:#4E5968;line-height:1.6;margin-bottom:20px">해지 대신 <b style="color:#191F28">라이트로 낮추기</b>도 있어요. 노트는 그대로 남아요.</div>
+<div style="height:56px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);color:#4E5968;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-bottom:10px">라이트로 낮추기</div>
+<div style="height:56px;border-radius:12px;background:rgba(240,68,82,.08);color:#F04452;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">해지하기</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-9 · 환불 신청</div><div style="font-size:12px;color:#8B95A1;max-width:390px">예상 환불액을 크게, 계산 근거를 그 아래 작게.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">환불 신청</span></div>
+<div style="flex:1;overflow:hidden;padding:8px 20px;display:flex;flex-direction:column;gap:24px">
+<div>
+<div style="font-size:15px;color:#8B95A1;margin-bottom:6px">돌려받을 수 있는 금액</div>
+<div style="font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1.2px">96,800원</div>
+</div>
+<div style="padding:18px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);display:flex;flex-direction:column;gap:10px">
+<div style="display:flex"><span style="flex:1;font-size:14px;color:#4E5968">결제한 금액</span><span style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums">174,900원</span></div>
+<div style="display:flex"><span style="flex:1;font-size:14px;color:#4E5968">이미 쓴 21일치</span><span style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums">-78,100원</span></div>
+<div style="height:1px;background:rgba(28,42,74,.07)"></div>
+<div style="display:flex"><span style="flex:1;font-size:15px;font-weight:600">환불 예정</span><span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">96,800원</span></div>
+</div>
+<div>
+<div style="font-size:15px;font-weight:600;margin-bottom:10px">왜 환불하시나요?</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="padding:14px 16px;border-radius:12px;background:rgba(26,86,219,.07);box-shadow:0 0 0 2px #1A56DB inset;font-size:15px;font-weight:600;color:#1A56DB">답변이 너무 늦어요</div>
+<div style="padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);font-size:15px">답변 내용이 도움이 안 돼요</div>
+<div style="padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);font-size:15px">실수로 결제했어요</div>
+<div style="padding:14px 16px;border-radius:12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);font-size:15px">그 밖의 이유</div>
+</div>
+</div>
+<div style="font-size:13px;color:#8B95A1;line-height:1.6">신청 후 영업일 3일 안에 결제 수단으로 돌려드려요.</div>
+</div>
+<div style="flex:none;padding:12px 20px 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.55);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 -8px 32px rgba(28,42,74,.06),inset 0 1px 0 rgba(255,255,255,.5)"><div style="height:56px;border-radius:12px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">환불 신청하기</div></div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div style="font-size:13px;font-weight:700">5-10 · 설정</div><div style="font-size:12px;color:#8B95A1;max-width:390px">알림은 종류별 토글. 탈퇴는 맨 아래, 위험색 없이 회색으로.</div></div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ W }}" height="{{ H }}" hint-size="390px,844px">
+<div style="height:100%;box-sizing:border-box;padding-top:56px;display:flex;flex-direction:column;background:linear-gradient(180deg,#F6F9FD 0%,#EDF3FA 52%,#F2F6FB 100%);font-family:Pretendard,-apple-system,system-ui,sans-serif;color:#191F28">
+<div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 4l-8 8 8 8" stroke="#191F28" stroke-width="2" stroke-linecap="round"></path></svg><span style="font-size:17px;font-weight:600">설정</span></div>
+<div style="flex:1;overflow:hidden;padding:0 20px">
+<div style="padding:6px 4px 8px;font-size:13px;color:#8B95A1">알림</div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:0 20px">
+<div style="height:60px;display:flex;align-items:center"><div style="flex:1"><div style="font-size:15px">답변이 왔을 때</div></div><div style="width:51px;height:31px;border-radius:16px;background:rgba(26,86,219,.92);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);display:flex;align-items:center;justify-content:flex-end;padding:0 3px"><div style="width:25px;height:25px;border-radius:13px;background:#fff;box-shadow:0 2px 6px rgba(28,42,74,.18)"></div></div></div>
+<div style="height:60px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><div style="flex:1"><div style="font-size:15px">멘토가 노트를 남겼을 때</div></div><div style="width:51px;height:31px;border-radius:16px;background:rgba(26,86,219,.92);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);display:flex;align-items:center;justify-content:flex-end;padding:0 3px"><div style="width:25px;height:25px;border-radius:13px;background:#fff;box-shadow:0 2px 6px rgba(28,42,74,.18)"></div></div></div>
+<div style="height:60px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><div style="flex:1"><div style="font-size:15px">구독 갱신 · 결제</div></div><div style="width:51px;height:31px;border-radius:16px;background:rgba(26,86,219,.92);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);display:flex;align-items:center;justify-content:flex-end;padding:0 3px"><div style="width:25px;height:25px;border-radius:13px;background:#fff;box-shadow:0 2px 6px rgba(28,42,74,.18)"></div></div></div>
+<div style="height:60px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><div style="flex:1"><div style="font-size:15px">커뮤니티 소식</div><div style="font-size:13px;color:#8B95A1;margin-top:2px">좋아요 · 댓글 · 추천 영상</div></div><div style="width:51px;height:31px;border-radius:16px;background:rgba(255,255,255,.3);box-shadow:inset 0 0 0 1px rgba(28,42,74,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;padding:0 3px"><div style="width:25px;height:25px;border-radius:13px;background:#fff;box-shadow:0 2px 6px rgba(28,42,74,.18)"></div></div></div>
+</div>
+<div style="height:12px"></div>
+<div style="background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:16px;padding:4px 20px">
+<div style="height:56px;display:flex;align-items:center"><span style="flex:1;font-size:15px">이용약관</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px">개인정보 처리방침</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#B0B8C1" stroke-width="2" stroke-linecap="round"></path></svg></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px;color:#8B95A1">버전 3.2.0</span><span style="font-size:13px;color:#B0B8C1">최신이에요</span></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px;color:#8B95A1">로그아웃</span></div>
+<div style="height:56px;display:flex;align-items:center;box-shadow:inset 0 1px 0 #F2F4F6"><span style="flex:1;font-size:15px;color:#B0B8C1">탈퇴하기</span></div>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+</div>
+
+<div style="margin-top:32px;display:flex;flex-wrap:wrap;gap:16px">
+<div style="width:268px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:16px;padding:22px"><div style="font-size:12px;color:#8B95A1;margin-bottom:14px">빈 상태 · 질문 없음</div><div style="padding:26px 12px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);text-align:center"><div style="font-size:16px;font-weight:600">아직 주고받은 질문이 없어요</div><div style="font-size:13px;color:#8B95A1;margin-top:6px;line-height:1.6">사진만 찍어 올려도 괜찮아요</div><div style="height:48px;border-radius:10px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:16px">첫 질문 하기</div></div></div>
+<div style="width:268px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:16px;padding:22px"><div style="font-size:12px;color:#8B95A1;margin-bottom:14px">빈 상태 · 구독 없음</div><div style="padding:26px 12px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);text-align:center"><div style="font-size:16px;font-weight:600">구독 중인 멘토가 없어요</div><div style="font-size:13px;color:#8B95A1;margin-top:6px;line-height:1.6">먼저 무료로 한 번 물어볼 수 있어요</div><div style="height:48px;border-radius:10px;background:rgba(26,86,219,.92);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 2px rgba(28,42,74,.08);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:16px">멘토 찾아보기</div></div></div>
+<div style="width:268px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:16px;padding:22px"><div style="font-size:12px;color:#8B95A1;margin-bottom:14px">빈 상태 · 알림 없음</div><div style="padding:26px 12px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);text-align:center"><div style="font-size:16px;font-weight:600">새 알림이 없어요</div><div style="font-size:13px;color:#8B95A1;margin-top:6px;line-height:1.6">답변이 오면 바로 알려드릴게요</div></div></div>
+<div style="width:268px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,rgba(255,255,255,.58);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 0 0 1px rgba(28,42,74,.09),inset 0 -1px 0 rgba(255,255,255,.1);border-radius:16px;padding:22px"><div style="font-size:12px;color:#8B95A1;margin-bottom:14px">빈 상태 · 노트 없음 (학생)</div><div style="padding:26px 12px;border-radius:16px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);text-align:center"><div style="font-size:16px;font-weight:600">아직 노트가 없어요</div><div style="font-size:13px;color:#8B95A1;margin-top:6px;line-height:1.6">질문을 주고받으면 멘토가<br>약한 부분을 적어줘요</div></div></div>
+</div>
+
+<div style="margin-top:26px;padding:18px 20px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent) top/100% 1px no-repeat,linear-gradient(180deg,rgba(255,255,255,.85),transparent 55%,rgba(255,255,255,.3)) left/1px 100% no-repeat,rgba(255,255,255,.48);backdrop-filter:blur(15px) saturate(170%);-webkit-backdrop-filter:blur(15px) saturate(170%);box-shadow:0 8px 32px rgba(28,42,74,.08),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.32);border-radius:14px;max-width:1144px;font-size:13px;line-height:1.75;color:#4E5968">
+<b style="color:#191F28">덧붙인 판단</b> — ① 구독 해지 시트에 <b style="color:#191F28">&ldquo;라이트로 낮추기&rdquo;</b>를 넣었습니다. 해지 사유의 상당수는 불만이 아니라 가격이고, 해지 화면이 유일한 개입 지점입니다. ② 해지 시 <b style="color:#191F28">노트를 잃는다는 사실</b>을 명시했습니다. 노트가 재구독의 이유라면, 그 가치는 떠나는 순간에 가장 크게 느껴집니다. ③ <b style="color:#191F28">주의할 점</b> — 커뮤니티 알림을 기본 꺼짐으로 뒀습니다. 학습 알림과 섞이면 정작 답변 알림이 무시됩니다.
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      W: 390, H: 844, yes: true,
+      tabBadgeStudent: { 알림: 3 },
+      tabBadgeMentor: { 질문방: 2 }
+    };
+  }
+}
+</script>
+</body>
+</html>
