@@ -24,6 +24,7 @@ void main() {
         questionRoomRead: GoldenReadRepository(
           roomRows: goldenMentorRooms(),
           statusRows: goldenMentorStatusRows(),
+          noteRows: goldenNotes(),
         ),
         studentLookup: GoldenStudentLookup(goldenStudents()),
       ),

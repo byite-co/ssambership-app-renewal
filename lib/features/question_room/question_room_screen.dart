@@ -31,6 +31,7 @@ import 'data/models/room.dart';
 import 'data/question_room_read_repository.dart';
 import 'ui/mentor/mentor_inbox_screen.dart';
 import 'ui/mentor_room_home_screen.dart';
+import 'ui/widgets/note_preview_line.dart';
 import '../../shared/errors/friendly_error.dart';
 import '../../shared/widgets/screen_visibility.dart';
 
@@ -329,7 +330,8 @@ class _RoomTile extends StatelessWidget {
 
   /// '프리미엄 · 질문 무제한' / '스탠다드 · 이번 주 9개 중 9개 남았어요'.
   /// 요금제·한도 정보가 하나도 없으면 null(줄 생략 — 날조 금지).
-  static String? planLine(SubscriptionSummary? sub, WeeklyQuestionUsage? usage) {
+  static String? planLine(
+      SubscriptionSummary? sub, WeeklyQuestionUsage? usage) {
     final List<String> bits = <String>[];
     final String? tier = sub?.planTier?.trim();
     if (tier != null && tier.isNotEmpty) bits.add(planTierLabel(tier));
@@ -341,7 +343,6 @@ class _RoomTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final SubscriptionSummary? sub = item.sub;
-    final RoleTheme roleTheme = RoleTheme.of(context);
     final String? plan = planLine(sub, item.usage);
     final ConnectionNote? note = item.latestNote;
     final String? noteSummary =
@@ -398,37 +399,7 @@ class _RoomTile extends StatelessWidget {
                 ],
                 if (noteSummary != null && noteSummary.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: roleTheme.tint,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(
-                          Icons.push_pin_rounded,
-                          size: 14,
-                          color: roleTheme.color,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            noteSummary,
-                            style: AppTypography.caption.copyWith(
-                              color: roleTheme.color,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  NotePreviewLine(summary: noteSummary),
                 ],
                 if (hasBadges) ...<Widget>[
                   const SizedBox(height: 8),
@@ -459,9 +430,8 @@ class _RoomTile extends StatelessWidget {
     if (status == 'cancel_scheduled') {
       final DateTime? until = sub.nextRenewal;
       return StatusPill(
-        label: until == null
-            ? '해지 예정'
-            : '해지 예정 · ${Formatters.monthDay(until)}까지',
+        label:
+            until == null ? '해지 예정' : '해지 예정 · ${Formatters.monthDay(until)}까지',
         tone: StatusTone.danger,
       );
     }
