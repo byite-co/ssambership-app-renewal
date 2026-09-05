@@ -291,7 +291,7 @@ String? formatIqExpiryRemaining(
 String iqFailureMessage(Object error) {
   final String raw = error.toString();
   if (raw.contains('CASH_INSUFFICIENT')) {
-    return '캐시가 부족해요. 충전은 웹에서 할 수 있어요.';
+    return '캐시가 부족해요. 캐시 충전은 앱에서 지원하지 않아요.';
   }
   if (raw.contains('MENTOR_PRICE_NOT_SET')) {
     return '이 멘토는 아직 개별질문 가격을 설정하지 않았어요.';

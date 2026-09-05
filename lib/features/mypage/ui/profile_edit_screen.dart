@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../core/auth/auth_service.dart' show AppRole;
-import '../../../core/web_bridge/web_bridge_actions.dart';
+import '../../../app/app_navigation.dart';
+import '../../../app/app_route_paths.dart';
 import '../../../design/tokens/app_spacing.dart';
 import '../../../design/tokens/app_typography.dart';
 import '../../../design/widgets/app_blocks.dart';
@@ -12,6 +13,7 @@ import '../../../design/widgets/app_primary_button.dart';
 import '../../../design/widgets/app_secondary_button.dart';
 import '../data/mypage_models.dart';
 import '../data/profile_edit_repository.dart';
+import '../../mentor_console/ui/mentor_profile_edit_screen.dart';
 import '../../../shared/errors/friendly_error.dart';
 
 /// 프로필 수정 — 안전 필드(표시명·학년)만 편집. 역할·이메일·id 는 편집 대상 아님(표시만/제외).
@@ -45,7 +47,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   /// 재학 상태 상한(DB-4 203 `STUDENT_STATUS_TOO_LONG` 과 동일).
   static const int studentStatusMaxLength = 20;
 
-  /// 역할 분기: 멘토는 학년 필드가 없고(웹에서 상세 관리), 학생만 학년을 편집한다.
+  /// 역할 분기: 멘토는 학년 필드가 없고(상세는 멘토 프로필 편집), 학생만 학년을 편집한다.
   bool get _isMentor =>
       AppScope.of(context).auth.currentRole == AppRole.mentor; // A-2
 
@@ -124,7 +126,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               textInputAction: TextInputAction.next,
             ),
           ),
-          // 학년은 학생만 편집(멘토는 학년 개념 없음 — 웹 프로필 관리로 연결).
+          // 학년은 학생만 편집(멘토는 학년 개념 없음 — 멘토 프로필 편집으로 연결).
           if (!_isMentor) ...<Widget>[
             const SizedBox(height: AppSpacing.s20),
             AppField(
@@ -150,13 +152,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           if (widget.profile.email != null)
             Text('이메일 ${widget.profile.email} · 역할·이메일은 여기서 바꿀 수 없어요.',
                 style: AppTypography.captionSecondary),
-          // 멘토: 상세 프로필(대학·학과·소개 등)은 웹에서 관리.
+          // 멘토: 상세 프로필(대학·학과·소개 등)은 앱의 멘토 프로필 편집(A-4a)에서.
           if (_isMentor) ...<Widget>[
             const SizedBox(height: AppSpacing.s20),
             AppSecondaryButton(
-              label: '멘토 프로필 관리 (웹)',
-              icon: Icons.open_in_new_rounded,
-              onPressed: () => openProfileEditWeb(context),
+              label: '멘토 프로필 편집',
+              icon: Icons.school_outlined,
+              onPressed: () => AppNavigation.push<void>(
+                context,
+                AppRoutePaths.mentorProfileEdit,
+                fallbackBuilder: (_) => const MentorProfileEditScreen(),
+              ),
             ),
           ],
         ],

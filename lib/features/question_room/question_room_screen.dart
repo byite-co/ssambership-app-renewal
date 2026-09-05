@@ -5,7 +5,6 @@ import '../../app/app_route_paths.dart';
 import '../../app/app_scope.dart';
 import '../../app/app_tabs.dart';
 import '../../core/auth/auth_service.dart' show AppRole;
-import '../../core/commerce/commerce_policy.dart';
 import '../../core/entitlement/subscription_status_display.dart';
 import '../../core/refresh/data_refresh_bus.dart';
 import '../../core/entitlement/subscription_summary.dart';
@@ -21,7 +20,6 @@ import '../../design/widgets/initial_avatar.dart';
 import '../../design/widgets/status_pill.dart';
 import '../../shared/format/formatters.dart';
 import '../../shared/labels/subscription_copy.dart';
-import '../../shared/widgets/commerce_notice_card.dart';
 import '../mentors/format/mentor_price_format.dart';
 import 'data/mentor_lookup_repository.dart';
 import 'data/mentor_note_format.dart';
@@ -274,10 +272,6 @@ class _StudentRoomListState extends State<_StudentRoomList>
                   actionLabel: '멘토 찾기',
                   onAction: () => TabNavigator.go(AppTab.mentors),
                 ),
-              ),
-              Padding(
-                padding: AppPage.contentPadding(context, top: 0, bottom: 16),
-                child: const CommerceNoticeCard(text: kSubscribeNoticeText),
               ),
             ],
           );
